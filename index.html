@@ -223,6 +223,7 @@
             <option value="cinematic">Cinematic</option>
             <option value="cinematic_ex">Cinematic (Extended)</option>
             <option value="fifties">1950s</option>
+            <option value="cctv">CCTV</option>
             <!-- <option value="macro">Macro Photo</option> -->
             <!-- <option value="studio">Studio Portrait</option> -->
             <option value="none">No Style</option>
@@ -310,6 +311,9 @@
 
       const CINEMATIC =
         ", cinematic shot, dynamic lighting, 75mm, Technicolor, Panavision, cinemascope, sharp focus, fine details, 8k, HDR, realism, realistic, key visual, film still, cinematic color grading, depth of field.";
+
+      const CCTV =
+        ", old CCTV footage, high-angle CCTV image, creepy and cursed, absolutely cursed photo, nope nope nope nope, what the actual f, unsettling photo, cursed_thing, cursedimages, no context, cursed image, bad photo, weird photo, very strange, color photo, creepy photo, nightmare fuel.";
 
       const CINEMATIC_EX =
         ", cinematic shot, dynamic lighting, 75mm, Technicolor, Panavision, cinemascope, sharp focus, fine details, 8k, HDR, realism, realistic, key visual, film still, cinematic color grading, depth of field.\n\nOverall, it's an absolute world-class cinematic masterpiece. It's an aesthetically pleasing cinematic shot with impeccable attention to detail and impressive composition. The lighting is dramatic and expertly executed, creating a captivating atmosphere. The image is rendered in stunning 8k resolution with HDR, showcasing fine details and textures that contribute to its realism. The color grading is cinematic and visually striking, enhancing the overall mood and impact of the shot. This image stands out as a prime example of top-tier cinematic photography, evoking strong emotions and leaving a lasting impression on viewers.";
@@ -792,18 +796,19 @@
 
       // Keyboard shortcuts
       document.addEventListener("keydown", (e) => {
+        const key = e.key.toUpperCase();
         // Ctrl+Shift+S for scratchpad
-        if (e.ctrlKey && e.shiftKey && e.key === "S") {
+        if (e.ctrlKey && e.shiftKey && key === "S") {
           e.preventDefault();
           toggleScratchpad();
         }
         // Ctrl+Shift+H for history
-        if (e.ctrlKey && e.shiftKey && e.key === "H") {
+        if (e.ctrlKey && e.shiftKey && key === "H") {
           e.preventDefault();
           toggleHistory();
         }
-        // Ctrl+Shift+C for cancel (only if cancel button is visible)
-        if (e.ctrlKey && e.shiftKey && e.key === "Q") {
+        // Ctrl+Shift+Q for cancel (only if cancel button is visible)
+        if (e.ctrlKey && e.shiftKey && key === "Q") {
           const cancelBtn = el.cancelGenBtn;
           if (
             cancelBtn &&
@@ -815,7 +820,7 @@
           }
         }
         // Ctrl+Shift+E for auto-adjust prompt height
-        if (e.ctrlKey && e.shiftKey && e.key === "E") {
+        if (e.ctrlKey && e.shiftKey && key === "E") {
           e.preventDefault();
           autoAdjustPromptHeight();
         }
@@ -1563,6 +1568,7 @@
 
             if (style === "cinematic") imagePrompt += CINEMATIC;
             if (style === "cinematic_ex") imagePrompt += CINEMATIC_EX;
+            if (style === "cctv") imagePrompt += CCTV;
             if (style === "fifties")
               imagePrompt =
                 "Famous vintage 1950s photo, " + imagePrompt + FIFTIES;
