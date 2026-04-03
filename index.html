@@ -4,52 +4,12 @@
     <meta charset="utf-8" />
     <title>TTI Generator</title>
     <script>
-      // CRITICAL: Intercept fetch BEFORE any other scripts load
-      // Store resolved prompts from Perchance requests with a better tracking system
-      window.resolvedPromptsData = {};
-      let requestCounter = 0;
-
       const _originalFetch = window.fetch;
       window.fetch = async function (...args) {
         const url = typeof args[0] === "string" ? args[0] : args[0]?.url;
-
-        // Capture generate request payload
-        if (
-          url &&
-          url.includes("/api/generate") &&
-          !url.includes("getUserQueuePosition") &&
-          !url.includes("downloadTemporary")
-        ) {
-          try {
-            const requestOptions = args[1] || {};
-            if (requestOptions.body) {
-              const bodyText =
-                typeof requestOptions.body === "string"
-                  ? requestOptions.body
-                  : JSON.stringify(requestOptions.body);
-              const bodyData = JSON.parse(bodyText);
-
-              if (bodyData.prompt) {
-                const requestId = ++requestCounter;
-                window.resolvedPromptsData[requestId] = {
-                  prompt: bodyData.prompt,
-                  seed: bodyData.seed !== undefined ? bodyData.seed : null,
-                  timestamp: Date.now(),
-                };
-                console.log(
-                  "✓ Captured request #" + requestId + ":",
-                  bodyData.prompt.substring(0, 60),
-                  "...",
-                );
-                // Store in window for easy access
-                window._lastCapturedRequestId = requestId;
-              }
-            }
-          } catch (e) {
-            console.warn("Failed to parse:", e);
-          }
+        if (url && url.includes("/api/generate") && !url.includes("getUserQueuePosition")) {
+          console.log("API request to:", url);
         }
-
         return _originalFetch.apply(this, args);
       };
     </script>
@@ -293,12 +253,6 @@
       const REALISM_ENFORCER =
         "Photorealistic, real-world photography, natural lighting, real skin texture, life-like, natural imperfections. Overall, the image should look like a genuine photograph taken in the real world, not an AI-generated image. Avoid any elements that could make it look artificial or stylized.";
 
-      const REALISM_ENFORCER_v2 =
-        "\n\nPhotorealistic, real-world photography, natural lighting, real skin texture, realistic proportions, life-like, natural imperfections\n\nOverall, the image should look like a genuine photograph taken in the real world, not an AI-generated image. Avoid any elements that could make it look artificial or stylized.\n\n";
-
-      const NO_ANIME =
-        "\n\n(negativePrompt:::anime, manga, illustration, cartoon, digital painting, concept art, fantasy art, stylized, cel shading, 2d, 3d render, unreal engine, blender, pixar, disney, painting, sketch, drawing)";
-
       const CASUAL_PHOTO = ". It's a casual photo.";
 
       const RAW_CASUAL_PHOTO = ". It's an unedited smartphone snapshot.";
@@ -320,24 +274,6 @@
 
       const FIFTIES =
         ", grainy photograph, 1950s photo with film grain, 1950s photo with vignetting, retro, r/OldSchoolCool, 1950s photo, vintage photo.";
-
-      // const CASUAL_PHOTO =
-      //   "\n\nSmartphone photo, natural ambient light, wide-angle lens, no artificial depth of field, slight noise, handheld shot, candid moment, everyday photography, realistic imperfections.";
-
-      // const PROFESSIONAL_PHOTO =
-      //   "\n\nProfessional photography, studio lighting, soft focus, shallow depth of field, ultra-high resolution, HDR, taken with Canon EOS R5, DSLR, 85mm lens, crisp details, realistic skin texture.";
-
-      // const CINEMATIC =
-      //   "\n\nCinematic shot, dramatic lighting, anamorphic lens, cinemascope, film grain, dynamic composition, shallow depth of field, ultra-detailed, HDR, cinematic color grading, film still realism.";
-
-      // const RAW_CASUAL_PHOTO =
-      //   "\n\nUnedited smartphone snapshot, flat lighting, wide-angle lens, no depth of field, slight motion blur, uneven exposure, natural noise, everyday realism.";
-
-      // const MACRO_PHOTO =
-      //   "\n\nExtreme close-up, macro lens, ultra-fine texture detail, shallow depth of field, sharp focus, realistic lighting, high magnification, natural color rendering, professional macro photography, 8k.";
-
-      // const STUDIO_PORTRAIT =
-      //   "\n\nStudio lighting setup, softbox key light, rim light, clean background, ultra-sharp focus, high-resolution, 85mm lens, shallow depth of field, realistic skin texture, professional studio photography, 8k, HDR.";
 
       const el = {
         prompt: document.getElementById("promptText"),
@@ -383,14 +319,11 @@
       // Track tiles that have been cancelled
       let cancelledTiles = new Set();
 
-      // Monitor queue position only
-      const originalFetch = window.fetch;
       window.fetch = async function (...args) {
         const url = typeof args[0] === "string" ? args[0] : args[0]?.url;
 
-        const response = await originalFetch.apply(this, args);
+        const response = await _originalFetch.apply(this, args);
 
-        // Check if this is a queue position request
         if (url && url.includes("getUserQueuePosition")) {
           const clonedResponse = response.clone();
           try {
@@ -491,37 +424,26 @@
         }
       });
 
-      // Update guidance value display
+      function updateGuidanceColor(value) {
+        if (value <= 7) {
+          el.guidance.style.accentColor = "#f59e0b";
+          el.guidanceValue.style.color = "#f59e0b";
+        } else if (value > 24) {
+          el.guidance.style.accentColor = "#ef4444";
+          el.guidanceValue.style.color = "#ef4444";
+        } else {
+          el.guidance.style.accentColor = "#3b82f6";
+          el.guidanceValue.style.color = "#c9d1d9";
+        }
+      }
+
       el.guidance.addEventListener("input", () => {
         const value = parseInt(el.guidance.value, 10);
         el.guidanceValue.textContent = value;
-
-        // Update color based on value
-        if (value <= 7) {
-          el.guidance.style.accentColor = "#f59e0b"; // Yellow/amber
-          el.guidanceValue.style.color = "#f59e0b";
-        } else if (value > 24) {
-          el.guidance.style.accentColor = "#ef4444"; // Red
-          el.guidanceValue.style.color = "#ef4444";
-        } else {
-          el.guidance.style.accentColor = "#3b82f6"; // Blue
-          el.guidanceValue.style.color = "#c9d1d9"; // Default text color
-        }
+        updateGuidanceColor(value);
       });
 
-      // Initialize guidance value display and color
-      const initGuidanceValue = parseInt(el.guidance.value, 10);
-      el.guidanceValue.textContent = initGuidanceValue;
-      if (initGuidanceValue <= 7) {
-        el.guidance.style.accentColor = "#f59e0b";
-        el.guidanceValue.style.color = "#f59e0b";
-      } else if (initGuidanceValue > 24) {
-        el.guidance.style.accentColor = "#ef4444";
-        el.guidanceValue.style.color = "#ef4444";
-      } else {
-        el.guidance.style.accentColor = "#3b82f6";
-        el.guidanceValue.style.color = "#c9d1d9";
-      }
+      updateGuidanceColor(parseInt(el.guidance.value, 10));
 
       // Seed input validation - only allow numbers
       el.seed.addEventListener("input", (e) => {
@@ -824,18 +746,6 @@
           e.preventDefault();
           autoAdjustPromptHeight();
         }
-        // Info box toggle logic
-        const infoBox = document.getElementById("infoBox");
-        const toggleInfoBtn = document.getElementById("toggleInfoBtn");
-        const closeInfoBtn = document.getElementById("closeInfoBtn");
-
-        toggleInfoBtn.addEventListener("click", () => {
-          infoBox.style.display =
-            infoBox.style.display === "none" ? "block" : "none";
-        });
-        closeInfoBtn.addEventListener("click", () => {
-          infoBox.style.display = "none";
-        });
         // Ctrl+Enter for generate (but not when focused on textarea with Shift)
         if (
           e.ctrlKey &&
@@ -848,6 +758,18 @@
             generateImages();
           }
         }
+      });
+
+      el.infoBox = document.getElementById("infoBox");
+      el.toggleInfoBtn = document.getElementById("toggleInfoBtn");
+      el.closeInfoBtn = document.getElementById("closeInfoBtn");
+
+      el.toggleInfoBtn.addEventListener("click", () => {
+        el.infoBox.style.display =
+          el.infoBox.style.display === "none" ? "block" : "none";
+      });
+      el.closeInfoBtn.addEventListener("click", () => {
+        el.infoBox.style.display = "none";
       });
 
       // Auto-adjust prompt textarea height to fit content
@@ -941,16 +863,7 @@
             el.guidanceValue.textContent = guidance.value;
             // Update color based on loaded value
             const value = parseInt(guidance.value, 10);
-            if (value <= 7) {
-              el.guidance.style.accentColor = "#f59e0b";
-              el.guidanceValue.style.color = "#f59e0b";
-            } else if (value > 24) {
-              el.guidance.style.accentColor = "#ef4444";
-              el.guidanceValue.style.color = "#ef4444";
-            } else {
-              el.guidance.style.accentColor = "#3b82f6";
-              el.guidanceValue.style.color = "#c9d1d9";
-            }
+            updateGuidanceColor(value);
           }
           if (negativePrompt) el.negativePrompt.value = negativePrompt.value;
           if (realismEnforcer)
@@ -1178,9 +1091,6 @@
           // Add tile to waiting set so it gets queue updates
           waitingTiles.add(tile);
 
-          // Store the request ID BEFORE making the API call
-          const preRequestId = window._lastCapturedRequestId || 0;
-
           // Make the actual API call
           const startTime = Date.now();
           const promptData = {
@@ -1213,43 +1123,10 @@
           // Track this image for batch download
           generatedImages.push(r.dataUrl);
 
-          // Store metadata with the ACTUAL prompt from API response (with random choices resolved)
-          if (!window.imageMetadata) window.imageMetadata = {};
-
-          // Get the resolved prompt from the tracked requests
-          let actualPrompt = metadata.prompt;
-          let actualSeed = metadata.seed;
-
-          // Try to find the resolved prompt that was captured during the API call
-          // The interceptor will have the most recent request ID
-          const currentRequestId = window._lastCapturedRequestId;
-          if (currentRequestId && currentRequestId > preRequestId) {
-            const resolvedData = window.resolvedPromptsData[currentRequestId];
-            if (resolvedData) {
-              actualPrompt = resolvedData.prompt;
-              actualSeed = resolvedData.seed;
-              console.log(
-                "✓ Using resolved prompt from request #" + currentRequestId,
-              );
-              // Clean up old data to prevent memory leak
-              delete window.resolvedPromptsData[currentRequestId];
-            } else {
-              console.log(
-                "Resolved data not found for request #" + currentRequestId,
-              );
-            }
-          } else {
-            console.log("No new resolved prompt captured, using sent prompt");
-          }
-
-          // window.imageMetadata[r.dataUrl] = {
-          //   prompt: actualPrompt,
-          //   seed: actualSeed,
-          // };
-
+          window.imageMetadata = window.imageMetadata || {};
           window.imageMetadata[r.dataUrl] = {
-            prompt: r.inputs.prompt, // Use the prompt from the API response which should have all random choices resolved
-            seed: r.inputs.seed, // Use the seed from the API response which may be different if it was auto-generated
+            prompt: r.inputs.prompt,
+            seed: r.inputs.seed,
           };
 
           // Use requestAnimationFrame to ensure DOM updates aren't throttled
