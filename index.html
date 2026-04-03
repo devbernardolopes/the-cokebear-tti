@@ -1,0 +1,1631 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>TTI Generator</title>
+    <script>
+      // CRITICAL: Intercept fetch BEFORE any other scripts load
+      // Store resolved prompts from Perchance requests with a better tracking system
+      window.resolvedPromptsData = {};
+      let requestCounter = 0;
+
+      const _originalFetch = window.fetch;
+      window.fetch = async function (...args) {
+        const url = typeof args[0] === "string" ? args[0] : args[0]?.url;
+
+        // Capture generate request payload
+        if (
+          url &&
+          url.includes("/api/generate") &&
+          !url.includes("getUserQueuePosition") &&
+          !url.includes("downloadTemporary")
+        ) {
+          try {
+            const requestOptions = args[1] || {};
+            if (requestOptions.body) {
+              const bodyText =
+                typeof requestOptions.body === "string"
+                  ? requestOptions.body
+                  : JSON.stringify(requestOptions.body);
+              const bodyData = JSON.parse(bodyText);
+
+              if (bodyData.prompt) {
+                const requestId = ++requestCounter;
+                window.resolvedPromptsData[requestId] = {
+                  prompt: bodyData.prompt,
+                  seed: bodyData.seed !== undefined ? bodyData.seed : null,
+                  timestamp: Date.now(),
+                };
+                console.log(
+                  "✓ Captured request #" + requestId + ":",
+                  bodyData.prompt.substring(0, 60),
+                  "...",
+                );
+                // Store in window for easy access
+                window._lastCapturedRequestId = requestId;
+              }
+            }
+          } catch (e) {
+            console.warn("Failed to parse:", e);
+          }
+        }
+
+        return _originalFetch.apply(this, args);
+      };
+    </script>
+    <script src="https://unpkg.com/dexie@3.2.4/dist/dexie.min.js"></script>
+  </head>
+
+  <body>
+    <div class="input-container">
+      <h1 class="page-title">The Cokebear TTI</h1>
+
+      <div
+        id="infoBox"
+        style="
+          display: none;
+          background: #161b22;
+          color: #c9d1d9;
+          border: 1px solid #30363d;
+          border-radius: 6px;
+          padding: 16px;
+          margin-bottom: 16px;
+          max-width: 900px;
+        "
+      >
+        <div
+          style="
+            display: flex;
+            justify-content: space-between;
+            align-items: left;
+          "
+        >
+          <span style="font-weight: bold; font-size: 18px">Info & Guide</span>
+          <button
+            id="closeInfoBtn"
+            style="
+              background: #30363d;
+              color: #fff;
+              border: none;
+              border-radius: 4px;
+              padding: 2px 10px;
+              font-size: 18px;
+              cursor: pointer;
+            "
+          >
+            Close
+          </button>
+        </div>
+        <div
+          id="infoBoxContent"
+          style="margin-top: 10px; font-size: 14px; align-items: left"
+        >
+          <p>
+            <b>Shortcuts:</b><br />
+            • <b>Ctrl+Shift+S</b>: Toggle Scratchpad<br />
+            • <b>Ctrl+Shift+H</b>: Toggle History<br />
+            • <b>Ctrl+Shift+E</b>: Auto-adjust prompt height<br />
+            • <b>Ctrl+Shift+Q</b>: Cancel generation (when enabled)<br />
+            • <b>Ctrl+Enter</b>: Generate (when not focused in prompt, or if
+            'ENTER to send' is off)<br />
+            • <b>Enter</b>: Generate (when 'ENTER to send' is on and focused in
+            prompt)<br />
+          </p>
+          <p>
+            <b>Cancel Button:</b> Only enabled when there are images in the
+            queue that can still be cancelled ("Waiting...").
+          </p>
+        </div>
+      </div>
+      <button
+        id="toggleInfoBtn"
+        style="
+          background: #1f6feb;
+          border-color: #388bfd;
+          color: #fff;
+          border-radius: 6px;
+          padding: 6px 12px;
+          margin-bottom: 10px;
+          font-size: 14px;
+          font-weight: 600;
+          cursor: pointer;
+        "
+      >
+        Info
+      </button>
+      <br />
+
+      <button
+        onclick="toggleScratchpad()"
+        id="scratchpadBtn"
+        class="scratchpad-toggle"
+      >
+        Scratchpad
+      </button>
+      <br />
+      <div id="scratchpadContainer" style="display: none">
+        <textarea
+          id="scratchpadText"
+          placeholder="Define variables here, e.g., HAIR_COLOR = {black|brown|blond}"
+        ></textarea>
+      </div>
+      <br />
+
+      <textarea id="promptText" placeholder="Describe your image..."></textarea>
+
+      <div class="controls">
+        <div class="controls-row">
+          <button onclick="toggleHistory()" id="historyBtn">History</button>
+
+          <select id="concurrency">
+            <option value="1">1x</option>
+            <option value="2" selected>2x</option>
+            <option value="3">3x</option>
+            <option value="4">4x</option>
+          </select>
+
+          <div style="display: flex; align-items: center; gap: 6px">
+            <input id="guidance" type="range" min="1" max="30" value="14" />
+            <span id="guidanceValue" style="min-width: 30px; font-size: 13px"
+              >14</span
+            >
+          </div>
+
+          <input
+            id="negativePrompt"
+            type="text"
+            placeholder="Negative prompt..."
+            style="min-width: 200px"
+          />
+
+          <label
+            style="
+              display: flex;
+              align-items: center;
+              gap: 4px;
+              cursor: pointer;
+            "
+          >
+            <input type="checkbox" id="realismEnforcer" />
+            <span>RE</span>
+          </label>
+
+          <label
+            style="
+              display: flex;
+              align-items: center;
+              gap: 4px;
+              cursor: pointer;
+            "
+          >
+            <input type="checkbox" id="enterToSend" checked />
+            <span style="font-size: 12px">ENTER to send</span>
+          </label>
+        </div>
+
+        <div class="controls-row">
+          <input
+            id="seed"
+            type="text"
+            placeholder="Seed (optional)"
+            style="width: 140px"
+            inputmode="numeric"
+            pattern="[0-9]*"
+          />
+
+          <select id="style">
+            <option value="casual">Casual Photo</option>
+            <option value="casual_raw">Casual Photo (Raw)</option>
+            <option value="professional">Professional Photo</option>
+            <option value="professional_ex">
+              Professional Photo (Extended)
+            </option>
+            <option value="cinematic">Cinematic</option>
+            <option value="cinematic_ex">Cinematic (Extended)</option>
+            <option value="fifties">1950s</option>
+            <!-- <option value="macro">Macro Photo</option> -->
+            <!-- <option value="studio">Studio Portrait</option> -->
+            <option value="none">No Style</option>
+          </select>
+
+          <select id="resolution">
+            <option value="512x768">Portrait</option>
+            <option value="512x512">Square</option>
+            <option value="768x512">Landscape</option>
+          </select>
+
+          <select id="numImages">
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="4">4</option>
+            <option value="6">6</option>
+            <option value="8">8</option>
+            <option value="16">16</option>
+            <option value="32">32</option>
+            <option value="64">64</option>
+          </select>
+
+          <button onclick="downloadAllImages()" id="downloadAllBtn" disabled>
+            Download All
+          </button>
+          <button
+            id="cancelGenBtn"
+            onclick="cancelGeneration()"
+            style="display: none; background: #da3633; border-color: #f85149"
+          >
+            Cancel
+          </button>
+          <button onclick="generateImages()" id="generateBtn">Generate</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="historyPanel" style="display: none">
+      <div id="historyList"></div>
+    </div>
+
+    <!-- <div id="loading">Generating images...</div> -->
+    <div id="error"></div>
+    <div id="mosaic"></div>
+
+    <div id="imageModal" onclick="closeModal()">
+      <div id="modalImageContainer" onclick="event.stopPropagation()">
+        <img id="modalImage" src="" alt="" ondblclick="downloadModalImage()" />
+        <button
+          id="modalDownloadBtn"
+          class="modal-download-btn"
+          onclick="
+            event.stopPropagation();
+            downloadModalImage();
+          "
+        >
+          ⬇
+        </button>
+        <div id="modalCounter" class="modal-counter"></div>
+      </div>
+    </div>
+
+    <script>
+      let pluginReady = false;
+      let db = null;
+
+      const REALISM_ENFORCER =
+        "Photorealistic, real-world photography, natural lighting, real skin texture, life-like, natural imperfections. Overall, the image should look like a genuine photograph taken in the real world, not an AI-generated image. Avoid any elements that could make it look artificial or stylized.";
+
+      const REALISM_ENFORCER_v2 =
+        "\n\nPhotorealistic, real-world photography, natural lighting, real skin texture, realistic proportions, life-like, natural imperfections\n\nOverall, the image should look like a genuine photograph taken in the real world, not an AI-generated image. Avoid any elements that could make it look artificial or stylized.\n\n";
+
+      const NO_ANIME =
+        "\n\n(negativePrompt:::anime, manga, illustration, cartoon, digital painting, concept art, fantasy art, stylized, cel shading, 2d, 3d render, unreal engine, blender, pixar, disney, painting, sketch, drawing)";
+
+      const CASUAL_PHOTO = ". It's a casual photo.";
+
+      const RAW_CASUAL_PHOTO = ". It's an unedited smartphone snapshot.";
+
+      const PROFESSIONAL_PHOTO =
+        ", {sharp|soft} focus, depth of field, 8k photo, HDR, professional lighting, taken with Canon EOS R5, DSLR, 75mm lens.";
+
+      const PROFESSIONAL_PHOTO_EX =
+        ", {sharp|soft} focus, depth of field, 8k photo, HDR, professional lighting, taken with Canon EOS R5, DSLR, 75mm lens. Overall, it's a stunning professional photograph with impeccable attention to detail and composition. The lighting is expertly executed, creating a captivating atmosphere. The image is rendered in ultra-high resolution with HDR, showcasing fine details and textures that contribute to its realism. The use of a 75mm lens adds a pleasing perspective and depth to the photo, making it look like it was taken by a skilled photographer.";
+
+      const CINEMATIC =
+        ", cinematic shot, dynamic lighting, 75mm, Technicolor, Panavision, cinemascope, sharp focus, fine details, 8k, HDR, realism, realistic, key visual, film still, cinematic color grading, depth of field.";
+
+      const CINEMATIC_EX =
+        ", cinematic shot, dynamic lighting, 75mm, Technicolor, Panavision, cinemascope, sharp focus, fine details, 8k, HDR, realism, realistic, key visual, film still, cinematic color grading, depth of field.\n\nOverall, it's an absolute world-class cinematic masterpiece. It's an aesthetically pleasing cinematic shot with impeccable attention to detail and impressive composition. The lighting is dramatic and expertly executed, creating a captivating atmosphere. The image is rendered in stunning 8k resolution with HDR, showcasing fine details and textures that contribute to its realism. The color grading is cinematic and visually striking, enhancing the overall mood and impact of the shot. This image stands out as a prime example of top-tier cinematic photography, evoking strong emotions and leaving a lasting impression on viewers.";
+
+      const FIFTIES =
+        ", grainy photograph, 1950s photo with film grain, 1950s photo with vignetting, retro, r/OldSchoolCool, 1950s photo, vintage photo.";
+
+      // const CASUAL_PHOTO =
+      //   "\n\nSmartphone photo, natural ambient light, wide-angle lens, no artificial depth of field, slight noise, handheld shot, candid moment, everyday photography, realistic imperfections.";
+
+      // const PROFESSIONAL_PHOTO =
+      //   "\n\nProfessional photography, studio lighting, soft focus, shallow depth of field, ultra-high resolution, HDR, taken with Canon EOS R5, DSLR, 85mm lens, crisp details, realistic skin texture.";
+
+      // const CINEMATIC =
+      //   "\n\nCinematic shot, dramatic lighting, anamorphic lens, cinemascope, film grain, dynamic composition, shallow depth of field, ultra-detailed, HDR, cinematic color grading, film still realism.";
+
+      // const RAW_CASUAL_PHOTO =
+      //   "\n\nUnedited smartphone snapshot, flat lighting, wide-angle lens, no depth of field, slight motion blur, uneven exposure, natural noise, everyday realism.";
+
+      // const MACRO_PHOTO =
+      //   "\n\nExtreme close-up, macro lens, ultra-fine texture detail, shallow depth of field, sharp focus, realistic lighting, high magnification, natural color rendering, professional macro photography, 8k.";
+
+      // const STUDIO_PORTRAIT =
+      //   "\n\nStudio lighting setup, softbox key light, rim light, clean background, ultra-sharp focus, high-resolution, 85mm lens, shallow depth of field, realistic skin texture, professional studio photography, 8k, HDR.";
+
+      const el = {
+        prompt: document.getElementById("promptText"),
+        scratchpad: document.getElementById("scratchpadText"),
+        scratchpadContainer: document.getElementById("scratchpadContainer"),
+        scratchpadBtn: document.getElementById("scratchpadBtn"),
+        resolution: document.getElementById("resolution"),
+        guidance: document.getElementById("guidance"),
+        guidanceValue: document.getElementById("guidanceValue"),
+        negativePrompt: document.getElementById("negativePrompt"),
+        realismEnforcer: document.getElementById("realismEnforcer"),
+        seed: document.getElementById("seed"),
+        style: document.getElementById("style"),
+        num: document.getElementById("numImages"),
+        conc: document.getElementById("concurrency"),
+        mosaic: document.getElementById("mosaic"),
+        error: document.getElementById("error"),
+        // loading: document.getElementById("loading"),
+        historyPanel: document.getElementById("historyPanel"),
+        historyList: document.getElementById("historyList"),
+        historyBtn: document.getElementById("historyBtn"),
+        imageModal: document.getElementById("imageModal"),
+        modalImageContainer: document.getElementById("modalImageContainer"),
+        modalImage: document.getElementById("modalImage"),
+        modalDownloadBtn: document.getElementById("modalDownloadBtn"),
+        modalCounter: document.getElementById("modalCounter"),
+        downloadAllBtn: document.getElementById("downloadAllBtn"),
+        generateBtn: document.getElementById("generateBtn"),
+        cancelGenBtn: document.getElementById("cancelGenBtn"),
+        enterToSend: document.getElementById("enterToSend"),
+      };
+
+      // Track generated images for batch download
+      let generatedImages = [];
+      let currentModalImageSrc = null;
+      let currentModalIndex = -1;
+      let currentGenerationId = 0; // Track which generation batch is active
+      let isGenerating = false;
+
+      // Track tiles currently waiting for generation
+      const waitingTiles = new Set();
+
+      // Track tiles that have been cancelled
+      let cancelledTiles = new Set();
+
+      // Monitor queue position only
+      const originalFetch = window.fetch;
+      window.fetch = async function (...args) {
+        const url = typeof args[0] === "string" ? args[0] : args[0]?.url;
+
+        const response = await originalFetch.apply(this, args);
+
+        // Check if this is a queue position request
+        if (url && url.includes("getUserQueuePosition")) {
+          const clonedResponse = response.clone();
+          try {
+            const data = await clonedResponse.json();
+            if (
+              data.position !== undefined &&
+              data.total !== undefined &&
+              data.position > 0
+            ) {
+              requestAnimationFrame(() => {
+                waitingTiles.forEach((tile) => {
+                  const placeholder = tile.querySelector(".placeholder");
+                  if (
+                    placeholder &&
+                    (placeholder.textContent.startsWith("Generating") ||
+                      placeholder.textContent.startsWith("Queued"))
+                  ) {
+                    placeholder.textContent = `Queued (${data.position}/${data.total})`;
+                  }
+                });
+              });
+            }
+          } catch (e) {
+            // Ignore
+          }
+        }
+
+        return response;
+      };
+
+      // Keep track of tab visibility to prevent throttling
+      let keepAliveInterval = null;
+      let audioContext = null;
+
+      function startKeepAlive() {
+        if (keepAliveInterval) return;
+
+        // Create a silent audio context to prevent throttling
+        // Browsers don't throttle tabs that are playing audio
+        try {
+          if (!audioContext) {
+            audioContext = new (
+              window.AudioContext || window.webkitAudioContext
+            )();
+          }
+          // Create a silent oscillator
+          const oscillator = audioContext.createOscillator();
+          const gainNode = audioContext.createGain();
+          gainNode.gain.value = 0; // Silent
+          oscillator.connect(gainNode);
+          gainNode.connect(audioContext.destination);
+          oscillator.start();
+
+          // Store for cleanup
+          window._generationOscillator = oscillator;
+          window._generationGain = gainNode;
+        } catch (e) {
+          console.warn("AudioContext not available:", e);
+        }
+
+        // Send a tiny keep-alive signal every 500ms to prevent tab throttling
+        keepAliveInterval = setInterval(() => {
+          if (isGenerating) {
+            // Just updating a variable keeps the JS engine active
+            performance.now();
+          }
+        }, 500);
+      }
+
+      function stopKeepAlive() {
+        // Stop the silent audio
+        try {
+          if (window._generationOscillator) {
+            window._generationOscillator.stop();
+            window._generationOscillator.disconnect();
+            delete window._generationOscillator;
+          }
+          if (window._generationGain) {
+            window._generationGain.disconnect();
+            delete window._generationGain;
+          }
+        } catch (e) {
+          console.warn("Error stopping audio:", e);
+        }
+
+        if (keepAliveInterval) {
+          clearInterval(keepAliveInterval);
+          keepAliveInterval = null;
+        }
+      }
+
+      // Monitor visibility changes
+      document.addEventListener("visibilitychange", () => {
+        if (document.hidden && isGenerating) {
+          console.log("Tab hidden during generation - keeping alive");
+        } else if (!document.hidden && isGenerating) {
+          console.log("Tab visible again - generation continuing");
+        }
+      });
+
+      // Update guidance value display
+      el.guidance.addEventListener("input", () => {
+        const value = parseInt(el.guidance.value, 10);
+        el.guidanceValue.textContent = value;
+
+        // Update color based on value
+        if (value <= 7) {
+          el.guidance.style.accentColor = "#f59e0b"; // Yellow/amber
+          el.guidanceValue.style.color = "#f59e0b";
+        } else if (value > 24) {
+          el.guidance.style.accentColor = "#ef4444"; // Red
+          el.guidanceValue.style.color = "#ef4444";
+        } else {
+          el.guidance.style.accentColor = "#3b82f6"; // Blue
+          el.guidanceValue.style.color = "#c9d1d9"; // Default text color
+        }
+      });
+
+      // Initialize guidance value display and color
+      const initGuidanceValue = parseInt(el.guidance.value, 10);
+      el.guidanceValue.textContent = initGuidanceValue;
+      if (initGuidanceValue <= 7) {
+        el.guidance.style.accentColor = "#f59e0b";
+        el.guidanceValue.style.color = "#f59e0b";
+      } else if (initGuidanceValue > 24) {
+        el.guidance.style.accentColor = "#ef4444";
+        el.guidanceValue.style.color = "#ef4444";
+      } else {
+        el.guidance.style.accentColor = "#3b82f6";
+        el.guidanceValue.style.color = "#c9d1d9";
+      }
+
+      // Seed input validation - only allow numbers
+      el.seed.addEventListener("input", (e) => {
+        e.target.value = e.target.value.replace(/[^0-9]/g, "");
+      });
+
+      el.seed.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          const generateBtnDisabled = el.generateBtn.disabled;
+          if (!generateBtnDisabled) {
+            e.preventDefault();
+            generateImages();
+          }
+        }
+      });
+
+      el.negativePrompt.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          const generateBtnDisabled = el.generateBtn.disabled;
+          if (!generateBtnDisabled) {
+            e.preventDefault();
+            generateImages();
+          }
+        }
+      });
+
+      // Modal functions
+      window.openModal = function (imgSrc) {
+        currentModalImageSrc = imgSrc;
+        currentModalIndex = generatedImages.indexOf(imgSrc);
+        el.modalImage.src = imgSrc;
+        el.imageModal.style.display = "flex";
+        document.body.style.overflow = "hidden";
+        updateModalCounter();
+      };
+
+      window.closeModal = function () {
+        el.imageModal.style.display = "none";
+        document.body.style.overflow = "auto";
+        currentModalImageSrc = null;
+        currentModalIndex = -1;
+      };
+
+      window.downloadModalImage = function () {
+        if (currentModalImageSrc) {
+          downloadImage(currentModalImageSrc);
+        }
+      };
+
+      window.updateModalCounter = function () {
+        if (generatedImages.length > 0 && currentModalIndex >= 0) {
+          el.modalCounter.textContent = `${currentModalIndex + 1}/${generatedImages.length}`;
+        } else {
+          el.modalCounter.textContent = "";
+        }
+      };
+
+      window.showNextImage = function () {
+        if (generatedImages.length === 0) return;
+        currentModalIndex = (currentModalIndex + 1) % generatedImages.length;
+        currentModalImageSrc = generatedImages[currentModalIndex];
+        el.modalImage.src = currentModalImageSrc;
+        updateModalCounter();
+      };
+
+      window.showPreviousImage = function () {
+        if (generatedImages.length === 0) return;
+        currentModalIndex =
+          (currentModalIndex - 1 + generatedImages.length) %
+          generatedImages.length;
+        currentModalImageSrc = generatedImages[currentModalIndex];
+        el.modalImage.src = currentModalImageSrc;
+        updateModalCounter();
+      };
+
+      // Close modal on Escape key
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && el.imageModal.style.display === "flex") {
+          closeModal();
+        }
+      });
+
+      // Mouse wheel navigation in modal
+      el.imageModal.addEventListener("wheel", (e) => {
+        if (el.imageModal.style.display === "flex") {
+          e.preventDefault();
+          if (e.deltaY > 0) {
+            showNextImage();
+          } else {
+            showPreviousImage();
+          }
+        }
+      });
+
+      // Save prompt text on every change (even if not generated)
+      el.prompt.addEventListener("input", async () => {
+        if (!db) return;
+        try {
+          await db.settings.put({
+            key: "lastPromptText",
+            value: el.prompt.value,
+          });
+        } catch (e) {
+          console.warn("Failed to save prompt text:", e);
+        }
+      });
+
+      // Save scratchpad text on every change
+      el.scratchpad.addEventListener("input", async () => {
+        if (!db) return;
+        try {
+          await db.settings.put({
+            key: "scratchpadText",
+            value: el.scratchpad.value,
+          });
+        } catch (e) {
+          console.warn("Failed to save scratchpad text:", e);
+        }
+      });
+
+      // Parse scratchpad to extract valid parameter names
+      function parseParametersFromScratchpad() {
+        const scratchpadContent = el.scratchpad.value;
+        const parameters = [];
+
+        if (!scratchpadContent.trim()) return parameters;
+
+        const lines = scratchpadContent.split("\n");
+        for (const line of lines) {
+          // Match pattern: PARAMETER_NAME = {anything}
+          // Parameter name is case-insensitive, followed by =, then {items}
+          const match = line.match(/^\s*([A-Z_][A-Z0-9_]*)\s*=\s*\{.+\}/i);
+          if (match) {
+            parameters.push(match[1].toUpperCase());
+          }
+        }
+
+        return parameters;
+      }
+
+      // Check if selected text is a valid parameter
+      function getSelectedParameterIfValid() {
+        const selection = el.scratchpad.value.substring(
+          el.scratchpad.selectionStart,
+          el.scratchpad.selectionEnd,
+        );
+
+        const trimmedSelection = selection.trim();
+        if (!trimmedSelection) return null;
+
+        const parameters = parseParametersFromScratchpad();
+        const upperSelection = trimmedSelection.toUpperCase();
+
+        if (parameters.includes(upperSelection)) {
+          return upperSelection;
+        }
+
+        return null;
+      }
+
+      // Insert parameter at cursor in promptText
+      function insertParameterAtCursor(parameter) {
+        const textarea = el.prompt;
+        const beforeCursor = textarea.value.substring(
+          0,
+          textarea.selectionStart,
+        );
+        const afterCursor = textarea.value.substring(textarea.selectionEnd);
+
+        textarea.value = beforeCursor + `[${parameter}]` + afterCursor;
+
+        // Position cursor after the inserted parameter
+        const newCursorPos = beforeCursor.length + parameter.length + 2;
+        textarea.selectionStart = newCursorPos;
+        textarea.selectionEnd = newCursorPos;
+        textarea.focus();
+
+        // Trigger input event to save the change
+        textarea.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+
+      // Show/hide parameter insert button based on selection
+      function showParameterInsertOption() {
+        const parameter = getSelectedParameterIfValid();
+
+        if (parameter) {
+          // Create or get the insert button
+          let insertBtn = document.getElementById("parameterInsertBtn");
+          if (!insertBtn) {
+            insertBtn = document.createElement("button");
+            insertBtn.id = "parameterInsertBtn";
+            insertBtn.className = "parameter-insert-btn";
+            el.scratchpadContainer.parentNode.insertBefore(
+              insertBtn,
+              el.scratchpadContainer.nextSibling,
+            );
+          }
+
+          insertBtn.textContent = `Insert [${parameter}] into prompt →`;
+          insertBtn.style.display = "block";
+          insertBtn.onclick = () => {
+            insertParameterAtCursor(parameter);
+            insertBtn.style.display = "none";
+          };
+        } else {
+          // Hide the insert button
+          const insertBtn = document.getElementById("parameterInsertBtn");
+          if (insertBtn) {
+            insertBtn.style.display = "none";
+          }
+        }
+      }
+
+      // Add selection listeners to scratchpadText
+      el.scratchpad.addEventListener("mouseup", showParameterInsertOption);
+      el.scratchpad.addEventListener("keyup", showParameterInsertOption);
+
+      // Helper function to check if there are any waiting tiles
+      function hasWaitingTiles() {
+        const placeholders = document.querySelectorAll(".placeholder");
+        for (const p of placeholders) {
+          if (p.textContent === "Waiting...") {
+            return true;
+          }
+        }
+        return false;
+      }
+
+      // Update UI state for generate and cancel buttons
+      function updateGenerationUI() {
+        const hasWaiting = hasWaitingTiles() && isGenerating;
+        el.cancelGenBtn.style.display = hasWaiting ? "block" : "none";
+        el.generateBtn.disabled = isGenerating;
+      }
+
+      // Cancel generation
+      window.cancelGeneration = function () {
+        // Mark all waiting tiles as cancelled and add to set
+        const placeholders = document.querySelectorAll(".placeholder");
+        for (const p of placeholders) {
+          if (p.textContent === "Waiting...") {
+            const tile = p.parentElement;
+            cancelledTiles.add(tile);
+            p.textContent = "Cancelled";
+          }
+        }
+
+        // Check if any tiles are still being generated
+        let hasGenerating = false;
+        for (const p of placeholders) {
+          const text = p.textContent;
+          if (
+            text === "Starting..." ||
+            text === "Generating..." ||
+            text.startsWith("Queued") ||
+            text === "Processing..."
+          ) {
+            hasGenerating = true;
+            break;
+          }
+        }
+
+        // Only stop generation if no tiles are being generated
+        if (!hasGenerating) {
+          isGenerating = false;
+          stopKeepAlive();
+          // el.loading.style.display = "none";
+        }
+
+        updateGenerationUI();
+      };
+
+      // Keyboard shortcuts
+      document.addEventListener("keydown", (e) => {
+        // Ctrl+Shift+S for scratchpad
+        if (e.ctrlKey && e.shiftKey && e.key === "S") {
+          e.preventDefault();
+          toggleScratchpad();
+        }
+        // Ctrl+Shift+H for history
+        if (e.ctrlKey && e.shiftKey && e.key === "H") {
+          e.preventDefault();
+          toggleHistory();
+        }
+        // Ctrl+Shift+C for cancel (only if cancel button is visible)
+        if (e.ctrlKey && e.shiftKey && e.key === "Q") {
+          const cancelBtn = el.cancelGenBtn;
+          if (
+            cancelBtn &&
+            cancelBtn.style.display !== "none" &&
+            !cancelBtn.disabled
+          ) {
+            e.preventDefault();
+            cancelBtn.click();
+          }
+        }
+        // Ctrl+Shift+E for auto-adjust prompt height
+        if (e.ctrlKey && e.shiftKey && e.key === "E") {
+          e.preventDefault();
+          autoAdjustPromptHeight();
+        }
+        // Info box toggle logic
+        const infoBox = document.getElementById("infoBox");
+        const toggleInfoBtn = document.getElementById("toggleInfoBtn");
+        const closeInfoBtn = document.getElementById("closeInfoBtn");
+
+        toggleInfoBtn.addEventListener("click", () => {
+          infoBox.style.display =
+            infoBox.style.display === "none" ? "block" : "none";
+        });
+        closeInfoBtn.addEventListener("click", () => {
+          infoBox.style.display = "none";
+        });
+        // Ctrl+Enter for generate (but not when focused on textarea with Shift)
+        if (
+          e.ctrlKey &&
+          e.key === "Enter" &&
+          document.activeElement !== el.prompt
+        ) {
+          const generateBtnDisabled = el.generateBtn.disabled;
+          if (!generateBtnDisabled) {
+            e.preventDefault();
+            generateImages();
+          }
+        }
+      });
+
+      // Auto-adjust prompt textarea height to fit content
+      window.autoAdjustPromptHeight = function () {
+        el.prompt.style.height = "auto";
+        el.prompt.style.height = el.prompt.scrollHeight + "px";
+      };
+
+      window.toggleScratchpad = function () {
+        if (el.scratchpadContainer.style.display === "none") {
+          el.scratchpadContainer.style.display = "block";
+          el.scratchpadBtn.textContent = "Hide Scratchpad";
+        } else {
+          el.scratchpadContainer.style.display = "none";
+          el.scratchpadBtn.textContent = "Scratchpad";
+        }
+      };
+
+      // Initialize Dexie database
+      async function initDB() {
+        try {
+          db = new Dexie("the-cokebear-tti");
+          db.version(1).stores({
+            prompts: "++id, prompt, timestamp",
+          });
+          db.version(2).stores({
+            prompts: "++id, prompt, timestamp",
+            settings: "key, value",
+          });
+          await db.open();
+
+          // Load last prompt text (even if not saved to history)
+          const lastPromptText = await db.settings.get("lastPromptText");
+          if (lastPromptText && lastPromptText.value) {
+            el.prompt.value = lastPromptText.value;
+          }
+
+          // Load scratchpad text
+          const scratchpadText = await db.settings.get("scratchpadText");
+          if (scratchpadText && scratchpadText.value) {
+            el.scratchpad.value = scratchpadText.value;
+          }
+
+          // Load saved settings
+          await loadSettings();
+        } catch (e) {
+          console.warn("DB init failed:", e);
+        }
+      }
+
+      // Save settings to database
+      async function saveSettings() {
+        if (!db) return;
+        try {
+          await db.settings.put({
+            key: "resolution",
+            value: el.resolution.value,
+          });
+          await db.settings.put({ key: "guidance", value: el.guidance.value });
+          await db.settings.put({
+            key: "negativePrompt",
+            value: el.negativePrompt.value,
+          });
+          await db.settings.put({
+            key: "realismEnforcer",
+            value: el.realismEnforcer.checked,
+          });
+          await db.settings.put({ key: "style", value: el.style.value });
+          await db.settings.put({ key: "numImages", value: el.num.value });
+          await db.settings.put({ key: "concurrency", value: el.conc.value });
+        } catch (e) {
+          console.warn("Failed to save settings:", e);
+        }
+      }
+
+      // Load settings from database
+      async function loadSettings() {
+        if (!db) return;
+        try {
+          const resolution = await db.settings.get("resolution");
+          const guidance = await db.settings.get("guidance");
+          const negativePrompt = await db.settings.get("negativePrompt");
+          const realismEnforcer = await db.settings.get("realismEnforcer");
+          const style = await db.settings.get("style");
+          const numImages = await db.settings.get("numImages");
+          const concurrency = await db.settings.get("concurrency");
+
+          if (resolution) el.resolution.value = resolution.value;
+          if (guidance) {
+            el.guidance.value = guidance.value;
+            el.guidanceValue.textContent = guidance.value;
+            // Update color based on loaded value
+            const value = parseInt(guidance.value, 10);
+            if (value <= 7) {
+              el.guidance.style.accentColor = "#f59e0b";
+              el.guidanceValue.style.color = "#f59e0b";
+            } else if (value > 24) {
+              el.guidance.style.accentColor = "#ef4444";
+              el.guidanceValue.style.color = "#ef4444";
+            } else {
+              el.guidance.style.accentColor = "#3b82f6";
+              el.guidanceValue.style.color = "#c9d1d9";
+            }
+          }
+          if (negativePrompt) el.negativePrompt.value = negativePrompt.value;
+          if (realismEnforcer)
+            el.realismEnforcer.checked = realismEnforcer.value;
+          if (style) el.style.value = style.value;
+          if (numImages) el.num.value = numImages.value;
+          if (concurrency) el.conc.value = concurrency.value;
+        } catch (e) {
+          console.warn("Failed to load settings:", e);
+        }
+      }
+
+      // Add change listeners to save settings
+      el.resolution.addEventListener("change", saveSettings);
+      el.guidance.addEventListener("change", saveSettings);
+      el.negativePrompt.addEventListener("input", saveSettings);
+      el.realismEnforcer.addEventListener("change", saveSettings);
+      el.style.addEventListener("change", saveSettings);
+      el.num.addEventListener("change", saveSettings);
+      el.conc.addEventListener("change", saveSettings);
+
+      // Save prompt to database
+      async function savePrompt(prompt) {
+        if (!db || !prompt.trim()) return;
+        try {
+          // Check if this prompt already exists
+          const existing = await db.prompts
+            .where("prompt")
+            .equals(prompt)
+            .first();
+
+          if (existing) {
+            // Update the timestamp to move it to the top
+            await db.prompts.update(existing.id, { timestamp: Date.now() });
+          } else {
+            // Add new prompt
+            await db.prompts.add({
+              prompt: prompt,
+              timestamp: Date.now(),
+            });
+          }
+
+          // Update history list if it's currently visible
+          if (el.historyPanel.style.display !== "none") {
+            await loadHistory();
+          }
+        } catch (e) {
+          console.warn("Failed to save prompt:", e);
+        }
+      }
+
+      // Load and display history
+      async function loadHistory() {
+        if (!db) return;
+        try {
+          const prompts = await db.prompts
+            .orderBy("timestamp")
+            .reverse()
+            //.limit(50)
+            .toArray();
+
+          el.historyList.innerHTML = "";
+          if (prompts.length === 0) {
+            el.historyList.innerHTML =
+              '<div class="history-empty">No history yet</div>';
+            return;
+          }
+
+          prompts.forEach((item) => {
+            const div = document.createElement("div");
+            div.className = "history-item";
+            div.title = item.prompt; // Native browser tooltip
+            div.innerHTML = `
+                    <span class="history-prompt">${escapeHtml(item.prompt)}</span>
+                    <button class="history-delete" onclick="deletePrompt(${item.id})">x</button>
+                  `;
+            // Make the entire item clickable except for the delete button
+            div.onclick = (e) => {
+              if (!e.target.classList.contains("history-delete")) {
+                usePrompt(item.id);
+              }
+            };
+
+            el.historyList.appendChild(div);
+          });
+        } catch (e) {
+          console.warn("Failed to load history:", e);
+        }
+      }
+
+      window.toggleHistory = async function () {
+        if (el.historyPanel.style.display === "none") {
+          await loadHistory();
+          el.historyPanel.style.display = "block";
+          el.historyBtn.textContent = "Hide History";
+        } else {
+          el.historyPanel.style.display = "none";
+          el.historyBtn.textContent = "History";
+        }
+      };
+
+      window.usePrompt = async function (id) {
+        if (!db) return;
+        try {
+          const item = await db.prompts.get(id);
+          if (item) {
+            el.prompt.value = item.prompt;
+            // Keep history panel open - don't hide it
+          }
+        } catch (e) {
+          console.warn("Failed to use prompt:", e);
+        }
+      };
+
+      window.deletePrompt = async function (id) {
+        if (!db) return;
+        try {
+          await db.prompts.delete(id);
+          await loadHistory();
+        } catch (e) {
+          console.warn("Failed to delete prompt:", e);
+        }
+      };
+
+      function escapeHtml(text) {
+        const div = document.createElement("div");
+        div.textContent = text;
+        return div.innerHTML;
+      }
+
+      // Parse scratchpad and replace variables in prompt
+      function replaceVariables(prompt) {
+        const scratchpadContent = el.scratchpad.value;
+        if (!scratchpadContent.trim()) return prompt;
+
+        // Parse scratchpad for variable definitions
+        // Format: VARIABLE_NAME = {value1|value2|value3}
+        const variableMap = {};
+        const lines = scratchpadContent.split("\n");
+
+        for (const line of lines) {
+          // Match pattern: VARIABLE_NAME = {anything} - must have curly braces
+          const match = line.match(
+            /^\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*(\{[^}]+\})\s*$/,
+          );
+          if (match) {
+            const varName = match[1].toUpperCase();
+            const varValue = match[2].trim(); // Keep the curly braces
+            // Only add if value is properly enclosed in {}
+            if (varValue.startsWith("{") && varValue.endsWith("}")) {
+              variableMap[varName] = varValue;
+            }
+          }
+        }
+
+        // Replace [VARIABLE_NAME] in prompt with the corresponding value
+        let processedPrompt = prompt;
+        for (const [varName, varValue] of Object.entries(variableMap)) {
+          // Case-insensitive replacement, replace first occurrence only
+          const regex = new RegExp(`\\[${varName}\\]`, "i");
+          processedPrompt = processedPrompt.replace(regex, varValue);
+        }
+
+        return processedPrompt;
+      }
+
+      el.prompt.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && !e.shiftKey) {
+          const shouldSendOnEnter = el.enterToSend.checked;
+          const isCtrlPressed = e.ctrlKey;
+          const generateBtnDisabled = el.generateBtn.disabled;
+          // Only trigger if Generate is enabled
+          if (!generateBtnDisabled) {
+            // Send if: (checked and no ctrl) OR (unchecked and ctrl pressed)
+            if (
+              (shouldSendOnEnter && !isCtrlPressed) ||
+              (!shouldSendOnEnter && isCtrlPressed)
+            ) {
+              e.preventDefault();
+              generateImages();
+            }
+          }
+          // Otherwise allow normal newline behavior
+        }
+      });
+
+      window.initPlugin = async function () {
+        if (typeof image === "function") {
+          pluginReady = true;
+          return;
+        }
+        setTimeout(window.initPlugin, 200);
+      };
+
+      // Initialize both DB and plugin
+      initDB();
+      window.initPlugin();
+
+      async function generateOne(imagePrompt, tile, generationId, metadata) {
+        try {
+          // Check if this is an old generation
+          if (currentGenerationId !== generationId) {
+            throw new Error("Cancelled");
+          }
+
+          // Update status to starting (before API call)
+          const updateStatus = (text) => {
+            requestAnimationFrame(() => {
+              const placeholder = tile.querySelector(".placeholder");
+              if (placeholder) {
+                placeholder.textContent = text;
+                // Update UI to check if cancel button should still be visible
+                updateGenerationUI();
+              }
+            });
+          };
+
+          updateStatus("Starting...");
+
+          // Give UI time to update
+          await new Promise((resolve) => setTimeout(resolve, 100));
+
+          updateStatus("Generating...");
+
+          // Add tile to waiting set so it gets queue updates
+          waitingTiles.add(tile);
+
+          // Store the request ID BEFORE making the API call
+          const preRequestId = window._lastCapturedRequestId || 0;
+
+          // Make the actual API call
+          const startTime = Date.now();
+          const promptData = {
+            prompt: imagePrompt,
+            guidanceScale: parseInt(el.guidance.value),
+            negativePrompt: el.negativePrompt.value,
+            seed: metadata.seed,
+            resolution: el.resolution.value,
+          };
+
+          const r = await image(promptData);
+          const duration = Date.now() - startTime;
+
+          // Remove from waiting set
+          waitingTiles.delete(tile);
+
+          // If it took more than 500ms, show processing state
+          if (duration > 500) {
+            updateStatus("Processing...");
+            await new Promise((resolve) => setTimeout(resolve, 100));
+          }
+
+          // Check again after generation completes
+          if (currentGenerationId !== generationId) {
+            throw new Error("Cancelled");
+          }
+
+          if (!r?.dataUrl) throw "No image data";
+
+          // Track this image for batch download
+          generatedImages.push(r.dataUrl);
+
+          // Store metadata with the ACTUAL prompt from API response (with random choices resolved)
+          if (!window.imageMetadata) window.imageMetadata = {};
+
+          // Get the resolved prompt from the tracked requests
+          let actualPrompt = metadata.prompt;
+          let actualSeed = metadata.seed;
+
+          // Try to find the resolved prompt that was captured during the API call
+          // The interceptor will have the most recent request ID
+          const currentRequestId = window._lastCapturedRequestId;
+          if (currentRequestId && currentRequestId > preRequestId) {
+            const resolvedData = window.resolvedPromptsData[currentRequestId];
+            if (resolvedData) {
+              actualPrompt = resolvedData.prompt;
+              actualSeed = resolvedData.seed;
+              console.log(
+                "✓ Using resolved prompt from request #" + currentRequestId,
+              );
+              // Clean up old data to prevent memory leak
+              delete window.resolvedPromptsData[currentRequestId];
+            } else {
+              console.log(
+                "Resolved data not found for request #" + currentRequestId,
+              );
+            }
+          } else {
+            console.log("No new resolved prompt captured, using sent prompt");
+          }
+
+          // window.imageMetadata[r.dataUrl] = {
+          //   prompt: actualPrompt,
+          //   seed: actualSeed,
+          // };
+
+          window.imageMetadata[r.dataUrl] = {
+            prompt: r.inputs.prompt, // Use the prompt from the API response which should have all random choices resolved
+            seed: r.inputs.seed, // Use the seed from the API response which may be different if it was auto-generated
+          };
+
+          // Use requestAnimationFrame to ensure DOM updates aren't throttled
+          requestAnimationFrame(() => {
+            const img = document.createElement("img");
+            img.src = r.dataUrl;
+            img.style.cursor = "pointer";
+            img.onclick = () => openModal(r.dataUrl);
+
+            // Create info button overlay
+            const infoBtn = document.createElement("button");
+            infoBtn.className = "tile-info-btn";
+            infoBtn.innerHTML = "ℹ";
+            infoBtn.onclick = (e) => {
+              e.stopPropagation();
+              flipTileToInfo(tile, r.dataUrl);
+            };
+
+            // Create download button overlay
+            const downloadBtn = document.createElement("button");
+            downloadBtn.className = "tile-download-btn";
+            downloadBtn.innerHTML = "⬇";
+            downloadBtn.onclick = (e) => {
+              e.stopPropagation();
+              downloadImage(r.dataUrl);
+            };
+
+            tile.innerHTML = "";
+            tile.appendChild(img);
+            tile.appendChild(infoBtn);
+            tile.appendChild(downloadBtn);
+            tile.classList.add("tile-with-image");
+            tile.dataset.imageUrl = r.dataUrl;
+            updateGenerationUI();
+          });
+        } catch (err) {
+          // Re-throw to let the task handler deal with it
+          throw err;
+        }
+      }
+
+      function downloadImage(dataUrl) {
+        const timestamp = new Date()
+          .toISOString()
+          .replace(/[:.]/g, "-")
+          .slice(0, -5);
+        const filename = `tti-${timestamp}.png`;
+
+        const link = document.createElement("a");
+        link.href = dataUrl;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+
+      function flipTileToInfo(tile, imageUrl) {
+        const metadata = window.imageMetadata?.[imageUrl];
+        if (!metadata) return;
+
+        const infoPanel = document.createElement("div");
+        infoPanel.className = "tile-info-panel";
+
+        const promptLabel = document.createElement("div");
+        promptLabel.textContent = "Prompt:";
+        promptLabel.style.fontWeight = "600";
+        promptLabel.style.marginBottom = "4px";
+        promptLabel.style.fontSize = "11px";
+
+        const promptArea = document.createElement("textarea");
+        // promptArea.value = metadata.prompt;
+        promptArea.value = metadata.prompt;
+        promptArea.readOnly = true;
+        promptArea.style.width = "100%";
+        promptArea.style.height = "120px";
+        promptArea.style.resize = "none";
+        promptArea.style.fontSize = "10px";
+        promptArea.style.padding = "6px";
+        promptArea.style.marginBottom = "8px";
+        promptArea.style.background = "#0d1117";
+        promptArea.style.color = "#c9d1d9";
+        promptArea.style.border = "1px solid #30363d";
+        promptArea.style.borderRadius = "4px";
+
+        const useAsPromptBtn = document.createElement("button");
+        useAsPromptBtn.textContent = "Use as Prompt";
+        useAsPromptBtn.style.width = "100%";
+        useAsPromptBtn.style.padding = "6px";
+        useAsPromptBtn.style.fontSize = "11px";
+        useAsPromptBtn.style.marginBottom = "8px";
+        useAsPromptBtn.style.background = "#6e40c9";
+        useAsPromptBtn.style.border = "1px solid #8957e5";
+        useAsPromptBtn.style.borderRadius = "4px";
+        useAsPromptBtn.style.color = "#fff";
+        useAsPromptBtn.style.cursor = "pointer";
+        useAsPromptBtn.onclick = () => {
+          el.prompt.value = metadata.prompt;
+          el.prompt.dispatchEvent(new Event("input", { bubbles: true }));
+        };
+
+        const seedLabel = document.createElement("div");
+        seedLabel.textContent = "Seed:";
+        seedLabel.style.fontWeight = "600";
+        seedLabel.style.marginBottom = "4px";
+        seedLabel.style.fontSize = "11px";
+
+        const seedContainer = document.createElement("div");
+        seedContainer.style.display = "flex";
+        seedContainer.style.gap = "4px";
+        seedContainer.style.marginBottom = "8px";
+        seedContainer.style.width = "100%";
+        seedContainer.style.boxSizing = "border-box";
+
+        const seedInput = document.createElement("input");
+        seedInput.type = "text";
+        seedInput.value = metadata.seed || "";
+        seedInput.readOnly = true;
+        seedInput.style.flex = "1";
+        seedInput.style.minWidth = "0";
+        seedInput.style.fontSize = "11px";
+        seedInput.style.padding = "4px 6px";
+        seedInput.style.background = "#0d1117";
+        seedInput.style.color = "#c9d1d9";
+        seedInput.style.border = "1px solid #30363d";
+        seedInput.style.borderRadius = "4px";
+        seedInput.style.boxSizing = "border-box";
+
+        const copySeedBtn = document.createElement("button");
+        copySeedBtn.textContent = "Copy";
+        copySeedBtn.style.padding = "4px 8px";
+        copySeedBtn.style.fontSize = "10px";
+        copySeedBtn.style.background = "#238636";
+        copySeedBtn.style.border = "1px solid #2ea043";
+        copySeedBtn.style.borderRadius = "4px";
+        copySeedBtn.style.color = "#fff";
+        copySeedBtn.style.cursor = "pointer";
+        copySeedBtn.style.whiteSpace = "nowrap";
+        copySeedBtn.style.flexShrink = "0";
+        copySeedBtn.onclick = () => {
+          // Access the seed input element directly
+          const seedInputElement = document.getElementById("seed");
+          if (seedInputElement) {
+            seedInputElement.value = metadata.seed || "";
+          }
+          copySeedBtn.textContent = "✓";
+          setTimeout(() => {
+            copySeedBtn.textContent = "Copy";
+          }, 1000);
+        };
+
+        seedContainer.appendChild(seedInput);
+        seedContainer.appendChild(copySeedBtn);
+
+        const backBtn = document.createElement("button");
+        backBtn.textContent = "← Back";
+        backBtn.style.width = "100%";
+        backBtn.style.padding = "6px";
+        backBtn.style.fontSize = "11px";
+        backBtn.onclick = () => flipTileToImage(tile, imageUrl);
+
+        infoPanel.appendChild(promptLabel);
+        infoPanel.appendChild(promptArea);
+        infoPanel.appendChild(useAsPromptBtn);
+        infoPanel.appendChild(seedLabel);
+        infoPanel.appendChild(seedContainer);
+        infoPanel.appendChild(backBtn);
+
+        tile.innerHTML = "";
+        tile.appendChild(infoPanel);
+        tile.classList.add("tile-flipped");
+      }
+
+      function flipTileToImage(tile, imageUrl) {
+        const img = document.createElement("img");
+        img.src = imageUrl;
+        img.style.cursor = "pointer";
+        img.onclick = () => openModal(imageUrl);
+
+        const infoBtn = document.createElement("button");
+        infoBtn.className = "tile-info-btn";
+        infoBtn.innerHTML = "ℹ";
+        infoBtn.onclick = (e) => {
+          e.stopPropagation();
+          flipTileToInfo(tile, imageUrl);
+        };
+
+        const downloadBtn = document.createElement("button");
+        downloadBtn.className = "tile-download-btn";
+        downloadBtn.innerHTML = "⬇";
+        downloadBtn.onclick = (e) => {
+          e.stopPropagation();
+          downloadImage(imageUrl);
+        };
+
+        tile.innerHTML = "";
+        tile.appendChild(img);
+        tile.appendChild(infoBtn);
+        tile.appendChild(downloadBtn);
+        tile.classList.remove("tile-flipped");
+      }
+
+      window.downloadAllImages = function () {
+        if (generatedImages.length === 0) return;
+
+        const baseTimestamp = new Date()
+          .toISOString()
+          .replace(/[:.]/g, "-")
+          .slice(0, -5);
+
+        generatedImages.forEach((dataUrl, index) => {
+          setTimeout(() => {
+            const filename = `tti-${baseTimestamp}-${String(index + 1).padStart(2, "0")}.png`;
+            const link = document.createElement("a");
+            link.href = dataUrl;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+          }, index * 100); // Small delay between downloads to avoid browser blocking
+        });
+      };
+
+      async function runQueue(tasks, concurrency, generationId) {
+        let index = 0;
+
+        async function worker() {
+          while (index < tasks.length && currentGenerationId === generationId) {
+            const i = index++;
+            await tasks[i]();
+          }
+        }
+
+        await Promise.all(Array.from({ length: concurrency }, worker));
+      }
+
+      window.generateImages = async function () {
+        if (!pluginReady) return;
+
+        const basePrompt = el.prompt.value.trim();
+        if (!basePrompt) return;
+
+        // Increment generation ID to invalidate any previous generations
+        currentGenerationId++;
+        const thisGenerationId = currentGenerationId;
+
+        // Save prompt to history
+        await savePrompt(basePrompt);
+
+        const res = el.resolution.value;
+        const gs = `(guidanceScale:::${el.guidance.value})`;
+        const negPrompt = el.negativePrompt.value.trim();
+        const negPromptFormatted = negPrompt
+          ? `(negativePrompt:::${negPrompt})`
+          : "";
+        const seedInput = el.seed.value.trim();
+        const num = parseInt(el.num.value, 10);
+        const concurrency = parseInt(el.conc.value, 10);
+        const style = el.style.value;
+        const useRealismEnforcer = el.realismEnforcer.checked;
+
+        el.error.textContent = "";
+        el.mosaic.innerHTML = "";
+        el.mosaic.style.display = "grid";
+        // el.loading.style.display = "block";
+        // el.loading.textContent = "Generating images...";
+        el.downloadAllBtn.disabled = true;
+        generatedImages = []; // Reset for new generation
+        isGenerating = true;
+        startKeepAlive();
+
+        const shape = res.includes("512x768")
+          ? "portrait"
+          : res.includes("768x512")
+            ? "landscape"
+            : "square";
+
+        const tiles = [];
+        for (let i = 0; i < num; i++) {
+          const tile = document.createElement("div");
+          tile.className = `tile ${shape}`;
+          tile.innerHTML = `<div class="placeholder">Waiting...</div>`;
+          el.mosaic.appendChild(tile);
+          tiles.push(tile);
+        }
+
+        // Update UI after tiles are created
+        updateGenerationUI();
+
+        cancelledTiles.clear(); // Clear cancelled tiles for new generation
+
+        const tasks = tiles.map((tile, index) => async () => {
+          // Skip if this tile was cancelled
+          if (cancelledTiles.has(tile)) {
+            return;
+          }
+          if (currentGenerationId !== thisGenerationId) {
+            tile.innerHTML = `<div class="placeholder">Cancelled</div>`;
+            return;
+          }
+          try {
+            // Generate unique seed for each image
+            let imageSeedValue;
+            if (seedInput && /^\d+$/.test(seedInput)) {
+              imageSeedValue = parseInt(seedInput, 10);
+            } else {
+              imageSeedValue = Math.floor(Math.random() * 1000000000);
+              // imageSeedValue = -1; // Let the API generate a random seed if input is invalid or empty
+            }
+            // const imageSeedFormatted = `(seed:::${imageSeedValue})`;
+
+            // Replace variables from scratchpad in the base prompt
+            const processedBasePrompt = replaceVariables(basePrompt);
+
+            // Build prompt with this image's specific seed
+            let imagePrompt = processedBasePrompt;
+
+            if (style === "cinematic") imagePrompt += CINEMATIC;
+            if (style === "cinematic_ex") imagePrompt += CINEMATIC_EX;
+            if (style === "fifties")
+              imagePrompt =
+                "Famous vintage 1950s photo, " + imagePrompt + FIFTIES;
+            if (style === "casual")
+              imagePrompt = "A casual photo of " + imagePrompt + CASUAL_PHOTO;
+            if (style === "casual_raw")
+              imagePrompt =
+                "A casual photo of " + imagePrompt + RAW_CASUAL_PHOTO;
+            if (style === "professional") imagePrompt += PROFESSIONAL_PHOTO;
+            if (style === "professional_ex")
+              imagePrompt += PROFESSIONAL_PHOTO_EX;
+
+            if (useRealismEnforcer) {
+              imagePrompt = imagePrompt + REALISM_ENFORCER;
+            }
+
+            // imagePrompt += `${res} ${negPromptFormatted} ${imageSeedFormatted} ${gs}`;
+            // imagePrompt += `${res} ${negPromptFormatted} ${imageSeedFormatted} ${gs}`;
+
+            const metadata = {
+              prompt: imagePrompt,
+              seed: imageSeedValue,
+            };
+
+            await generateOne(imagePrompt, tile, thisGenerationId, metadata);
+          } catch (err) {
+            if (
+              currentGenerationId !== thisGenerationId ||
+              err.message === "Cancelled"
+            ) {
+              tile.innerHTML = `<div class="placeholder">Cancelled</div>`;
+            } else {
+              tile.innerHTML = `<div class="placeholder" style="color: #ff7b72;">Error</div>`;
+            }
+            updateGenerationUI();
+          }
+        });
+
+        try {
+          await runQueue(tasks, concurrency, thisGenerationId);
+        } catch (err) {
+          if (currentGenerationId === thisGenerationId) {
+            el.error.textContent = String(err);
+          }
+        } finally {
+          // Only update UI if this is still the current generation
+          if (currentGenerationId === thisGenerationId) {
+            // el.loading.style.display = "none";
+            // Enable download all button only after ALL tasks complete
+            if (generatedImages.length > 0) {
+              el.downloadAllBtn.disabled = false;
+            }
+            isGenerating = false;
+            stopKeepAlive();
+            updateGenerationUI();
+          }
+        }
+      };
+    </script>
+
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/gh/devbernardolopes/tti-generator-styles@main/styles.css"
+    />
+  </body>
+</html>
