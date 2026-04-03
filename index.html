@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>The Cokebear TTI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body class="min-h-screen bg-slate-100 text-slate-900">
+    <main
+      class="mx-auto flex min-h-screen w-full max-w-3xl flex-col items-center justify-center px-4 py-10"
+    >
+      <h1 class="mb-6 text-center text-3xl font-bold sm:text-4xl">
+        The Cokebear TTI
+      </h1>
+
+      <section class="w-full rounded-xl bg-white p-4 shadow sm:p-6">
+        <label
+          for="prompt"
+          class="mb-2 block text-sm font-medium text-slate-700"
+        >
+          Enter your prompt
+        </label>
+        <textarea
+          id="prompt"
+          class="min-h-32 w-full resize-y rounded-lg border border-slate-300 p-3 text-base outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-300"
+          placeholder="Describe the image you want to generate..."
+        ></textarea>
+
+        <button
+          id="generateBtn"
+          class="mt-4 w-full rounded-lg bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2 sm:w-auto"
+          type="button"
+        >
+          Generate Image
+        </button>
+      </section>
+    </main>
+
+    <script>
+      const cfTurnstile = ``; // Placeholder for future Cloudflare Turnstile integration.
+      const promptInput = document.getElementById("prompt");
+      const generateBtn = document.getElementById("generateBtn");
+
+      async function generateImage() {
+        const prompt = promptInput.value.trim();
+        if (!prompt) return;
+
+        // Placeholder for upcoming API request + image render flow.
+        console.log("Generate image for prompt:", prompt);
+      }
+
+      generateBtn.addEventListener("click", generateImage);
+    </script>
+  </body>
+</html>

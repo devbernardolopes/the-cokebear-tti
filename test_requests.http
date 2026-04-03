@@ -1,0 +1,73 @@
+@thread = 0
+@__cacheBust = {{$guid}}
+@token = 1
+@baseUrl = https://image-generation.perchance.org
+@baseAdUrl = https://perchance.org
+
+
+### CF
+# @name vcd15cbe7772f49c399c6a5babf22c1241717689176015
+
+GET https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015
+
+
+### CF 2
+GET https://challenges.cloudflare.com/turnstile/v0/api.js
+
+
+### USER API Requests 02
+
+GET {{baseUrl}}/api/checkUserVerificationStatus
+Accept: */*
+
+{
+  "userKey": "d9063764e6b133aa74727a168705fe7e6cdd6b3d205b0bee53462fc0e5174032",
+  "cacheKey": "590489934",
+}
+
+### Embed
+GET {{baseUrl}}/embed
+Content-Type: text/xml; charset=utf-8
+Content-Encoding: br 
+
+### USER API Requests 01
+# @name verifyUser
+
+GET {{baseUrl}}/api/verifyUser
+Accept: */*
+
+{
+  "thread": "{{thread}}",
+  "__cacheBust": "{{__cacheBust}}",
+  "token": "1",
+}
+
+
+### AD API Requests
+# @name getAccessCodeForAdPoweredStuff
+GET {{baseAdUrl}}/api/getAccessCodeForAdPoweredStuff
+
+{
+  "__cacheBust": "{{__cacheBust}}"
+}
+
+
+### CORE API Requests
+@cf_clearance = 4TIrBf_jx1lfEyOaOj5IqMD0jxoHxMCpNKvQRWpOeGA-1771463473-1.2.1.1-eE0FncSHWY.puTVpmAJVuBrNGIzkwxhGuW6IIzq_anh04TCOu_EV3VLX_SvDiwkLRJBk_mPg3v1HiSIogDDgBuElZr70u1EoaWBTJp0ed26cmp49jLr4gnCgF9Ez28czuORE2DkRVxQ9vF8Vma.YS70UuGa5y2RMdHipcw8iiVVnXdbo0nFq4a86coHpbtY1l9S5uRnqJYALjgNyWGVZW8d6wLhGP8LfHbxQ1uWJYgQ
+
+POST {{baseUrl}}/api/generate
+Accept: */*
+# Cookie: cf_clearance={{cf_clearance}}
+
+{
+  "prompt": "A casual photo of A bseball player. It's a casual photo.",
+  "negativePrompt":"",
+  "seed":246263037,
+  "resolution":"512x768",
+  "guidanceScale":14,
+  "channel":"the-cokebear-tti",
+  "subChannel":"public",
+  "userKey":"d9063764e6b133aa74727a168705fe7e6cdd6b3d205b0bee53462fc0e5174032",
+  "adAccessCode":"{{getAccessCodeForAdPoweredStuff.response.body.$}}",
+  "requestId":"0.6785800862024678"
+}
