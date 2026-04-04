@@ -21,44 +21,55 @@ This is a **Text-to-Image Generator UI** for [Perchance.org](https://perchance.o
 ## Architecture
 
 ### Fetch Interception
+
 The app intercepts `window.fetch` to:
+
 1. Capture generate requests and store resolved prompts for tracking
 2. Monitor queue position during generation
 
 ### Database Schema (IndexedDB via Dexie)
+
 ```javascript
 db.version(1).stores({ prompts: "++id, prompt, timestamp" });
-db.version(2).stores({ prompts: "++id, prompt, timestamp", settings: "key, value" });
+db.version(2).stores({
+  prompts: "++id, prompt, timestamp",
+  settings: "key, value",
+});
 ```
 
 ### Prompt Variable System
+
 Scratchpad variables are defined as `VARIABLE_NAME = {value1|value2|value3}` and inserted into prompts as `[VARIABLE_NAME]`.
 
 ### Style Constants
+
 Prompt suffixes for different image styles (cinematic, professional, casual, etc.) are defined as constants and appended during generation.
 
 ## Commands
 
 ### Testing
+
 No test framework is currently set up. Manual testing in browser is required.
 
 ### Linting/Typechecking
+
 No linter or type-checker is configured.
 
 ### Development
+
 This is a single HTML file — no build step required. Edit `index.html` directly and test in a browser.
 
 ## Keyboard Shortcuts
 
-| Shortcut | Action |
-|----------|--------|
-| `Ctrl+Shift+S` | Toggle Scratchpad |
-| `Ctrl+Shift+H` | Toggle History |
-| `Ctrl+Shift+E` | Auto-adjust prompt height |
-| `Ctrl+Shift+Q` | Cancel generation |
-| `Ctrl+Enter` | Generate (when not focused in prompt) |
-| `Enter` | Generate (when "ENTER to send" is on) |
-| `Escape` | Close modal |
+| Shortcut       | Action                                |
+| -------------- | ------------------------------------- |
+| `Ctrl+Shift+S` | Toggle Scratchpad                     |
+| `Ctrl+Shift+H` | Toggle History                        |
+| `Ctrl+Shift+E` | Auto-adjust prompt height             |
+| `Ctrl+Shift+Q` | Cancel generation                     |
+| `Ctrl+Enter`   | Generate (when not focused in prompt) |
+| `Enter`        | Generate (when "ENTER to send" is on) |
+| `Escape`       | Close modal                           |
 
 ## Important Notes
 
