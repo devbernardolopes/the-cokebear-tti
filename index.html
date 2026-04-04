@@ -932,23 +932,34 @@
         if (!db || !prompt.trim()) return;
         const { guidance, style, resolution, seeds } = options;
         try {
-          // Check if this prompt already exists
-          const existing = await db.prompts
-            .where("prompt")
-            .equals(prompt)
-            .first();
+          // Check if an identical entry exists (same prompt AND all parameters)
+          const allPrompts = await db.prompts.toArray();
+          const existing = allPrompts.find((item) => {
+            if (item.prompt !== prompt) return false;
+            if (item.guidance !== guidance) return false;
+            if (item.style !== style) return false;
+            if (item.resolution !== resolution) return false;
+            // Compare seeds - both must be arrays or both must be same value
+            const existingSeeds = item.seeds;
+            const newSeeds = seeds;
+            if (Array.isArray(existingSeeds) && Array.isArray(newSeeds)) {
+              if (existingSeeds.length !== newSeeds.length) return false;
+              return existingSeeds.every((seed, i) => seed === newSeeds[i]);
+            } else if (Array.isArray(existingSeeds) !== Array.isArray(newSeeds)) {
+              return false;
+            } else if (existingSeeds !== newSeeds) {
+              return false;
+            }
+            return true;
+          });
 
           if (existing) {
-            // Update the timestamp and settings to move it to the top
+            // Update only the timestamp to move it to the top
             await db.prompts.update(existing.id, {
               timestamp: Date.now(),
-              guidance,
-              style,
-              resolution,
-              seeds,
             });
           } else {
-            // Add new prompt
+            // Add new prompt entry
             await db.prompts.add({
               prompt: prompt,
               timestamp: Date.now(),
