@@ -1488,6 +1488,24 @@
         tile.classList.remove("tile-flipped");
       }
 
+      function closeAllInfoPanels() {
+        const flippedTiles = document.querySelectorAll(".tile-flipped");
+        flippedTiles.forEach((tile) => {
+          const imageUrl = tile.dataset.imageUrl;
+          if (imageUrl) {
+            flipTileToImage(tile, imageUrl);
+          }
+        });
+      }
+
+      document.addEventListener("click", (e) => {
+        const isInfoPanel = e.target.closest(".tile-info-panel");
+        const isInfoBtn = e.target.closest(".tile-info-btn");
+        if (!isInfoPanel && !isInfoBtn) {
+          closeAllInfoPanels();
+        }
+      });
+
       window.downloadAllImages = function () {
         if (generatedImages.length === 0) return;
 
