@@ -1331,7 +1331,9 @@
           .toISOString()
           .replace(/[:.]/g, "-")
           .slice(0, -5);
-        const filename = `tti-${timestamp}.png`;
+        const metadata = window.imageMetadata?.[dataUrl];
+        const seed = metadata?.seed ?? "";
+        const filename = seed ? `tti-${timestamp}-${seed}.png` : `tti-${timestamp}.png`;
 
         const link = document.createElement("a");
         link.href = dataUrl;
@@ -1496,7 +1498,10 @@
 
         generatedImages.forEach((dataUrl, index) => {
           setTimeout(() => {
-            const filename = `tti-${baseTimestamp}-${String(index + 1).padStart(2, "0")}.png`;
+            const metadata = window.imageMetadata?.[dataUrl];
+            const seed = metadata?.seed ?? "";
+            const seedSuffix = seed ? `-${seed}` : "";
+            const filename = `tti-${baseTimestamp}-${String(index + 1).padStart(2, "0")}${seedSuffix}.png`;
             const link = document.createElement("a");
             link.href = dataUrl;
             link.download = filename;
