@@ -226,7 +226,11 @@
     </div>
 
     <div id="historyPanel" style="display: none">
+      <div id="historySearchContainer">
+        <input type="text" id="historySearch" placeholder="Search prompts..." />
+      </div>
       <div id="historyList"></div>
+      <button id="loadMoreBtn" style="display: none">Load More</button>
     </div>
 
     <!-- <div id="loading">Generating images...</div> -->
@@ -304,6 +308,8 @@
         historyPanel: document.getElementById("historyPanel"),
         historyList: document.getElementById("historyList"),
         historyBtn: document.getElementById("historyBtn"),
+        historySearch: document.getElementById("historySearch"),
+        loadMoreBtn: document.getElementById("loadMoreBtn"),
         imageModal: document.getElementById("imageModal"),
         modalImageContainer: document.getElementById("modalImageContainer"),
         modalImage: document.getElementById("modalImage"),
@@ -327,6 +333,13 @@
 
       // Track tiles that have been cancelled
       let cancelledTiles = new Set();
+
+      // History pagination state
+      let historyOffset = 0;
+      const historyLimit = 50;
+      let historyTotalCount = 0;
+      let historySearchQuery = '';
+      let historyDebounceTimer = null;
 
       window.fetch = async function (...args) {
         const url = typeof args[0] === "string" ? args[0] : args[0]?.url;
@@ -898,6 +911,22 @@
       el.num.addEventListener("change", saveSettings);
       el.conc.addEventListener("change", saveSettings);
 
+      // History search with debounce
+      el.historySearch.addEventListener("input", (e) => {
+        clearTimeout(historyDebounceTimer);
+        historyDebounceTimer = setTimeout(() => {
+          historySearchQuery = e.target.value;
+          historyOffset = 0;
+          loadHistory(false);
+        }, 300);
+      });
+
+      // Load More button
+      el.loadMoreBtn.addEventListener("click", () => {
+        historyOffset += historyLimit;
+        loadHistory(true);
+      });
+
       // Save prompt to database
       async function savePrompt(prompt, options = {}) {
         if (!db || !prompt.trim()) return;
@@ -940,23 +969,58 @@
       }
 
       // Load and display history
-      async function loadHistory() {
+      async function loadHistory(append = false) {
         if (!db) return;
         try {
-          const prompts = await db.prompts
-            .orderBy("timestamp")
-            .reverse()
-            //.limit(50)
-            .toArray();
+          const searchQuery = historySearchQuery.toLowerCase();
 
-          el.historyList.innerHTML = "";
-          if (prompts.length === 0) {
+          // Get total count for Load More visibility
+          historyTotalCount = await db.prompts.count();
+
+          let items;
+          if (searchQuery) {
+            // For search, load all and filter (could optimize with indexed search)
+            items = await db.prompts
+              .orderBy("timestamp")
+              .reverse()
+              .toArray();
+            // Client-side filter for search
+            const filteredItems = items.filter(item => item.prompt.toLowerCase().includes(searchQuery));
+            historyTotalCountFiltered = filteredItems.length;
+            // Apply pagination after filtering
+            const start = historyOffset;
+            const end = start + historyLimit;
+            items = filteredItems.slice(start, end);
+          } else {
+            // No search - use database pagination
+            items = await db.prompts
+              .orderBy("timestamp")
+              .reverse()
+              .offset(historyOffset)
+              .limit(historyLimit)
+              .toArray();
+          }
+
+          if (!append) {
+            el.historyList.innerHTML = "";
+          }
+
+          if (items.length === 0 && !append) {
             el.historyList.innerHTML =
-              '<div class="history-empty">No history yet</div>';
+              searchQuery
+                ? '<div class="history-empty">No matching prompts found</div>'
+                : '<div class="history-empty">No history yet</div>';
+            el.loadMoreBtn.style.display = "none";
             return;
           }
 
-          prompts.forEach((item) => {
+          if (items.length === 0 && append) {
+            // No more items to load
+            el.loadMoreBtn.style.display = "none";
+            return;
+          }
+
+          items.forEach((item) => {
             const div = document.createElement("div");
             div.className = "history-item";
             div.title = item.prompt;
@@ -995,6 +1059,11 @@
 
             el.historyList.appendChild(div);
           });
+
+          // Show/hide Load More button
+          const effectiveTotal = searchQuery ? historyTotalCountFiltered : historyTotalCount;
+          const hasMore = (historyOffset + items.length) < effectiveTotal;
+          el.loadMoreBtn.style.display = hasMore ? "block" : "none";
         } catch (e) {
           console.warn("Failed to load history:", e);
         }
@@ -1002,7 +1071,11 @@
 
       window.toggleHistory = async function () {
         if (el.historyPanel.style.display === "none") {
-          await loadHistory();
+          // Reset pagination and search when opening
+          historyOffset = 0;
+          historySearchQuery = '';
+          el.historySearch.value = '';
+          await loadHistory(false);
           el.historyPanel.style.display = "block";
           el.historyBtn.textContent = "Hide History";
         } else {
@@ -1622,6 +1695,43 @@
       }
       .history-item {
         padding: 10px 12px;
+      }
+      #historySearchContainer {
+        padding: 8px 12px;
+        border-bottom: 1px solid #30363d;
+      }
+      #historySearch {
+        width: 100%;
+        padding: 8px 12px;
+        background: #0d1117;
+        border: 1px solid #30363d;
+        border-radius: 6px;
+        color: #c9d1d9;
+        font-size: 13px;
+        box-sizing: border-box;
+      }
+      #historySearch:focus {
+        outline: none;
+        border-color: #58a6ff;
+      }
+      #historySearch::placeholder {
+        color: #8b949e;
+      }
+      #loadMoreBtn {
+        display: block;
+        width: calc(100% - 24px);
+        margin: 12px auto;
+        padding: 10px;
+        background: #21262d;
+        border: 1px solid #30363d;
+        border-radius: 6px;
+        color: #c9d1d9;
+        font-size: 13px;
+        cursor: pointer;
+      }
+      #loadMoreBtn:hover {
+        background: #30363d;
+        border-color: #8b949e;
       }
     </style>
 
