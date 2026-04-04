@@ -88,3 +88,8 @@ This is a single HTML file — no build step required. Edit `index.html` directl
 - Global functions exposed via `window.*`
 - Async/await for database operations
 - Dexie.js for IndexedDB abstraction
+
+## Git Rules
+
+- Never run `git commit`, `git push`, `git add`, or any other git commands that modify the repository.
+- After completing a task where any file was changed, always suggest a single-line, concise commit message in plain-text in its own separate paragraph.

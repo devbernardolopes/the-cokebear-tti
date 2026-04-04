@@ -7,7 +7,11 @@
       const _originalFetch = window.fetch;
       window.fetch = async function (...args) {
         const url = typeof args[0] === "string" ? args[0] : args[0]?.url;
-        if (url && url.includes("/api/generate") && !url.includes("getUserQueuePosition")) {
+        if (
+          url &&
+          url.includes("/api/generate") &&
+          !url.includes("getUserQueuePosition")
+        ) {
           console.log("API request to:", url);
         }
         return _originalFetch.apply(this, args);
@@ -231,7 +235,12 @@
 
     <div id="imageModal" onclick="closeModal()">
       <div id="modalImageContainer" onclick="event.stopPropagation()">
-        <img id="modalImage" src="" alt="" ondblclick="downloadModalImage()" />
+        <img
+          id="modalImage"
+          src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMSIgaGVpZ2h0PSIxIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxyZWN0IHdpZHRoPSIxIiBoZWlnaHQ9IjEiIGZpbGw9InRyYW5zcGFyZW50Ii8+PC9zdmc+"
+          alt=""
+          ondblclick="downloadModalImage()"
+        />
         <button
           id="modalDownloadBtn"
           class="modal-download-btn"
@@ -799,6 +808,10 @@
             prompts: "++id, prompt, timestamp",
             settings: "key, value",
           });
+          db.version(3).stores({
+            prompts: "++id, prompt, timestamp",
+            settings: "key, value",
+          });
           await db.open();
 
           // Load last prompt text (even if not saved to history)
@@ -886,8 +899,9 @@
       el.conc.addEventListener("change", saveSettings);
 
       // Save prompt to database
-      async function savePrompt(prompt) {
+      async function savePrompt(prompt, options = {}) {
         if (!db || !prompt.trim()) return;
+        const { guidance, style, resolution, seeds } = options;
         try {
           // Check if this prompt already exists
           const existing = await db.prompts
@@ -896,13 +910,23 @@
             .first();
 
           if (existing) {
-            // Update the timestamp to move it to the top
-            await db.prompts.update(existing.id, { timestamp: Date.now() });
+            // Update the timestamp and settings to move it to the top
+            await db.prompts.update(existing.id, {
+              timestamp: Date.now(),
+              guidance,
+              style,
+              resolution,
+              seeds,
+            });
           } else {
             // Add new prompt
             await db.prompts.add({
               prompt: prompt,
               timestamp: Date.now(),
+              guidance,
+              style,
+              resolution,
+              seeds,
             });
           }
 
@@ -935,12 +959,34 @@
           prompts.forEach((item) => {
             const div = document.createElement("div");
             div.className = "history-item";
-            div.title = item.prompt; // Native browser tooltip
+            div.title = item.prompt;
+
+            // Build metadata display
+            let metaHtml = '<div class="history-meta">';
+            if (item.style) {
+              const styleLabel = item.style.replace(/_/g, " ");
+              metaHtml += `<span class="history-badge">${escapeHtml(styleLabel)}</span>`;
+            }
+            if (item.guidance) {
+              metaHtml += `<span class="history-badge guidance-badge">CFG: ${escapeHtml(item.guidance)}</span>`;
+            }
+            if (item.resolution) {
+              metaHtml += `<span class="history-badge">${escapeHtml(item.resolution)}</span>`;
+            }
+            if (item.seeds) {
+              if (Array.isArray(item.seeds) && item.seeds.length > 0) {
+                metaHtml += `<span class="history-badge seed-badge" title="${item.seeds.join(", ")}">${item.seeds.length} seed${item.seeds.length > 1 ? "s" : ""}</span>`;
+              } else if (!Array.isArray(item.seeds)) {
+                metaHtml += `<span class="history-badge seed-badge">Seed: ${item.seeds}</span>`;
+              }
+            }
+            metaHtml += "</div>";
+
             div.innerHTML = `
                     <span class="history-prompt">${escapeHtml(item.prompt)}</span>
+                    ${metaHtml}
                     <button class="history-delete" onclick="deletePrompt(${item.id})">x</button>
                   `;
-            // Make the entire item clickable except for the delete button
             div.onclick = (e) => {
               if (!e.target.classList.contains("history-delete")) {
                 usePrompt(item.id);
@@ -971,7 +1017,33 @@
           const item = await db.prompts.get(id);
           if (item) {
             el.prompt.value = item.prompt;
-            // Keep history panel open - don't hide it
+
+            // Restore settings
+            if (item.guidance) {
+              el.guidance.value = item.guidance;
+              el.guidanceValue.textContent = item.guidance;
+              updateGuidanceColor(parseInt(item.guidance, 10));
+            }
+            if (item.style) {
+              el.style.value = item.style;
+            }
+            if (item.resolution) {
+              el.resolution.value = item.resolution;
+            }
+
+            // Restore seed(s)
+            if (item.seeds) {
+              if (Array.isArray(item.seeds) && item.seeds.length > 0) {
+                el.seed.value = item.seeds.join(",");
+                el.seed.title = `All seeds: ${item.seeds.join(", ")}`;
+              } else {
+                el.seed.value = item.seeds;
+                el.seed.title = "";
+              }
+            } else {
+              el.seed.value = "";
+              el.seed.title = "";
+            }
           }
         } catch (e) {
           console.warn("Failed to use prompt:", e);
@@ -1162,6 +1234,8 @@
             tile.dataset.imageUrl = r.dataUrl;
             updateGenerationUI();
           });
+
+          return metadata;
         } catch (err) {
           // Re-throw to let the task handler deal with it
           throw err;
@@ -1372,9 +1446,6 @@
         currentGenerationId++;
         const thisGenerationId = currentGenerationId;
 
-        // Save prompt to history
-        await savePrompt(basePrompt);
-
         const res = el.resolution.value;
         const gs = `(guidanceScale:::${el.guidance.value})`;
         const negPrompt = el.negativePrompt.value.trim();
@@ -1386,6 +1457,8 @@
         const concurrency = parseInt(el.conc.value, 10);
         const style = el.style.value;
         const useRealismEnforcer = el.realismEnforcer.checked;
+        const userProvidedSeed =
+          seedInput && /^\d+$/.test(seedInput) ? parseInt(seedInput, 10) : null;
 
         el.error.textContent = "";
         el.mosaic.innerHTML = "";
@@ -1394,6 +1467,7 @@
         // el.loading.textContent = "Generating images...";
         el.downloadAllBtn.disabled = true;
         generatedImages = []; // Reset for new generation
+        const generatedSeeds = []; // Track seeds for this generation
         isGenerating = true;
         startKeepAlive();
 
@@ -1429,11 +1503,10 @@
           try {
             // Generate unique seed for each image
             let imageSeedValue;
-            if (seedInput && /^\d+$/.test(seedInput)) {
-              imageSeedValue = parseInt(seedInput, 10);
+            if (userProvidedSeed !== null) {
+              imageSeedValue = userProvidedSeed;
             } else {
               imageSeedValue = Math.floor(Math.random() * 1000000000);
-              // imageSeedValue = -1; // Let the API generate a random seed if input is invalid or empty
             }
             // const imageSeedFormatted = `(seed:::${imageSeedValue})`;
 
@@ -1470,7 +1543,15 @@
               seed: imageSeedValue,
             };
 
-            await generateOne(imagePrompt, tile, thisGenerationId, metadata);
+            const result = await generateOne(
+              imagePrompt,
+              tile,
+              thisGenerationId,
+              metadata,
+            );
+            if (result && result.seed !== undefined) {
+              generatedSeeds.push(result.seed);
+            }
           } catch (err) {
             if (
               currentGenerationId !== thisGenerationId ||
@@ -1501,10 +1582,48 @@
             isGenerating = false;
             stopKeepAlive();
             updateGenerationUI();
+
+            // Save prompt to history with settings after generation completes
+            const seedsToSave =
+              userProvidedSeed !== null ? userProvidedSeed : generatedSeeds;
+            await savePrompt(basePrompt, {
+              guidance: el.guidance.value,
+              style: style,
+              resolution: res,
+              seeds: seedsToSave,
+            });
           }
         }
       };
     </script>
+
+    <style>
+      .history-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        margin-top: 6px;
+      }
+      .history-badge {
+        font-size: 10px;
+        padding: 2px 6px;
+        border-radius: 3px;
+        background: #30363d;
+        color: #8b949e;
+        text-transform: capitalize;
+      }
+      .history-badge.guidance-badge {
+        background: #388bfd30;
+        color: #58a6ff;
+      }
+      .history-badge.seed-badge {
+        background: #23863630;
+        color: #3fb950;
+      }
+      .history-item {
+        padding: 10px 12px;
+      }
+    </style>
 
     <link
       rel="stylesheet"
