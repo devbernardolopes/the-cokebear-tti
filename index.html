@@ -1332,24 +1332,20 @@
         const bytes = new Uint8Array(binary.length);
         for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
 
-        const textChunk = (keyword, text) => {
-          const encoder = new TextEncoder();
-          const keywordBytes = encoder.encode(keyword);
-          const textBytes = encoder.encode(text);
-          const data = new Uint8Array(keywordBytes.length + 1 + textBytes.length);
-          data.set(keywordBytes, 0);
-          data[keywordBytes.length] = 0;
-          data.set(textBytes, keywordBytes.length + 1);
+        const header = bytes.slice(0, 8);
+        let pos = 8;
+        const chunks = [];
 
-          const type = encoder.encode("tEXt");
-          const length = new Uint8Array(4);
-          new DataView(length.buffer).setUint32(0, data.length, false);
-          const crc = crc32([...type, ...data]);
-          const crcBytes = new Uint8Array(4);
-          new DataView(crcBytes.buffer).setUint32(0, crc, false);
-
-          return new Blob([length, type, data, crcBytes], { type: "image/png" });
-        };
+        while (pos < bytes.length) {
+          const length = new DataView(bytes.slice(pos, pos + 4).buffer).getUint32(0, false);
+          const type = String.fromCharCode(...bytes.slice(pos + 4, pos + 8));
+          const fullChunk = bytes.slice(pos, pos + 12 + length);
+          if (type !== "tEXt") {
+            chunks.push(fullChunk);
+          }
+          if (type === "IEND") break;
+          pos += 12 + length;
+        }
 
         function crc32(data) {
           let crc = 0xffffffff;
@@ -1363,30 +1359,34 @@
           return (crc ^ 0xffffffff) >>> 0;
         }
 
-        const header = bytes.slice(0, 8);
-        let pos = 8;
-        let chunks = [];
-        let hasIend = false;
+        function textChunk(keyword, text) {
+          const encoder = new TextEncoder();
+          const keywordBytes = encoder.encode(keyword);
+          const textBytes = encoder.encode(text);
+          const data = new Uint8Array(keywordBytes.length + 1 + textBytes.length);
+          data.set(keywordBytes, 0);
+          data[keywordBytes.length] = 0;
+          data.set(textBytes, keywordBytes.length + 1);
 
-        while (pos < bytes.length) {
-          const length = new DataView(bytes.slice(pos, pos + 4).buffer).getUint32(0, false);
-          const type = String.fromCharCode(...bytes.slice(pos + 4, pos + 8));
-          const chunkData = bytes.slice(pos + 8, pos + 8 + length);
-          if (type === "IEND") {
-            hasIend = true;
-            chunks.push({ type, data: chunkData, pos, length });
-          } else if (type !== "tEXt") {
-            chunks.push({ type, data: chunkData, pos, length });
-          }
-          pos += 12 + length;
+          const type = "tEXt";
+          const typeBytes = encoder.encode(type);
+          const length = new Uint8Array(4);
+          new DataView(length.buffer).setUint32(0, data.length, false);
+
+          const crcData = [...typeBytes, ...data];
+          const crc = crc32(crcData);
+          const crcBytes = new Uint8Array(4);
+          new DataView(crcBytes.buffer).setUint32(0, crc, false);
+
+          return new Blob([length, typeBytes, data, crcBytes], { type: "application/octet-stream" });
         }
 
-        const promptChunk = textChunk("Prompt", prompt);
-        const seedChunk = textChunk("Seed", String(seed));
+        const promptChunk = await textChunk("Prompt", prompt);
+        const seedChunk = await textChunk("Seed", String(seed));
         const promptArr = new Uint8Array(await promptChunk.arrayBuffer());
         const seedArr = new Uint8Array(await seedChunk.arrayBuffer());
 
-        const newPng = new Blob([header, ...chunks.slice(0, chunks.length - 1).map(c => c.data), promptArr, seedArr, chunks[chunks.length - 1].data], { type: "image/png" });
+        const newPng = new Blob([header, ...chunks, promptArr, seedArr], { type: "image/png" });
         return URL.createObjectURL(newPng);
       }
 
