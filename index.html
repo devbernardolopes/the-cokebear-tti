@@ -996,7 +996,18 @@
               .reverse()
               .toArray();
             // Client-side filter for search
-            const filteredItems = items.filter(item => item.prompt.toLowerCase().includes(searchQuery));
+            const filteredItems = items.filter(item => {
+              const promptMatch = item.prompt.toLowerCase().includes(searchQuery);
+              let seedMatch = false;
+              if (item.seeds) {
+                if (Array.isArray(item.seeds)) {
+                  seedMatch = item.seeds.some(s => String(s).includes(searchQuery));
+                } else {
+                  seedMatch = String(item.seeds).includes(searchQuery);
+                }
+              }
+              return promptMatch || seedMatch;
+            });
             historyTotalCountFiltered = filteredItems.length;
             // Apply pagination after filtering
             const start = historyOffset;
