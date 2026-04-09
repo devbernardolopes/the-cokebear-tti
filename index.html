@@ -120,6 +120,7 @@
       <div class="controls">
         <div class="controls-row">
           <button onclick="toggleHistory()" id="historyBtn">History</button>
+          <button onclick="openManageHistoryModal()" id="manageHistoryBtn">Manage History</button>
 
           <select id="concurrency">
             <option value="1">1x</option>
@@ -233,6 +234,24 @@
       <button id="loadMoreBtn" style="display: none">Load More</button>
     </div>
 
+    <div id="manageHistoryModal" class="modal" style="display: none">
+      <div id="manageHistoryModalContent" onclick="event.stopPropagation()">
+        <div class="modal-header">
+          <h3>Manage History</h3>
+          <button onclick="closeManageHistoryModal()">x</button>
+        </div>
+        <div id="manageHistorySearchContainer">
+          <input type="text" id="manageHistorySearch" placeholder="Search prompts..." />
+        </div>
+        <div id="manageHistoryList"></div>
+        <button id="manageLoadMoreBtn" style="display: none">Load More</button>
+        <div class="modal-footer">
+          <span id="manageHistoryCount"></span>
+          <button onclick="deleteSelectedPrompts()" id="deleteSelectedBtn" disabled>Delete Selected</button>
+        </div>
+      </div>
+    </div>
+
     <!-- <div id="loading">Generating images...</div> -->
     <div id="error"></div>
     <div id="mosaic"></div>
@@ -310,6 +329,13 @@
         historyBtn: document.getElementById("historyBtn"),
         historySearch: document.getElementById("historySearch"),
         loadMoreBtn: document.getElementById("loadMoreBtn"),
+        manageHistoryModal: document.getElementById("manageHistoryModal"),
+        manageHistoryModalContent: document.getElementById("manageHistoryModalContent"),
+        manageHistoryList: document.getElementById("manageHistoryList"),
+        manageHistorySearch: document.getElementById("manageHistorySearch"),
+        manageLoadMoreBtn: document.getElementById("manageLoadMoreBtn"),
+        manageHistoryCount: document.getElementById("manageHistoryCount"),
+        deleteSelectedBtn: document.getElementById("deleteSelectedBtn"),
         imageModal: document.getElementById("imageModal"),
         modalImageContainer: document.getElementById("modalImageContainer"),
         modalImage: document.getElementById("modalImage"),
@@ -825,6 +851,10 @@
             prompts: "++id, prompt, timestamp",
             settings: "key, value",
           });
+          db.version(4).stores({
+            prompts: "++id, prompt, timestamp, bookmarked",
+            settings: "key, value",
+          });
           await db.open();
 
           // Load last prompt text (even if not saved to history)
@@ -971,7 +1001,7 @@
           }
 
           // Update history list if it's currently visible
-          if (el.historyPanel.style.display !== "none") {
+          if (el.historyPanel.style.display !== "none" && el.historyPanel.style.display !== "") {
             await loadHistory();
           }
         } catch (e) {
@@ -996,7 +1026,7 @@
               .reverse()
               .toArray();
             // Client-side filter for search
-            const filteredItems = items.filter(item => {
+            let filteredItems = items.filter(item => {
               const promptMatch = item.prompt.toLowerCase().includes(searchQuery);
               let seedMatch = false;
               if (item.seeds) {
@@ -1008,19 +1038,26 @@
               }
               return promptMatch || seedMatch;
             });
+            // Sort: bookmarked first (by timestamp desc), then non-bookmarked
+            filteredItems.sort((a, b) => {
+              if (a.bookmarked && !b.bookmarked) return -1;
+              if (!a.bookmarked && b.bookmarked) return 1;
+              return b.timestamp - a.timestamp;
+            });
             historyTotalCountFiltered = filteredItems.length;
             // Apply pagination after filtering
             const start = historyOffset;
             const end = start + historyLimit;
             items = filteredItems.slice(start, end);
           } else {
-            // No search - use database pagination
-            items = await db.prompts
-              .orderBy("timestamp")
-              .reverse()
-              .offset(historyOffset)
-              .limit(historyLimit)
-              .toArray();
+            // No search - load all and sort: bookmarked first (by timestamp desc), then non-bookmarked
+            const allItems = await db.prompts.orderBy("timestamp").reverse().toArray();
+            const sortedItems = allItems.sort((a, b) => {
+              if (a.bookmarked && !b.bookmarked) return -1;
+              if (!a.bookmarked && b.bookmarked) return 1;
+              return b.timestamp - a.timestamp;
+            });
+            items = sortedItems.slice(historyOffset, historyOffset + historyLimit);
           }
 
           if (!append) {
@@ -1068,13 +1105,16 @@
             }
             metaHtml += "</div>";
 
+            const starClass = item.bookmarked ? "history-star starred" : "history-star";
+            const starIcon = item.bookmarked ? "★" : "☆";
             div.innerHTML = `
+                    <button class="${starClass}" onclick="toggleBookmark(${item.id})">${starIcon}</button>
                     <span class="history-prompt">${escapeHtml(item.prompt)}</span>
                     ${metaHtml}
                     <button class="history-delete" onclick="deletePrompt(${item.id})">x</button>
                   `;
             div.onclick = (e) => {
-              if (!e.target.classList.contains("history-delete")) {
+              if (!e.target.classList.contains("history-delete") && !e.target.classList.contains("history-star")) {
                 usePrompt(item.id);
               }
             };
@@ -1154,6 +1194,188 @@
           console.warn("Failed to delete prompt:", e);
         }
       };
+
+      window.toggleBookmark = async function (id) {
+        if (!db) return;
+        try {
+          const item = await db.prompts.get(id);
+          if (item) {
+            const newBookmark = item.bookmarked ? 0 : 1;
+            await db.prompts.update(id, { bookmarked: newBookmark });
+            await loadHistory();
+          }
+        } catch (e) {
+          console.warn("Failed to toggle bookmark:", e);
+        }
+      };
+
+      // Manage History Modal state
+      let manageHistoryOffset = 0;
+      const manageHistoryLimit = 50;
+      let manageHistoryTotalCount = 0;
+      let manageHistorySearchQuery = '';
+      let manageHistoryDebounceTimer = null;
+      let selectedPromptIds = new Set();
+
+      async function loadManageHistory(append = false) {
+        if (!db) return;
+        try {
+          if (!append) {
+            manageHistoryOffset = 0;
+            el.manageHistoryList.innerHTML = "";
+          }
+
+          let items;
+          if (manageHistorySearchQuery) {
+            const allItems = await db.prompts.orderBy("timestamp").reverse().toArray();
+            manageHistoryTotalCount = allItems.length;
+            const filteredItems = allItems.filter((item) => {
+              const promptMatch = item.prompt.toLowerCase().includes(manageHistorySearchQuery);
+              let seedMatch = false;
+              if (item.seeds) {
+                if (Array.isArray(item.seeds)) {
+                  seedMatch = item.seeds.some(s => String(s).includes(manageHistorySearchQuery));
+                } else {
+                  seedMatch = String(item.seeds).includes(manageHistorySearchQuery);
+                }
+              }
+              return promptMatch || seedMatch;
+            });
+            manageHistoryTotalCount = filteredItems.length;
+            const start = manageHistoryOffset;
+            const end = start + manageHistoryLimit;
+            items = filteredItems.slice(start, end);
+          } else {
+            manageHistoryTotalCount = await db.prompts.count();
+            items = await db.prompts
+              .orderBy("timestamp")
+              .reverse()
+              .offset(manageHistoryOffset)
+              .limit(manageHistoryLimit)
+              .toArray();
+          }
+
+          if (!append) {
+            el.manageHistoryList.innerHTML = "";
+          }
+
+          if (items.length === 0 && !append) {
+            el.manageHistoryList.innerHTML =
+              manageHistorySearchQuery
+                ? '<div class="history-empty">No matching prompts found</div>'
+                : '<div class="history-empty">No history yet</div>';
+            el.manageLoadMoreBtn.style.display = "none";
+            updateManageHistoryCount();
+            return;
+          }
+
+          if (items.length === 0 && append) {
+            el.manageLoadMoreBtn.style.display = "none";
+            updateManageHistoryCount();
+            return;
+          }
+
+          items.forEach((item) => {
+            const div = document.createElement("div");
+            div.className = "history-item";
+            div.title = item.prompt;
+
+            let metaHtml = '<div class="history-meta">';
+            if (item.style) {
+              const styleLabel = item.style.replace(/_/g, " ");
+              metaHtml += `<span class="history-badge">${escapeHtml(styleLabel)}</span>`;
+            }
+            if (item.guidance) {
+              metaHtml += `<span class="history-badge guidance-badge">CFG: ${escapeHtml(item.guidance)}</span>`;
+            }
+            if (item.resolution) {
+              metaHtml += `<span class="history-badge">${escapeHtml(item.resolution)}</span>`;
+            }
+            if (item.seeds) {
+              if (Array.isArray(item.seeds) && item.seeds.length > 0) {
+                metaHtml += `<span class="history-badge seed-badge" title="${item.seeds.join(", ")}">${item.seeds.length} seed${item.seeds.length > 1 ? "s" : ""}</span>`;
+              } else if (!Array.isArray(item.seeds)) {
+                metaHtml += `<span class="history-badge seed-badge">Seed: ${item.seeds}</span>`;
+              }
+            }
+            metaHtml += "</div>";
+
+            const isChecked = selectedPromptIds.has(item.id) ? "checked" : "";
+            div.innerHTML = `
+                    <input type="checkbox" class="history-checkbox" data-id="${item.id}" ${isChecked} />
+                    <span class="history-prompt">${escapeHtml(item.prompt)}</span>
+                    ${metaHtml}
+                  `;
+
+            const checkbox = div.querySelector('input[type="checkbox"]');
+            checkbox.addEventListener("change", (e) => {
+              if (e.target.checked) {
+                selectedPromptIds.add(item.id);
+              } else {
+                selectedPromptIds.delete(item.id);
+              }
+              updateManageHistoryCount();
+            });
+
+            el.manageHistoryList.appendChild(div);
+          });
+
+          const hasMore = (manageHistoryOffset + items.length) < manageHistoryTotalCount;
+          el.manageLoadMoreBtn.style.display = hasMore ? "block" : "none";
+          updateManageHistoryCount();
+        } catch (e) {
+          console.warn("Failed to load manage history:", e);
+        }
+      }
+
+      async function updateManageHistoryCount() {
+        const total = manageHistorySearchQuery ? manageHistoryTotalCount : (await db?.prompts.count() || 0);
+        el.manageHistoryCount.textContent = `${selectedPromptIds.size} of ${total} selected`;
+        el.deleteSelectedBtn.disabled = selectedPromptIds.size === 0;
+      }
+
+      window.openManageHistoryModal = async function () {
+        manageHistoryOffset = 0;
+        manageHistorySearchQuery = '';
+        selectedPromptIds.clear();
+        el.manageHistorySearch.value = '';
+        el.manageHistoryList.innerHTML = "";
+        selectedPromptIds = new Set();
+        await loadManageHistory(false);
+        el.manageHistoryModal.style.display = "flex";
+      };
+
+      window.closeManageHistoryModal = function () {
+        el.manageHistoryModal.style.display = "none";
+      };
+
+      window.deleteSelectedPrompts = async function () {
+        if (!db || selectedPromptIds.size === 0) return;
+        const ids = Array.from(selectedPromptIds);
+        try {
+          await db.prompts.bulkDelete(ids);
+          selectedPromptIds.clear();
+          await loadManageHistory(false);
+        } catch (e) {
+          console.warn("Failed to delete selected prompts:", e);
+        }
+      };
+
+      // Manage History search with debounce
+      el.manageHistorySearch.addEventListener("input", (e) => {
+        clearTimeout(manageHistoryDebounceTimer);
+        manageHistoryDebounceTimer = setTimeout(() => {
+          manageHistorySearchQuery = e.target.value;
+          manageHistoryOffset = 0;
+          loadManageHistory(false);
+        }, 300);
+      });
+
+      // Manage History Load More button
+      el.manageLoadMoreBtn.addEventListener("click", () => {
+        manageHistoryOffset += manageHistoryLimit;
+        loadManageHistory(true);
+      });
 
       function escapeHtml(text) {
         const div = document.createElement("div");
@@ -1851,7 +2073,144 @@
       }
       #loadMoreBtn:hover {
         background: #30363d;
-        border-color: #8b949e;
+      }
+      .history-star {
+        background: none;
+        border: none;
+        color: #8b949e;
+        font-size: 16px;
+        cursor: pointer;
+        padding: 0 4px;
+        margin-right: 4px;
+      }
+      .history-star:hover {
+        color: #e3b341;
+      }
+      .history-star.starred {
+        color: #e3b341;
+      }
+      .history-item .history-prompt {
+        flex: 1;
+      }
+      #manageHistoryModal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.7);
+        z-index: 1000;
+        display: none;
+        align-items: center;
+        justify-content: center;
+      }
+      #manageHistoryModalContent {
+        background: #161b22;
+        border: 1px solid #30363d;
+        border-radius: 12px;
+        width: 90%;
+        max-width: 800px;
+        max-height: 80vh;
+        display: flex;
+        flex-direction: column;
+      }
+      .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 16px;
+        border-bottom: 1px solid #30363d;
+      }
+      .modal-header h3 {
+        margin: 0;
+        color: #c9d1d9;
+      }
+      .modal-header button {
+        background: none;
+        border: none;
+        color: #8b949e;
+        font-size: 20px;
+        cursor: pointer;
+        padding: 4px 8px;
+      }
+      .modal-header button:hover {
+        color: #c9d1d9;
+      }
+      #manageHistorySearchContainer {
+        padding: 8px 12px;
+        border-bottom: 1px solid #30363d;
+      }
+      #manageHistorySearch {
+        width: 100%;
+        padding: 8px 12px;
+        background: #0d1117;
+        border: 1px solid #30363d;
+        border-radius: 6px;
+        color: #c9d1d9;
+        font-size: 13px;
+        box-sizing: border-box;
+      }
+      #manageHistorySearch:focus {
+        outline: none;
+        border-color: #58a6ff;
+      }
+      #manageHistorySearch::placeholder {
+        color: #8b949e;
+      }
+      #manageHistoryList {
+        flex: 1;
+        overflow-y: auto;
+        padding: 8px 0;
+      }
+      #manageLoadMoreBtn {
+        display: block;
+        width: calc(100% - 24px);
+        margin: 12px auto;
+        padding: 10px;
+        background: #21262d;
+        border: 1px solid #30363d;
+        border-radius: 6px;
+        color: #c9d1d9;
+        font-size: 13px;
+        cursor: pointer;
+      }
+      #manageLoadMoreBtn:hover {
+        background: #30363d;
+      }
+      .modal-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px 16px;
+        border-top: 1px solid #30363d;
+      }
+      #manageHistoryCount {
+        color: #8b949e;
+        font-size: 13px;
+      }
+      #deleteSelectedBtn {
+        padding: 8px 16px;
+        background: #da3633;
+        border: 1px solid #da3633;
+        border-radius: 6px;
+        color: white;
+        font-size: 13px;
+        cursor: pointer;
+      }
+      #deleteSelectedBtn:hover:not(:disabled) {
+        background: #f85149;
+      }
+      #deleteSelectedBtn:disabled {
+        background: #21262d;
+        border-color: #30363d;
+        color: #484f58;
+        cursor: not-allowed;
+      }
+      .history-checkbox {
+        margin-right: 10px;
+        cursor: pointer;
+        width: 16px;
+        height: 16px;
       }
     </style>
 
