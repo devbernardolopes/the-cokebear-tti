@@ -132,12 +132,18 @@
       </div>
     </div>
 
-    <div id="historyPanel" style="display: none">
-      <div id="historySearchContainer">
-        <input type="text" id="historySearch" placeholder="Search prompts..." />
+    <div id="historyModal" class="modal" style="display: none">
+      <div id="historyModalContent" onclick="event.stopPropagation()">
+        <div class="modal-header">
+          <h3>History</h3>
+          <button onclick="closeHistoryModal()">x</button>
+        </div>
+        <div id="historySearchContainer">
+          <input type="text" id="historySearch" placeholder="Search prompts..." />
+        </div>
+        <div id="historyList"></div>
+        <button id="loadMoreBtn" style="display: none">Load More</button>
       </div>
-      <div id="historyList"></div>
-      <button id="loadMoreBtn" style="display: none">Load More</button>
     </div>
 
     <div id="manageHistoryModal" class="modal" style="display: none">
@@ -240,7 +246,8 @@
         mosaic: document.getElementById("mosaic"),
         error: document.getElementById("error"),
         // loading: document.getElementById("loading"),
-        historyPanel: document.getElementById("historyPanel"),
+        historyModal: document.getElementById("historyModal"),
+        historyModalContent: document.getElementById("historyModalContent"),
         historyList: document.getElementById("historyList"),
         historyBtn: document.getElementById("historyBtn"),
         historySearch: document.getElementById("historySearch"),
@@ -884,7 +891,7 @@
           }
 
           // Update history list if it's currently visible
-          if (el.historyPanel.style.display !== "none" && el.historyPanel.style.display !== "") {
+          if (el.historyModal.style.display !== "none" && el.historyModal.style.display !== "") {
             await loadHistory();
           }
         } catch (e) {
@@ -1009,19 +1016,27 @@
       }
 
       window.toggleHistory = async function () {
-        if (el.historyPanel.style.display === "none") {
+        if (el.historyModal.style.display === "none") {
           // Reset pagination and search when opening
           historyOffset = 0;
           historySearchQuery = "";
           el.historySearch.value = "";
           await loadHistory(false);
-          el.historyPanel.style.display = "block";
-          el.historyBtn.textContent = "Hide History";
+          el.historyModal.style.display = "flex";
         } else {
-          el.historyPanel.style.display = "none";
-          el.historyBtn.textContent = "History";
+          el.historyModal.style.display = "none";
         }
       };
+
+      window.closeHistoryModal = function () {
+        el.historyModal.style.display = "none";
+      };
+
+      el.historyModal.addEventListener("click", (e) => {
+        if (e.target === el.historyModal) {
+          closeHistoryModal();
+        }
+      });
 
       window.usePrompt = async function (id) {
         if (!db) return;
@@ -1902,6 +1917,21 @@
       #historySearchContainer {
         padding: 8px 12px;
         border-bottom: 1px solid #30363d;
+      }
+      #historyModalContent {
+        background: #161b22;
+        border: 1px solid #30363d;
+        border-radius: 12px;
+        width: 90%;
+        max-width: 800px;
+        max-height: 80vh;
+        display: flex;
+        flex-direction: column;
+      }
+      #historyList {
+        flex: 1;
+        overflow-y: auto;
+        padding: 8px 0;
       }
       #historySearch {
         width: 100%;
