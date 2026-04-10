@@ -742,6 +742,9 @@
           const lastPromptText = await db.settings.get("lastPromptText");
           if (lastPromptText && lastPromptText.value) {
             el.prompt.value = lastPromptText.value;
+            if (el.prompt.value.trim()) {
+              autoAdjustPromptHeight();
+            }
           }
 
           // Load scratchpad text
@@ -1026,6 +1029,9 @@
           const item = await db.prompts.get(id);
           if (item) {
             el.prompt.value = item.prompt;
+            if (el.prompt.value.trim()) {
+              autoAdjustPromptHeight();
+            }
 
             // Restore settings
             if (item.guidance) {
@@ -1548,6 +1554,9 @@
         useAsPromptBtn.style.cursor = "pointer";
         useAsPromptBtn.onclick = () => {
           el.prompt.value = metadata.prompt;
+          if (el.prompt.value.trim()) {
+            autoAdjustPromptHeight();
+          }
           el.prompt.dispatchEvent(new Event("input", { bubbles: true }));
         };
 
