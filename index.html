@@ -7,11 +7,7 @@
       const _originalFetch = window.fetch;
       window.fetch = async function (...args) {
         const url = typeof args[0] === "string" ? args[0] : args[0]?.url;
-        if (
-          url &&
-          url.includes("/api/generate") &&
-          !url.includes("getUserQueuePosition")
-        ) {
+        if (url && url.includes("/api/generate") && !url.includes("getUserQueuePosition")) {
           console.log("API request to:", url);
         }
         return _originalFetch.apply(this, args);
@@ -24,94 +20,36 @@
     <div class="input-container">
       <h1 class="page-title">The Cokebear TTI</h1>
 
-      <div
-        id="infoBox"
-        style="
-          display: none;
-          background: #161b22;
-          color: #c9d1d9;
-          border: 1px solid #30363d;
-          border-radius: 6px;
-          padding: 16px;
-          margin-bottom: 16px;
-          max-width: 900px;
-        "
-      >
-        <div
-          style="
-            display: flex;
-            justify-content: space-between;
-            align-items: left;
-          "
-        >
+      <div id="infoBox" style="display: none; background: #161b22; color: #c9d1d9; border: 1px solid #30363d; border-radius: 6px; padding: 16px; margin-bottom: 16px; max-width: 900px">
+        <div style="display: flex; justify-content: space-between; align-items: left">
           <span style="font-weight: bold; font-size: 18px">Info & Guide</span>
-          <button
-            id="closeInfoBtn"
-            style="
-              background: #30363d;
-              color: #fff;
-              border: none;
-              border-radius: 4px;
-              padding: 2px 10px;
-              font-size: 18px;
-              cursor: pointer;
-            "
-          >
-            Close
-          </button>
+          <button id="closeInfoBtn" style="background: #30363d; color: #fff; border: none; border-radius: 4px; padding: 2px 10px; font-size: 18px; cursor: pointer">Close</button>
         </div>
-        <div
-          id="infoBoxContent"
-          style="margin-top: 10px; font-size: 14px; align-items: left"
-        >
+        <div id="infoBoxContent" style="margin-top: 10px; font-size: 14px; align-items: left">
           <p>
             <b>Shortcuts:</b><br />
             • <b>Ctrl+Shift+S</b>: Toggle Scratchpad<br />
             • <b>Ctrl+Shift+H</b>: Toggle History<br />
             • <b>Ctrl+Shift+E</b>: Auto-adjust prompt height<br />
             • <b>Ctrl+Shift+Q</b>: Cancel generation (when enabled)<br />
-            • <b>Ctrl+Enter</b>: Generate (when not focused in prompt, or if
-            'ENTER to send' is off)<br />
-            • <b>Enter</b>: Generate (when 'ENTER to send' is on and focused in
-            prompt)<br />
+            • <b>Ctrl+Enter</b>: Generate (when not focused in prompt, or if 'ENTER to send' is off)<br />
+            • <b>Enter</b>: Generate (when 'ENTER to send' is on and focused in prompt)<br />
           </p>
-          <p>
-            <b>Cancel Button:</b> Only enabled when there are images in the
-            queue that can still be cancelled ("Waiting...").
-          </p>
+          <p><b>Cancel Button:</b> Only enabled when there are images in the queue that can still be cancelled ("Waiting...").</p>
         </div>
       </div>
       <button
         id="toggleInfoBtn"
-        style="
-          background: #1f6feb;
-          border-color: #388bfd;
-          color: #fff;
-          border-radius: 6px;
-          padding: 6px 12px;
-          margin-bottom: 10px;
-          font-size: 14px;
-          font-weight: 600;
-          cursor: pointer;
-        "
+        style="background: #1f6feb; border-color: #388bfd; color: #fff; border-radius: 6px; padding: 6px 12px; margin-bottom: 10px; font-size: 14px; font-weight: 600; cursor: pointer"
       >
         Info
       </button>
       <br />
 
-      <button
-        onclick="toggleScratchpad()"
-        id="scratchpadBtn"
-        class="scratchpad-toggle"
-      >
-        Scratchpad
-      </button>
+      <button onclick="toggleScratchpad()" id="scratchpadBtn" class="scratchpad-toggle">Scratchpad</button>
       <br />
       <div id="scratchpadContainer" style="display: none">
-        <textarea
-          id="scratchpadText"
-          placeholder="Define variables here, e.g., HAIR_COLOR = {black|brown|blond}"
-        ></textarea>
+        <textarea id="scratchpadText" placeholder="Define variables here, e.g., HAIR_COLOR = {black|brown|blond}"></textarea>
       </div>
       <br />
 
@@ -131,62 +69,38 @@
 
           <div style="display: flex; align-items: center; gap: 6px">
             <input id="guidance" type="range" min="1" max="30" value="14" />
-            <span id="guidanceValue" style="min-width: 30px; font-size: 13px"
-              >14</span
-            >
+            <span id="guidanceValue" style="min-width: 30px; font-size: 13px">14</span>
           </div>
 
-          <input
-            id="negativePrompt"
-            type="text"
-            placeholder="Negative prompt..."
-            style="min-width: 200px"
-          />
+          <input id="negativePrompt" type="text" placeholder="Negative prompt..." style="min-width: 200px" />
 
-          <label
-            style="
-              display: flex;
-              align-items: center;
-              gap: 4px;
-              cursor: pointer;
-            "
-          >
+          <label style="display: flex; align-items: center; gap: 4px; cursor: pointer">
             <input type="checkbox" id="realismEnforcer" />
             <span>RE</span>
           </label>
 
-          <label
-            style="
-              display: flex;
-              align-items: center;
-              gap: 4px;
-              cursor: pointer;
-            "
-          >
+          <label style="display: flex; align-items: center; gap: 4px; cursor: pointer">
             <input type="checkbox" id="enterToSend" checked />
             <span style="font-size: 12px">ENTER to send</span>
           </label>
         </div>
 
         <div class="controls-row">
-          <input
-            id="seed"
-            type="text"
-            placeholder="Seed (optional)"
-            style="width: 140px"
-            inputmode="numeric"
-            pattern="[0-9]*"
-          />
+          <input id="seed" type="text" placeholder="Seed (optional)" style="width: 140px" inputmode="numeric" pattern="[0-9]*" />
 
           <select id="style">
             <option value="casual">Casual Photo</option>
             <option value="casual_raw">Casual Photo (Raw)</option>
+            <option value="casual_snapchat">Casual Photo (Snapchat)</option>
             <option value="professional">Professional Photo</option>
-            <option value="professional_ex">
-              Professional Photo (Extended)
-            </option>
+            <option value="professional_ex">Professional Photo (Extended)</option>
             <option value="cinematic">Cinematic</option>
             <option value="cinematic_ex">Cinematic (Extended)</option>
+            <option value="twotousands">2000s</option>
+            <option value="nineties">1990s</option>
+            <option value="eighties">1980s</option>
+            <option value="seventies">1970s</option>
+            <option value="sixties">1960s</option>
             <option value="fifties">1950s</option>
             <option value="cctv">CCTV</option>
             <!-- <option value="macro">Macro Photo</option> -->
@@ -211,16 +125,8 @@
             <option value="64">64</option>
           </select>
 
-          <button onclick="downloadAllImages()" id="downloadAllBtn" disabled>
-            Download All
-          </button>
-          <button
-            id="cancelGenBtn"
-            onclick="cancelGeneration()"
-            style="display: none; background: #da3633; border-color: #f85149"
-          >
-            Cancel
-          </button>
+          <button onclick="downloadAllImages()" id="downloadAllBtn" disabled>Download All</button>
+          <button id="cancelGenBtn" onclick="cancelGeneration()" style="display: none; background: #da3633; border-color: #f85149">Cancel</button>
           <button onclick="generateImages()" id="generateBtn">Generate</button>
         </div>
       </div>
@@ -289,8 +195,9 @@
 
       const RAW_CASUAL_PHOTO = ". It's an unedited smartphone snapshot.";
 
-      const PROFESSIONAL_PHOTO =
-        ", {sharp|soft} focus, depth of field, 8k photo, HDR, professional lighting, taken with Canon EOS R5, DSLR, 75mm lens.";
+      const SNAPCHAT_CASUAL_PHOTO = ". It's a casual Snapchat selfie photo.";
+
+      const PROFESSIONAL_PHOTO = ", {sharp|soft} focus, depth of field, 8k photo, HDR, professional lighting, taken with Canon EOS R5, DSLR, 75mm lens.";
 
       const PROFESSIONAL_PHOTO_EX =
         ", {sharp|soft} focus, depth of field, 8k photo, HDR, professional lighting, taken with Canon EOS R5, DSLR, 75mm lens. Overall, it's a stunning professional photograph with impeccable attention to detail and composition. The lighting is expertly executed, creating a captivating atmosphere. The image is rendered in ultra-high resolution with HDR, showcasing fine details and textures that contribute to its realism. The use of a 75mm lens adds a pleasing perspective and depth to the photo, making it look like it was taken by a skilled photographer.";
@@ -304,8 +211,17 @@
       const CINEMATIC_EX =
         ", cinematic shot, dynamic lighting, 75mm, Technicolor, Panavision, cinemascope, sharp focus, fine details, 8k, HDR, realism, realistic, key visual, film still, cinematic color grading, depth of field.\n\nOverall, it's an absolute world-class cinematic masterpiece. It's an aesthetically pleasing cinematic shot with impeccable attention to detail and impressive composition. The lighting is dramatic and expertly executed, creating a captivating atmosphere. The image is rendered in stunning 8k resolution with HDR, showcasing fine details and textures that contribute to its realism. The color grading is cinematic and visually striking, enhancing the overall mood and impact of the shot. This image stands out as a prime example of top-tier cinematic photography, evoking strong emotions and leaving a lasting impression on viewers.";
 
-      const FIFTIES =
-        ", grainy photograph, 1950s photo with film grain, 1950s photo with vignetting, retro, r/OldSchoolCool, 1950s photo, vintage photo.";
+      const TWOTHOUSANDS = ", grainy photograph, 1950s photo with film grain, 1950s photo with vignetting, retro, r/OldSchoolCool, 1950s photo, vintage photo.";
+
+      const NINETIES = ", grainy photograph, 1950s photo with film grain, 1950s photo with vignetting, retro, r/OldSchoolCool, 1950s photo, vintage photo.";
+
+      const EIGHTIES = ", grainy photograph, 1950s photo with film grain, 1950s photo with vignetting, retro, r/OldSchoolCool, 1950s photo, vintage photo.";
+
+      const SEVENTIES = ", grainy photograph, 1950s photo with film grain, 1950s photo with vignetting, retro, r/OldSchoolCool, 1950s photo, vintage photo.";
+
+      const SIXTIES = ", grainy photograph, 1950s photo with film grain, 1950s photo with vignetting, retro, r/OldSchoolCool, 1950s photo, vintage photo.";
+
+      const FIFTIES = ", grainy photograph, 1950s photo with film grain, 1950s photo with vignetting, retro, r/OldSchoolCool, 1950s photo, vintage photo.";
 
       const el = {
         prompt: document.getElementById("promptText"),
@@ -364,7 +280,7 @@
       let historyOffset = 0;
       const historyLimit = 50;
       let historyTotalCount = 0;
-      let historySearchQuery = '';
+      let historySearchQuery = "";
       let historyDebounceTimer = null;
 
       window.fetch = async function (...args) {
@@ -376,19 +292,11 @@
           const clonedResponse = response.clone();
           try {
             const data = await clonedResponse.json();
-            if (
-              data.position !== undefined &&
-              data.total !== undefined &&
-              data.position > 0
-            ) {
+            if (data.position !== undefined && data.total !== undefined && data.position > 0) {
               requestAnimationFrame(() => {
                 waitingTiles.forEach((tile) => {
                   const placeholder = tile.querySelector(".placeholder");
-                  if (
-                    placeholder &&
-                    (placeholder.textContent.startsWith("Generating") ||
-                      placeholder.textContent.startsWith("Queued"))
-                  ) {
+                  if (placeholder && (placeholder.textContent.startsWith("Generating") || placeholder.textContent.startsWith("Queued"))) {
                     placeholder.textContent = `Queued (${data.position}/${data.total})`;
                   }
                 });
@@ -413,9 +321,7 @@
         // Browsers don't throttle tabs that are playing audio
         try {
           if (!audioContext) {
-            audioContext = new (
-              window.AudioContext || window.webkitAudioContext
-            )();
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
           }
           // Create a silent oscillator
           const oscillator = audioContext.createOscillator();
@@ -559,9 +465,7 @@
 
       window.showPreviousImage = function () {
         if (generatedImages.length === 0) return;
-        currentModalIndex =
-          (currentModalIndex - 1 + generatedImages.length) %
-          generatedImages.length;
+        currentModalIndex = (currentModalIndex - 1 + generatedImages.length) % generatedImages.length;
         currentModalImageSrc = generatedImages[currentModalIndex];
         el.modalImage.src = currentModalImageSrc;
         updateModalCounter();
@@ -634,10 +538,7 @@
 
       // Check if selected text is a valid parameter
       function getSelectedParameterIfValid() {
-        const selection = el.scratchpad.value.substring(
-          el.scratchpad.selectionStart,
-          el.scratchpad.selectionEnd,
-        );
+        const selection = el.scratchpad.value.substring(el.scratchpad.selectionStart, el.scratchpad.selectionEnd);
 
         const trimmedSelection = selection.trim();
         if (!trimmedSelection) return null;
@@ -655,10 +556,7 @@
       // Insert parameter at cursor in promptText
       function insertParameterAtCursor(parameter) {
         const textarea = el.prompt;
-        const beforeCursor = textarea.value.substring(
-          0,
-          textarea.selectionStart,
-        );
+        const beforeCursor = textarea.value.substring(0, textarea.selectionStart);
         const afterCursor = textarea.value.substring(textarea.selectionEnd);
 
         textarea.value = beforeCursor + `[${parameter}]` + afterCursor;
@@ -684,10 +582,7 @@
             insertBtn = document.createElement("button");
             insertBtn.id = "parameterInsertBtn";
             insertBtn.className = "parameter-insert-btn";
-            el.scratchpadContainer.parentNode.insertBefore(
-              insertBtn,
-              el.scratchpadContainer.nextSibling,
-            );
+            el.scratchpadContainer.parentNode.insertBefore(insertBtn, el.scratchpadContainer.nextSibling);
           }
 
           insertBtn.textContent = `Insert [${parameter}] into prompt →`;
@@ -743,12 +638,7 @@
         let hasGenerating = false;
         for (const p of placeholders) {
           const text = p.textContent;
-          if (
-            text === "Starting..." ||
-            text === "Generating..." ||
-            text.startsWith("Queued") ||
-            text === "Processing..."
-          ) {
+          if (text === "Starting..." || text === "Generating..." || text.startsWith("Queued") || text === "Processing...") {
             hasGenerating = true;
             break;
           }
@@ -780,11 +670,7 @@
         // Ctrl+Shift+Q for cancel (only if cancel button is visible)
         if (e.ctrlKey && e.shiftKey && key === "Q") {
           const cancelBtn = el.cancelGenBtn;
-          if (
-            cancelBtn &&
-            cancelBtn.style.display !== "none" &&
-            !cancelBtn.disabled
-          ) {
+          if (cancelBtn && cancelBtn.style.display !== "none" && !cancelBtn.disabled) {
             e.preventDefault();
             cancelBtn.click();
           }
@@ -795,11 +681,7 @@
           autoAdjustPromptHeight();
         }
         // Ctrl+Enter for generate (but not when focused on textarea with Shift)
-        if (
-          e.ctrlKey &&
-          e.key === "Enter" &&
-          document.activeElement !== el.prompt
-        ) {
+        if (e.ctrlKey && e.key === "Enter" && document.activeElement !== el.prompt) {
           const generateBtnDisabled = el.generateBtn.disabled;
           if (!generateBtnDisabled) {
             e.preventDefault();
@@ -813,8 +695,7 @@
       el.closeInfoBtn = document.getElementById("closeInfoBtn");
 
       el.toggleInfoBtn.addEventListener("click", () => {
-        el.infoBox.style.display =
-          el.infoBox.style.display === "none" ? "block" : "none";
+        el.infoBox.style.display = el.infoBox.style.display === "none" ? "block" : "none";
       });
       el.closeInfoBtn.addEventListener("click", () => {
         el.infoBox.style.display = "none";
@@ -922,8 +803,7 @@
             updateGuidanceColor(value);
           }
           if (negativePrompt) el.negativePrompt.value = negativePrompt.value;
-          if (realismEnforcer)
-            el.realismEnforcer.checked = realismEnforcer.value;
+          if (realismEnforcer) el.realismEnforcer.checked = realismEnforcer.value;
           if (style) el.style.value = style.value;
           if (numImages) el.num.value = numImages.value;
           if (concurrency) el.conc.value = concurrency.value;
@@ -1021,17 +901,14 @@
           let items;
           if (searchQuery) {
             // For search, load all and filter (could optimize with indexed search)
-            items = await db.prompts
-              .orderBy("timestamp")
-              .reverse()
-              .toArray();
+            items = await db.prompts.orderBy("timestamp").reverse().toArray();
             // Client-side filter for search
-            let filteredItems = items.filter(item => {
+            let filteredItems = items.filter((item) => {
               const promptMatch = item.prompt.toLowerCase().includes(searchQuery);
               let seedMatch = false;
               if (item.seeds) {
                 if (Array.isArray(item.seeds)) {
-                  seedMatch = item.seeds.some(s => String(s).includes(searchQuery));
+                  seedMatch = item.seeds.some((s) => String(s).includes(searchQuery));
                 } else {
                   seedMatch = String(item.seeds).includes(searchQuery);
                 }
@@ -1065,10 +942,7 @@
           }
 
           if (items.length === 0 && !append) {
-            el.historyList.innerHTML =
-              searchQuery
-                ? '<div class="history-empty">No matching prompts found</div>'
-                : '<div class="history-empty">No history yet</div>';
+            el.historyList.innerHTML = searchQuery ? '<div class="history-empty">No matching prompts found</div>' : '<div class="history-empty">No history yet</div>';
             el.loadMoreBtn.style.display = "none";
             return;
           }
@@ -1124,7 +998,7 @@
 
           // Show/hide Load More button
           const effectiveTotal = searchQuery ? historyTotalCountFiltered : historyTotalCount;
-          const hasMore = (historyOffset + items.length) < effectiveTotal;
+          const hasMore = historyOffset + items.length < effectiveTotal;
           el.loadMoreBtn.style.display = hasMore ? "block" : "none";
         } catch (e) {
           console.warn("Failed to load history:", e);
@@ -1135,8 +1009,8 @@
         if (el.historyPanel.style.display === "none") {
           // Reset pagination and search when opening
           historyOffset = 0;
-          historySearchQuery = '';
-          el.historySearch.value = '';
+          historySearchQuery = "";
+          el.historySearch.value = "";
           await loadHistory(false);
           el.historyPanel.style.display = "block";
           el.historyBtn.textContent = "Hide History";
@@ -1213,7 +1087,7 @@
       let manageHistoryOffset = 0;
       const manageHistoryLimit = 50;
       let manageHistoryTotalCount = 0;
-      let manageHistorySearchQuery = '';
+      let manageHistorySearchQuery = "";
       let manageHistoryDebounceTimer = null;
       let selectedPromptIds = new Set();
 
@@ -1234,7 +1108,7 @@
               let seedMatch = false;
               if (item.seeds) {
                 if (Array.isArray(item.seeds)) {
-                  seedMatch = item.seeds.some(s => String(s).includes(manageHistorySearchQuery));
+                  seedMatch = item.seeds.some((s) => String(s).includes(manageHistorySearchQuery));
                 } else {
                   seedMatch = String(item.seeds).includes(manageHistorySearchQuery);
                 }
@@ -1247,12 +1121,7 @@
             items = filteredItems.slice(start, end);
           } else {
             manageHistoryTotalCount = await db.prompts.count();
-            items = await db.prompts
-              .orderBy("timestamp")
-              .reverse()
-              .offset(manageHistoryOffset)
-              .limit(manageHistoryLimit)
-              .toArray();
+            items = await db.prompts.orderBy("timestamp").reverse().offset(manageHistoryOffset).limit(manageHistoryLimit).toArray();
           }
 
           if (!append) {
@@ -1260,10 +1129,7 @@
           }
 
           if (items.length === 0 && !append) {
-            el.manageHistoryList.innerHTML =
-              manageHistorySearchQuery
-                ? '<div class="history-empty">No matching prompts found</div>'
-                : '<div class="history-empty">No history yet</div>';
+            el.manageHistoryList.innerHTML = manageHistorySearchQuery ? '<div class="history-empty">No matching prompts found</div>' : '<div class="history-empty">No history yet</div>';
             el.manageLoadMoreBtn.style.display = "none";
             updateManageHistoryCount();
             return;
@@ -1320,7 +1186,7 @@
             el.manageHistoryList.appendChild(div);
           });
 
-          const hasMore = (manageHistoryOffset + items.length) < manageHistoryTotalCount;
+          const hasMore = manageHistoryOffset + items.length < manageHistoryTotalCount;
           el.manageLoadMoreBtn.style.display = hasMore ? "block" : "none";
           updateManageHistoryCount();
         } catch (e) {
@@ -1329,16 +1195,16 @@
       }
 
       async function updateManageHistoryCount() {
-        const total = manageHistorySearchQuery ? manageHistoryTotalCount : (await db?.prompts.count() || 0);
+        const total = manageHistorySearchQuery ? manageHistoryTotalCount : (await db?.prompts.count()) || 0;
         el.manageHistoryCount.textContent = `${selectedPromptIds.size} of ${total} selected`;
         el.deleteSelectedBtn.disabled = selectedPromptIds.size === 0;
       }
 
       window.openManageHistoryModal = async function () {
         manageHistoryOffset = 0;
-        manageHistorySearchQuery = '';
+        manageHistorySearchQuery = "";
         selectedPromptIds.clear();
-        el.manageHistorySearch.value = '';
+        el.manageHistorySearch.value = "";
         el.manageHistoryList.innerHTML = "";
         selectedPromptIds = new Set();
         await loadManageHistory(false);
@@ -1395,9 +1261,7 @@
 
         for (const line of lines) {
           // Match pattern: VARIABLE_NAME = {anything} - must have curly braces
-          const match = line.match(
-            /^\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*(\{[^}]+\})\s*$/,
-          );
+          const match = line.match(/^\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*(\{[^}]+\})\s*$/);
           if (match) {
             const varName = match[1].toUpperCase();
             const varValue = match[2].trim(); // Keep the curly braces
@@ -1427,10 +1291,7 @@
           // Only trigger if Generate is enabled
           if (!generateBtnDisabled) {
             // Send if: (checked and no ctrl) OR (unchecked and ctrl pressed)
-            if (
-              (shouldSendOnEnter && !isCtrlPressed) ||
-              (!shouldSendOnEnter && isCtrlPressed)
-            ) {
+            if ((shouldSendOnEnter && !isCtrlPressed) || (!shouldSendOnEnter && isCtrlPressed)) {
               e.preventDefault();
               generateImages();
             }
@@ -1611,7 +1472,9 @@
           const crcBytes = new Uint8Array(4);
           new DataView(crcBytes.buffer).setUint32(0, crc, false);
 
-          return new Blob([length, typeBytes, data, crcBytes], { type: "application/octet-stream" });
+          return new Blob([length, typeBytes, data, crcBytes], {
+            type: "application/octet-stream",
+          });
         }
 
         const promptChunk = await textChunk("Prompt", prompt);
@@ -1619,15 +1482,14 @@
         const promptArr = new Uint8Array(await promptChunk.arrayBuffer());
         const seedArr = new Uint8Array(await seedChunk.arrayBuffer());
 
-        const newPng = new Blob([header, ...chunks, promptArr, seedArr], { type: "image/png" });
+        const newPng = new Blob([header, ...chunks, promptArr, seedArr], {
+          type: "image/png",
+        });
         return URL.createObjectURL(newPng);
       }
 
       async function downloadImage(dataUrl) {
-        const timestamp = new Date()
-          .toISOString()
-          .replace(/[:.]/g, "-")
-          .slice(0, -5);
+        const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, -5);
         const metadata = window.imageMetadata?.[dataUrl];
         const seed = metadata?.seed ?? "";
         const filename = seed ? `tti-${timestamp}-${seed}.png` : `tti-${timestamp}.png`;
@@ -1811,10 +1673,7 @@
       window.downloadAllImages = async function () {
         if (generatedImages.length === 0) return;
 
-        const baseTimestamp = new Date()
-          .toISOString()
-          .replace(/[:.]/g, "-")
-          .slice(0, -5);
+        const baseTimestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, -5);
 
         for (let index = 0; index < generatedImages.length; index++) {
           const dataUrl = generatedImages[index];
@@ -1834,7 +1693,7 @@
           document.body.appendChild(link);
           link.click();
           document.body.removeChild(link);
-          await new Promise(r => setTimeout(r, 100));
+          await new Promise((r) => setTimeout(r, 100));
         }
       };
 
@@ -1864,16 +1723,13 @@
         const res = el.resolution.value;
         const gs = `(guidanceScale:::${el.guidance.value})`;
         const negPrompt = el.negativePrompt.value.trim();
-        const negPromptFormatted = negPrompt
-          ? `(negativePrompt:::${negPrompt})`
-          : "";
+        const negPromptFormatted = negPrompt ? `(negativePrompt:::${negPrompt})` : "";
         const seedInput = el.seed.value.trim();
         const num = parseInt(el.num.value, 10);
         const concurrency = parseInt(el.conc.value, 10);
         const style = el.style.value;
         const useRealismEnforcer = el.realismEnforcer.checked;
-        const userProvidedSeed =
-          seedInput && /^\d+$/.test(seedInput) ? parseInt(seedInput, 10) : null;
+        const userProvidedSeed = seedInput && /^\d+$/.test(seedInput) ? parseInt(seedInput, 10) : null;
 
         el.error.textContent = "";
         el.mosaic.innerHTML = "";
@@ -1886,11 +1742,7 @@
         isGenerating = true;
         startKeepAlive();
 
-        const shape = res.includes("512x768")
-          ? "portrait"
-          : res.includes("768x512")
-            ? "landscape"
-            : "square";
+        const shape = res.includes("512x768") ? "portrait" : res.includes("768x512") ? "landscape" : "square";
 
         const tiles = [];
         for (let i = 0; i < num; i++) {
@@ -1934,17 +1786,20 @@
             if (style === "cinematic") imagePrompt += CINEMATIC;
             if (style === "cinematic_ex") imagePrompt += CINEMATIC_EX;
             if (style === "cctv") imagePrompt += CCTV;
-            if (style === "fifties")
-              imagePrompt =
-                "Famous vintage 1950s photo, " + imagePrompt + FIFTIES;
-            if (style === "casual")
-              imagePrompt = "A casual photo of " + imagePrompt + CASUAL_PHOTO;
-            if (style === "casual_raw")
-              imagePrompt =
-                "A casual photo of " + imagePrompt + RAW_CASUAL_PHOTO;
+
+            if (style === "twothousands") imagePrompt = "Famous vintage 2000s photo, " + imagePrompt + TWO_THOUSANDS;
+            if (style === "ninetees") imagePrompt = "Famous vintage 1990s photo, " + imagePrompt + NINETEES;
+            if (style === "eighties") imagePrompt = "Famous vintage 1980s photo, " + imagePrompt + EIGHTIES;
+            if (style === "seventies") imagePrompt = "Famous vintage 1970s photo, " + imagePrompt + SEVENTIES;
+            if (style === "sixties") imagePrompt = "Famous vintage 1960s photo, " + imagePrompt + SIXTIES;
+            if (style === "fifties") imagePrompt = "Famous vintage 1950s photo, " + imagePrompt + FIFTIES;
+
+            if (style === "casual") imagePrompt = "A casual photo of " + imagePrompt + CASUAL_PHOTO;
+
+            if (style === "casual_snapchat") imagePrompt = "A casual Snapchat selfie photo of " + imagePrompt + SNAPCHAT_CASUAL_PHOTO;
+            if (style === "casual_raw") imagePrompt = "A casual photo of " + imagePrompt + RAW_CASUAL_PHOTO;
             if (style === "professional") imagePrompt += PROFESSIONAL_PHOTO;
-            if (style === "professional_ex")
-              imagePrompt += PROFESSIONAL_PHOTO_EX;
+            if (style === "professional_ex") imagePrompt += PROFESSIONAL_PHOTO_EX;
 
             if (useRealismEnforcer) {
               imagePrompt = imagePrompt + REALISM_ENFORCER;
@@ -1958,20 +1813,12 @@
               seed: imageSeedValue,
             };
 
-            const result = await generateOne(
-              imagePrompt,
-              tile,
-              thisGenerationId,
-              metadata,
-            );
+            const result = await generateOne(imagePrompt, tile, thisGenerationId, metadata);
             if (result && result.seed !== undefined) {
               generatedSeeds.push(result.seed);
             }
           } catch (err) {
-            if (
-              currentGenerationId !== thisGenerationId ||
-              err.message === "Cancelled"
-            ) {
+            if (currentGenerationId !== thisGenerationId || err.message === "Cancelled") {
               tile.innerHTML = `<div class="placeholder">Cancelled</div>`;
             } else {
               tile.innerHTML = `<div class="placeholder" style="color: #ff7b72;">Error</div>`;
@@ -1999,8 +1846,7 @@
             updateGenerationUI();
 
             // Save prompt to history with settings after generation completes
-            const seedsToSave =
-              userProvidedSeed !== null ? userProvidedSeed : generatedSeeds;
+            const seedsToSave = userProvidedSeed !== null ? userProvidedSeed : generatedSeeds;
             await savePrompt(basePrompt, {
               guidance: el.guidance.value,
               style: style,
@@ -2214,9 +2060,6 @@
       }
     </style>
 
-    <link
-      rel="stylesheet"
-      href="https://cdn.jsdelivr.net/gh/devbernardolopes/tti-generator-styles@main/styles.css"
-    />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/devbernardolopes/tti-generator-styles@main/styles.css" />
   </body>
 </html>
