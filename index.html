@@ -704,7 +704,7 @@
       // Auto-adjust prompt textarea height to fit content
       window.autoAdjustPromptHeight = function () {
         el.prompt.style.height = "auto";
-        el.prompt.style.height = el.prompt.scrollHeight + "px";
+        el.prompt.style.height = (el.prompt.scrollHeight + 10) + "px";
       };
 
       window.toggleScratchpad = function () {
