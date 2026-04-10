@@ -20,12 +20,12 @@
     <div class="input-container">
       <h1 class="page-title">The Cokebear TTI</h1>
 
-      <div id="infoBox" style="display: none; background: #161b22; color: #c9d1d9; border: 1px solid #30363d; border-radius: 6px; padding: 16px; margin-bottom: 16px; max-width: 900px">
-        <div style="display: flex; justify-content: space-between; align-items: left">
-          <span style="font-weight: bold; font-size: 18px">Info & Guide</span>
-          <button id="closeInfoBtn" style="background: #30363d; color: #fff; border: none; border-radius: 4px; padding: 2px 10px; font-size: 18px; cursor: pointer">Close</button>
+      <div id="infoBox">
+        <div>
+          <span>Info & Guide</span>
+          <button id="closeInfoBtn">Close</button>
         </div>
-        <div id="infoBoxContent" style="margin-top: 10px; font-size: 14px; align-items: left">
+        <div id="infoBoxContent">
           <p>
             <b>Shortcuts:</b><br />
             • <b>Ctrl+Shift+S</b>: Toggle Scratchpad<br />
@@ -38,17 +38,12 @@
           <p><b>Cancel Button:</b> Only enabled when there are images in the queue that can still be cancelled ("Waiting...").</p>
         </div>
       </div>
-      <div id="buttonRow" style="display: flex; gap: 10px; margin-bottom: 10px; align-items: center;">
-        <button
-          id="toggleInfoBtn"
-          style="background: #1f6feb; border-color: #388bfd; color: #fff; border-radius: 6px; padding: 6px 12px; font-size: 14px; font-weight: 600; cursor: pointer"
-        >
-          Info
-        </button>
+      <div id="buttonRow">
+        <button id="toggleInfoBtn">Info</button>
 
-        <button onclick="toggleScratchpad()" id="scratchpadBtn" class="scratchpad-toggle" style="height: 33px;">Scratchpad</button>
+        <button onclick="toggleScratchpad()" id="scratchpadBtn" class="scratchpad-toggle">Scratchpad</button>
       </div>
-      <div id="scratchpadContainer" style="display: none">
+      <div id="scratchpadContainer">
         <textarea id="scratchpadText" placeholder="Define variables here, e.g., HAIR_COLOR = {black|brown|blond}"></textarea>
       </div>
       <br />
@@ -67,26 +62,26 @@
             <option value="4">4x</option>
           </select>
 
-          <div style="display: flex; align-items: center; gap: 6px">
+          <div class="guidance-row">
             <input id="guidance" type="range" min="1" max="30" value="14" />
-            <span id="guidanceValue" style="min-width: 30px; font-size: 13px">14</span>
+            <span id="guidanceValue">14</span>
           </div>
 
-          <input id="negativePrompt" type="text" placeholder="Negative prompt..." style="min-width: 200px" />
+          <input id="negativePrompt" type="text" placeholder="Negative prompt..." />
 
-          <label style="display: flex; align-items: center; gap: 4px; cursor: pointer">
+          <label class="checkbox-label">
             <input type="checkbox" id="realismEnforcer" />
             <span>RE</span>
           </label>
 
-          <label style="display: flex; align-items: center; gap: 4px; cursor: pointer">
+          <label class="checkbox-label">
             <input type="checkbox" id="enterToSend" checked />
-            <span style="font-size: 12px">ENTER to send</span>
+            <span>ENTER to send</span>
           </label>
         </div>
 
         <div class="controls-row">
-          <input id="seed" type="text" placeholder="Seed (optional)" style="width: 140px" inputmode="numeric" pattern="[0-9]*" />
+          <input id="seed" type="text" placeholder="Seed (optional)" inputmode="numeric" pattern="[0-9]*" />
 
           <select id="style">
             <option value="casual">Casual Photo</option>
@@ -126,13 +121,13 @@
           </select>
 
           <button onclick="downloadAllImages()" id="downloadAllBtn" disabled>Download All</button>
-          <button id="cancelGenBtn" onclick="cancelGeneration()" style="display: none; background: #da3633; border-color: #f85149">Cancel</button>
+          <button id="cancelGenBtn" onclick="cancelGeneration()">Cancel</button>
           <button onclick="generateImages()" id="generateBtn">Generate</button>
         </div>
       </div>
     </div>
 
-    <div id="historyModal" class="modal" style="display: none; align-items: center; justify-content: center;">
+    <div id="historyModal" class="modal">
       <div id="historyModalContent" onclick="event.stopPropagation()">
         <div class="modal-header">
           <h3>History</h3>
@@ -146,7 +141,7 @@
       </div>
     </div>
 
-    <div id="manageHistoryModal" class="modal" style="display: none">
+    <div id="manageHistoryModal" class="modal">
       <div id="manageHistoryModalContent" onclick="event.stopPropagation()">
         <div class="modal-header">
           <h3>Manage History</h3>
@@ -2120,6 +2115,6 @@
       }
     </style>
 
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/devbernardolopes/tti-generator-styles@main/styles.css" />
+    <link rel="stylesheet" href="style.css" />
   </body>
 </html>
