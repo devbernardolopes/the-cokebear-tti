@@ -1927,6 +1927,17 @@
         max-height: 80vh;
         display: flex;
         flex-direction: column;
+        position: relative;
+        z-index: 1001;
+      }
+      #historyModal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.7);
+        z-index: 1000;
       }
       #historyList {
         flex: 1;
