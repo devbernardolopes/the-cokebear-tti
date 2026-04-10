@@ -38,16 +38,16 @@
           <p><b>Cancel Button:</b> Only enabled when there are images in the queue that can still be cancelled ("Waiting...").</p>
         </div>
       </div>
-      <button
-        id="toggleInfoBtn"
-        style="background: #1f6feb; border-color: #388bfd; color: #fff; border-radius: 6px; padding: 6px 12px; margin-bottom: 10px; font-size: 14px; font-weight: 600; cursor: pointer"
-      >
-        Info
-      </button>
-      <br />
+      <div id="buttonRow" style="display: flex; gap: 10px; margin-bottom: 10px; align-items: center;">
+        <button
+          id="toggleInfoBtn"
+          style="background: #1f6feb; border-color: #388bfd; color: #fff; border-radius: 6px; padding: 6px 12px; font-size: 14px; font-weight: 600; cursor: pointer"
+        >
+          Info
+        </button>
 
-      <button onclick="toggleScratchpad()" id="scratchpadBtn" class="scratchpad-toggle">Scratchpad</button>
-      <br />
+        <button onclick="toggleScratchpad()" id="scratchpadBtn" class="scratchpad-toggle">Scratchpad</button>
+      </div>
       <div id="scratchpadContainer" style="display: none">
         <textarea id="scratchpadText" placeholder="Define variables here, e.g., HAIR_COLOR = {black|brown|blond}"></textarea>
       </div>
