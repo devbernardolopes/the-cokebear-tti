@@ -1221,6 +1221,12 @@
         el.manageHistoryModal.style.display = "none";
       };
 
+      el.manageHistoryModal.addEventListener("click", (e) => {
+        if (e.target === el.manageHistoryModal) {
+          closeManageHistoryModal();
+        }
+      });
+
       window.deleteSelectedPrompts = async function () {
         if (!db || selectedPromptIds.size === 0) return;
         const ids = Array.from(selectedPromptIds);
