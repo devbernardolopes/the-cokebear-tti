@@ -16,7 +16,7 @@ This is a **Text-to-Image Generator UI** for [Perchance.org](https://perchance.o
 ## Key Dependencies
 
 - **Dexie.js 3.2.4** (CDN: `https://unpkg.com/dexie@3.2.4/dist/dexie.min.js`)
-- **Local CSS** (`style.css` - styles are in a separate local file)
+- **Local CSS** (styles are in a `<style>` block within `index.html`)
 
 ## Architecture
 
