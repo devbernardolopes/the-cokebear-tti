@@ -132,7 +132,7 @@
       </div>
     </div>
 
-    <div id="historyModal" class="modal" style="display: none">
+    <div id="historyModal" class="modal" style="display: none; align-items: center; justify-content: center;">
       <div id="historyModalContent" onclick="event.stopPropagation()">
         <div class="modal-header">
           <h3>History</h3>
@@ -1023,6 +1023,8 @@
           el.historySearch.value = "";
           await loadHistory(false);
           el.historyModal.style.display = "flex";
+          el.historyModal.style.alignItems = "center";
+          el.historyModal.style.justifyContent = "center";
         } else {
           el.historyModal.style.display = "none";
         }
