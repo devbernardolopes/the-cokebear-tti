@@ -892,6 +892,9 @@
           if (el.historyModal.style.display !== "none" && el.historyModal.style.display !== "") {
             await loadHistory();
           }
+          if (el.manageHistoryModal.style.display !== "none" && el.manageHistoryModal.style.display !== "") {
+            await loadManageHistory(false);
+          }
         } catch (e) {
           console.warn("Failed to save prompt:", e);
         }
@@ -1089,7 +1092,11 @@
         if (!db) return;
         try {
           await db.prompts.delete(id);
-          await loadHistory();
+          if (el.manageHistoryModal.style.display !== "none" && el.manageHistoryModal.style.display !== "") {
+            await loadManageHistory(false);
+          } else {
+            await loadHistory();
+          }
         } catch (e) {
           console.warn("Failed to delete prompt:", e);
         }
