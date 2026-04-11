@@ -1193,10 +1193,14 @@
             metaHtml += "</div>";
 
             const isChecked = selectedPromptIds.has(item.id) ? "checked" : "";
+            const starClass = item.bookmarked ? "history-star starred" : "history-star";
+            const starIcon = item.bookmarked ? "★" : "☆";
             div.innerHTML = `
                     <input type="checkbox" class="history-checkbox" data-id="${item.id}" ${isChecked} />
+                    <button class="${starClass}" onclick="return false;">${starIcon}</button>
                     <span class="history-prompt">${escapeHtml(item.prompt)}</span>
                     ${metaHtml}
+                    <button class="history-delete" onclick="deletePrompt(${item.id})">x</button>
                   `;
 
             const checkbox = div.querySelector('input[type="checkbox"]');
@@ -2407,7 +2411,6 @@
       }
 
       .history-checkbox {
-        margin-right: 10px;
         cursor: pointer;
         width: 16px;
         height: 16px;
