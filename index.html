@@ -696,6 +696,9 @@
       el.toggleInfoBtn = document.getElementById("toggleInfoBtn");
       el.closeInfoBtn = document.getElementById("closeInfoBtn");
 
+      el.infoBox.style.display = "none";
+      el.scratchpadContainer.style.display = "none";
+
       el.toggleInfoBtn.addEventListener("click", () => {
         el.infoBox.style.display = el.infoBox.style.display === "none" ? "block" : "none";
       });
@@ -1034,6 +1037,9 @@
           closeHistoryModal();
         }
       });
+
+      el.historyModal.style.display = "none";
+      el.manageHistoryModal.style.display = "none";
 
       window.usePrompt = async function (id) {
         if (!db) return;
