@@ -967,6 +967,7 @@
           items.forEach((item) => {
             const div = document.createElement("div");
             div.className = "history-item";
+            div.dataset.id = item.id;
             div.title = item.prompt;
 
             // Build metadata display
@@ -1093,9 +1094,14 @@
         try {
           await db.prompts.delete(id);
           if (el.manageHistoryModal.style.display !== "none" && el.manageHistoryModal.style.display !== "") {
-            await loadManageHistory(false);
-          } else {
-            await loadHistory();
+            const itemEl = el.manageHistoryList.querySelector(`[data-id="${id}"]`);
+            if (itemEl) itemEl.remove();
+            manageHistoryTotalCount--;
+            updateManageHistoryCount();
+          } else if (el.historyModal.style.display !== "none" && el.historyModal.style.display !== "") {
+            const itemEl = el.historyList.querySelector(`[data-id="${id}"]`);
+            if (itemEl) itemEl.remove();
+            historyTotalCount--;
           }
         } catch (e) {
           console.warn("Failed to delete prompt:", e);
@@ -1177,6 +1183,7 @@
           items.forEach((item) => {
             const div = document.createElement("div");
             div.className = "history-item";
+            div.dataset.id = item.id;
             div.title = item.prompt;
 
             let metaHtml = '<div class="history-meta">';
