@@ -952,9 +952,7 @@
       el.conc.addEventListener("change", saveSettings);
       el.tileSize.addEventListener("change", () => {
         const size = el.tileSize.value;
-        console.log("Tile size changed to:", size, "px");
         el.mosaic.style.setProperty("--tile-size", size + "px");
-        console.log("CSS variable set, computed style:", getComputedStyle(el.mosaic).getPropertyValue("--tile-size"));
         saveSettings();
       });
 
@@ -2592,18 +2590,18 @@
       }
 
       .tile.square {
-        width: 200px;
-        height: 200px;
+        width: var(--tile-size, 200px);
+        height: var(--tile-size, 200px);
       }
 
       .tile.portrait {
-        width: 200px;
-        height: 300px;
+        width: var(--tile-size, 200px);
+        height: calc(var(--tile-size, 200px) * 1.5);
       }
 
       .tile.landscape {
-        width: 300px;
-        height: 200px;
+        width: calc(var(--tile-size, 200px) * 2);
+        height: var(--tile-size, 200px);
         grid-column: span 2;
       }
 
@@ -2619,8 +2617,6 @@
       }
 
       .tile {
-        width: var(--tile-size, 200px);
-        height: var(--tile-size, 200px);
         background: #161b22;
         border: 1px solid #30363d;
         border-radius: 6px;
