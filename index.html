@@ -516,8 +516,10 @@
       let touchStartDist = 0;
       let imageScale = 1;
       let isPinching = false;
+      let hasSwiped = false;
 
       el.modalImage.addEventListener("touchstart", (e) => {
+        hasSwiped = false;
         if (e.touches.length === 1) {
           touchStartX = e.touches[0].clientX;
           touchStartY = e.touches[0].clientY;
@@ -539,15 +541,15 @@
           el.modalImage.style.transform = `scale(${imageScale})`;
           touchStartDist = dist;
           e.preventDefault();
-        } else if (e.touches.length === 1 && imageScale === 1) {
+        } else if (e.touches.length === 1 && imageScale === 1 && !hasSwiped) {
           const deltaX = e.touches[0].clientX - touchStartX;
           if (Math.abs(deltaX) > 50) {
+            hasSwiped = true;
             if (deltaX > 0) {
               showPreviousImage();
             } else {
               showNextImage();
             }
-            touchStartX = e.touches[0].clientX;
           }
         }
       }, { passive: !isPinching });
@@ -797,7 +799,7 @@
         resizeHandle.addEventListener("touchmove", (e) => {
           if (!isResizing) return;
           e.preventDefault();
-          const deltaY = resizeStartY - e.touches[0].clientY;
+          const deltaY = e.touches[0].clientY - resizeStartY;
           const newHeight = Math.max(40, resizeStartHeight + deltaY);
           el.prompt.style.height = newHeight + "px";
         }, { passive: false });
@@ -2154,8 +2156,9 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        opacity: 0.5;
+        opacity: 0;
         touch-action: none;
+        pointer-events: none;
       }
 
       .textarea-resize-handle::after {
@@ -2167,6 +2170,7 @@
       @media (hover: none) {
         .textarea-resize-handle {
           opacity: 1;
+          pointer-events: auto;
         }
       }
 
