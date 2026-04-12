@@ -44,10 +44,10 @@
         <button onclick="toggleScratchpad()" id="scratchpadBtn" class="scratchpad-toggle">Scratchpad</button>
 
         <select id="tileSize">
-          <option value="100">Regular</option>
-          <option value="75">Small</option>
-          <option value="50">Extra Small</option>
+          <option value="200" selected>Regular</option>
           <option value="150">Large</option>
+          <option value="100">Small</option>
+          <option value="50">Extra Small</option>
         </select>
       </div>
       <div id="scratchpadContainer">
@@ -952,7 +952,9 @@
       el.conc.addEventListener("change", saveSettings);
       el.tileSize.addEventListener("change", () => {
         const size = el.tileSize.value;
+        console.log("Tile size changed to:", size, "px");
         el.mosaic.style.setProperty("--tile-size", size + "px");
+        console.log("CSS variable set, computed style:", getComputedStyle(el.mosaic).getPropertyValue("--tile-size"));
         saveSettings();
       });
 
