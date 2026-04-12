@@ -48,7 +48,10 @@
       </div>
       <br />
 
-      <textarea id="promptText" placeholder="Describe your image..."></textarea>
+      <div class="prompt-textarea-wrapper">
+        <textarea id="promptText" placeholder="Describe your image..."></textarea>
+        <div class="textarea-resize-handle"></div>
+      </div>
 
       <div class="controls">
         <div class="controls-row">
@@ -776,6 +779,44 @@
         el.prompt.style.height = "auto";
         el.prompt.style.height = (el.prompt.scrollHeight + 10) + "px";
       };
+
+      // Resize handle touch events for mobile
+      let resizeStartY = 0;
+      let resizeStartHeight = 0;
+      let isResizing = false;
+
+      const resizeHandle = document.querySelector(".textarea-resize-handle");
+      if (resizeHandle) {
+        resizeHandle.addEventListener("touchstart", (e) => {
+          e.preventDefault();
+          isResizing = true;
+          resizeStartY = e.touches[0].clientY;
+          resizeStartHeight = el.prompt.offsetHeight;
+        }, { passive: false });
+
+        resizeHandle.addEventListener("touchmove", (e) => {
+          if (!isResizing) return;
+          e.preventDefault();
+          const deltaY = resizeStartY - e.touches[0].clientY;
+          const newHeight = Math.max(40, resizeStartHeight + deltaY);
+          el.prompt.style.height = newHeight + "px";
+        }, { passive: false });
+
+        resizeHandle.addEventListener("touchend", () => {
+          isResizing = false;
+        });
+      }
+
+      // Double-tap to auto-size textarea
+      let lastTap = 0;
+      el.prompt.addEventListener("touchend", (e) => {
+        const now = Date.now();
+        if (now - lastTap < 300) {
+          window.autoAdjustPromptHeight();
+          e.preventDefault();
+        }
+        lastTap = now;
+      });
 
       window.toggleScratchpad = function () {
         if (el.scratchpadContainer.style.display === "none") {
@@ -2097,6 +2138,36 @@
         resize: vertical;
         overflow-y: auto;
         box-sizing: border-box;
+      }
+
+      .prompt-textarea-wrapper {
+        position: relative;
+      }
+
+      .textarea-resize-handle {
+        position: absolute;
+        bottom: 4px;
+        right: 8px;
+        width: 20px;
+        height: 20px;
+        cursor: se-resize;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0.5;
+        touch-action: none;
+      }
+
+      .textarea-resize-handle::after {
+        content: "⤡";
+        font-size: 16px;
+        color: #8b949e;
+      }
+
+      @media (hover: none) {
+        .textarea-resize-handle {
+          opacity: 1;
+        }
       }
 
       .parameter-insert-btn {
