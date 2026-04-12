@@ -181,6 +181,16 @@
         >
           ⬇
         </button>
+        <button
+          id="modalCloseBtn"
+          class="modal-close-btn"
+          onclick="
+            event.stopPropagation();
+            closeModal();
+          "
+        >
+          ✕
+        </button>
         <div id="modalCounter" class="modal-counter"></div>
       </div>
     </div>
@@ -258,6 +268,7 @@
         modalImageContainer: document.getElementById("modalImageContainer"),
         modalImage: document.getElementById("modalImage"),
         modalDownloadBtn: document.getElementById("modalDownloadBtn"),
+        modalCloseBtn: document.getElementById("modalCloseBtn"),
         modalCounter: document.getElementById("modalCounter"),
         downloadAllBtn: document.getElementById("downloadAllBtn"),
         generateBtn: document.getElementById("generateBtn"),
@@ -2610,6 +2621,31 @@
 
       .modal-download-btn:hover {
         background: rgba(46, 160, 67, 1);
+        transform: scale(1.1);
+      }
+
+      .modal-close-btn {
+        position: absolute;
+        bottom: 10px;
+        right: 10px;
+        width: 40px;
+        height: 40px;
+        padding: 0;
+        background: rgba(200, 0, 0, 0.9);
+        border: 1px solid #cc0000;
+        border-radius: 8px;
+        color: #fff;
+        font-size: 20px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10000;
+        transition: all 0.2s ease;
+      }
+
+      .modal-close-btn:hover {
+        background: rgba(220, 0, 0, 1);
         transform: scale(1.1);
       }
 
