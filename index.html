@@ -42,6 +42,13 @@
         <button id="toggleInfoBtn">Info</button>
 
         <button onclick="toggleScratchpad()" id="scratchpadBtn" class="scratchpad-toggle">Scratchpad</button>
+
+        <select id="tileSize">
+          <option value="100">Regular</option>
+          <option value="75">Small</option>
+          <option value="50">Extra Small</option>
+          <option value="150">Large</option>
+        </select>
       </div>
       <div id="scratchpadContainer">
         <textarea id="scratchpadText" placeholder="Define variables here, e.g., HAIR_COLOR = {black|brown|blond}"></textarea>
@@ -242,6 +249,7 @@
         scratchpad: document.getElementById("scratchpadText"),
         scratchpadContainer: document.getElementById("scratchpadContainer"),
         scratchpadBtn: document.getElementById("scratchpadBtn"),
+        tileSize: document.getElementById("tileSize"),
         resolution: document.getElementById("resolution"),
         guidance: document.getElementById("guidance"),
         guidanceValue: document.getElementById("guidanceValue"),
@@ -893,6 +901,7 @@
           await db.settings.put({ key: "style", value: el.style.value });
           await db.settings.put({ key: "numImages", value: el.num.value });
           await db.settings.put({ key: "concurrency", value: el.conc.value });
+          await db.settings.put({ key: "tileSize", value: el.tileSize.value });
         } catch (e) {
           console.warn("Failed to save settings:", e);
         }
@@ -923,6 +932,11 @@
           if (style) el.style.value = style.value;
           if (numImages) el.num.value = numImages.value;
           if (concurrency) el.conc.value = concurrency.value;
+          const tileSize = await db.settings.get("tileSize");
+          if (tileSize) {
+            el.tileSize.value = tileSize.value;
+            el.mosaic.style.setProperty("--tile-size", tileSize.value + "px");
+          }
         } catch (e) {
           console.warn("Failed to load settings:", e);
         }
@@ -936,6 +950,11 @@
       el.style.addEventListener("change", saveSettings);
       el.num.addEventListener("change", saveSettings);
       el.conc.addEventListener("change", saveSettings);
+      el.tileSize.addEventListener("change", () => {
+        const size = el.tileSize.value;
+        el.mosaic.style.setProperty("--tile-size", size + "px");
+        saveSettings();
+      });
 
       // History search with debounce
       el.historySearch.addEventListener("input", (e) => {
@@ -2592,14 +2611,14 @@
         margin-left: auto;
         margin-right: auto;
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(200px, max-content));
+        grid-template-columns: repeat(auto-fit, minmax(var(--tile-size, 200px), max-content));
         gap: 10px;
         justify-content: center;
       }
 
       .tile {
-        width: 200px;
-        height: 200px;
+        width: var(--tile-size, 200px);
+        height: var(--tile-size, 200px);
         background: #161b22;
         border: 1px solid #30363d;
         border-radius: 6px;
