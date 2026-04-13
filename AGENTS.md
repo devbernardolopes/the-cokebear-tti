@@ -92,4 +92,4 @@ This is a single HTML file — no build step required. Edit `index.html` directl
 ## Git Rules
 
 - Never run `git commit`, `git push`, `git add`, or any other git commands that modify the repository.
-- After completing a task where any file was changed, always suggest a single-line, concise commit message in plain-text in its own separate paragraph.
+- After completing a task always suggest a single-line, concise commit message in plain-text in its own separate paragraph at the end of your response, except when in plan mode.
