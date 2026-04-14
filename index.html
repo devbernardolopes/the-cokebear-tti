@@ -42,13 +42,7 @@
 
         <button onclick="toggleScratchpad()" id="scratchpadBtn" class="scratchpad-toggle">Scratchpad</button>
 
-        <select id="tileSize">
-          <option value="200" selected>Regular</option>
-          <option value="300">Large</option>
-          <option value="100">Small</option>
-          <option value="50">Extra Small</option>
-        </select>
-      </div>
+        </div>
       <div id="scratchpadContainer">
         <textarea id="scratchpadText" placeholder="Define variables here, e.g., HAIR_COLOR = {black|brown|blond}"></textarea>
       </div>
@@ -131,6 +125,12 @@
           <button onclick="downloadAllImages()" id="downloadAllBtn" disabled>Download All</button>
           <button id="cancelGenBtn" onclick="cancelGeneration()">Cancel</button>
           <button onclick="generateImages()" id="generateBtn">Generate</button>
+          <select id="tileSize">
+            <option value="200" selected>Regular</option>
+            <option value="300">Large</option>
+            <option value="100">Small</option>
+            <option value="50">Extra Small</option>
+          </select>
         </div>
       </div>
     </div>
