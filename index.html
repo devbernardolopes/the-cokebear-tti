@@ -49,7 +49,10 @@
       </div>
 
       <div class="prompt-textarea-wrapper">
-        <textarea id="promptText" placeholder="Describe your image..."></textarea>
+        <div class="prompt-input-container">
+          <textarea id="promptText" placeholder="Describe your image..."></textarea>
+          <button id="clearPromptBtn" type="button" title="Clear prompt">x</button>
+        </div>
         <div class="textarea-resize-handle"></div>
       </div>
 
@@ -286,6 +289,7 @@
         realismEnforcer: document.getElementById("realismEnforcer"),
         seed: document.getElementById("seed"),
         clearSeedBtn: document.getElementById("clearSeedBtn"),
+        clearPromptBtn: document.getElementById("clearPromptBtn"),
         style: document.getElementById("style"),
         num: document.getElementById("numImages"),
         conc: document.getElementById("concurrency"),
@@ -485,6 +489,11 @@
 
       el.clearSeedBtn.addEventListener("click", () => {
         el.seed.value = "";
+      });
+
+      el.clearPromptBtn.addEventListener("click", () => {
+        el.prompt.value = "";
+        autoAdjustPromptHeight();
       });
 
       el.negativePrompt.addEventListener("keydown", (e) => {
@@ -2477,6 +2486,38 @@
 
       .prompt-textarea-wrapper {
         position: relative;
+      }
+
+      .prompt-input-container {
+        display: flex;
+        align-items: center;
+        position: relative;
+        width: 100%;
+      }
+
+      #promptText {
+        width: 100%;
+        flex: 1;
+        padding-right: 32px;
+      }
+
+      #clearPromptBtn {
+        position: absolute;
+        right: 36px;
+        top: 50%;
+        transform: translateY(-50%);
+        padding: 4px 8px;
+        font-size: 10px;
+        background: #da3633;
+        border: 1px solid #f85149;
+        border-radius: 4px;
+        color: #fff;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+
+      #clearPromptBtn:hover {
+        background: #f85149;
       }
 
       .textarea-resize-handle {
