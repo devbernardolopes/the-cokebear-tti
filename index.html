@@ -2057,6 +2057,26 @@
         seedInput.style.borderRadius = "4px";
         seedInput.style.boxSizing = "border-box";
 
+        const clearSeedBtn = document.createElement("button");
+        clearSeedBtn.textContent = "x";
+        clearSeedBtn.title = "Clear seed";
+        clearSeedBtn.style.padding = "4px 8px";
+        clearSeedBtn.style.fontSize = "10px";
+        clearSeedBtn.style.background = "#da3633";
+        clearSeedBtn.style.border = "1px solid #f85149";
+        clearSeedBtn.style.borderRadius = "4px";
+        clearSeedBtn.style.color = "#fff";
+        clearSeedBtn.style.cursor = "pointer";
+        clearSeedBtn.style.whiteSpace = "nowrap";
+        clearSeedBtn.style.flexShrink = "0";
+        clearSeedBtn.onclick = () => {
+          seedInput.value = "";
+          const seedInputElement = document.getElementById("seed");
+          if (seedInputElement) {
+            seedInputElement.value = "";
+          }
+        };
+
         const copySeedBtn = document.createElement("button");
         copySeedBtn.textContent = "Copy";
         copySeedBtn.style.padding = "4px 8px";
@@ -2081,6 +2101,7 @@
         };
 
         seedContainer.appendChild(seedInput);
+        seedContainer.appendChild(clearSeedBtn);
         seedContainer.appendChild(copySeedBtn);
 
         const backBtn = document.createElement("button");
