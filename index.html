@@ -42,6 +42,7 @@
 
         <button onclick="toggleScratchpad()" id="scratchpadBtn" class="scratchpad-toggle">Scratchpad</button>
         <button onclick="openGallery()" id="galleryBtn" class="gallery-toggle">Gallery</button>
+        <button id="clearPromptHeaderBtn" title="Clear Prompt">Clear Prompt</button>
 
         </div>
       <div id="scratchpadContainer">
@@ -49,10 +50,7 @@
       </div>
 
       <div class="prompt-textarea-wrapper">
-        <div class="prompt-input-container">
-          <textarea id="promptText" placeholder="Describe your image..."></textarea>
-          <button id="clearPromptBtn" type="button" title="Clear prompt">x</button>
-        </div>
+        <textarea id="promptText" placeholder="Describe your image..."></textarea>
         <div class="textarea-resize-handle"></div>
       </div>
 
@@ -289,7 +287,7 @@
         realismEnforcer: document.getElementById("realismEnforcer"),
         seed: document.getElementById("seed"),
         clearSeedBtn: document.getElementById("clearSeedBtn"),
-        clearPromptBtn: document.getElementById("clearPromptBtn"),
+        clearPromptHeaderBtn: document.getElementById("clearPromptHeaderBtn"),
         style: document.getElementById("style"),
         num: document.getElementById("numImages"),
         conc: document.getElementById("concurrency"),
@@ -491,7 +489,7 @@
         el.seed.value = "";
       });
 
-      el.clearPromptBtn.addEventListener("click", () => {
+      el.clearPromptHeaderBtn.addEventListener("click", () => {
         el.prompt.value = "";
         autoAdjustPromptHeight();
       });
@@ -2486,38 +2484,6 @@
 
       .prompt-textarea-wrapper {
         position: relative;
-      }
-
-      .prompt-input-container {
-        display: flex;
-        align-items: center;
-        position: relative;
-        width: 100%;
-      }
-
-      #promptText {
-        width: 100%;
-        flex: 1;
-        padding-right: 32px;
-      }
-
-      #clearPromptBtn {
-        position: absolute;
-        right: 36px;
-        top: 50%;
-        transform: translateY(-50%);
-        padding: 4px 8px;
-        font-size: 10px;
-        background: #da3633;
-        border: 1px solid #f85149;
-        border-radius: 4px;
-        color: #fff;
-        cursor: pointer;
-        white-space: nowrap;
-      }
-
-      #clearPromptBtn:hover {
-        background: #f85149;
       }
 
       .textarea-resize-handle {
