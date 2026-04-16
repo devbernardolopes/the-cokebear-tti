@@ -43,8 +43,7 @@
         <button onclick="toggleScratchpad()" id="scratchpadBtn" class="scratchpad-toggle">Scratchpad</button>
         <button onclick="openGallery()" id="galleryBtn" class="gallery-toggle">Gallery</button>
         <button id="clearPromptHeaderBtn" title="Clear Prompt">Clear Prompt</button>
-
-        </div>
+      </div>
       <div id="scratchpadContainer">
         <textarea id="scratchpadText" placeholder="Define variables here, e.g., HAIR_COLOR = {black|brown|blond}"></textarea>
       </div>
@@ -73,7 +72,7 @@
 
           <input id="negativePrompt" type="text" placeholder="Negative prompt..." />
 
-          <label class="checkbox-label">
+          <label class="checkbox-label" aria-hidden="true">
             <input type="checkbox" id="realismEnforcer" />
             <span>RE</span>
           </label>
@@ -98,7 +97,7 @@
             <option value="professional_ex">Professional Photo (Extended)</option>
             <option value="cinematic">Cinematic</option>
             <option value="cinematic_ex">Cinematic (Extended)</option>
-            <option value="twotousands">2000s</option>
+            <option value="twothousands">2000s</option>
             <option value="nineties">1990s</option>
             <option value="eighties">1980s</option>
             <option value="seventies">1970s</option>
@@ -239,8 +238,10 @@
       let pluginReady = false;
       let db = null;
 
-      const REALISM_ENFORCER =
-        "Photorealistic, real-world photography, natural lighting, real skin texture, life-like, natural imperfections. Overall, the image should look like a genuine photograph taken in the real world, not an AI-generated image. Avoid any elements that could make it look artificial or stylized.";
+      const REALISM_ENFORCER = "Photorealistic photography, real skin texture, natural imperfections.";
+
+      // const REALISM_ENFORCER =
+      //   "Photorealistic, real-world photography, natural lighting, real skin texture, life-like, natural imperfections. Overall, the image should look like a genuine photograph taken in the real world, not an AI-generated image. Avoid any elements that could make it look artificial or stylized.";
 
       const CASUAL_PHOTO = ". It's a casual photo.";
 
@@ -248,31 +249,32 @@
 
       const SNAPCHAT_CASUAL_PHOTO = ". It's a casual Snapchat selfie photo.";
 
-      const PROFESSIONAL_PHOTO = ", {sharp|soft} focus, depth of field, 8k photo, HDR, professional lighting, taken with Canon EOS R5, DSLR, 75mm lens.";
+      const PROFESSIONAL_PHOTO = ". {Sharp|Soft} focus, depth of field, 8k photo, HDR, professional lighting, taken with Canon EOS R5, DSLR, 75mm lens.";
 
       const PROFESSIONAL_PHOTO_EX =
-        ", {sharp|soft} focus, depth of field, 8k photo, HDR, professional lighting, taken with Canon EOS R5, DSLR, 75mm lens. Overall, it's a stunning professional photograph with impeccable attention to detail and composition. The lighting is expertly executed, creating a captivating atmosphere. The image is rendered in ultra-high resolution with HDR, showcasing fine details and textures that contribute to its realism. The use of a 75mm lens adds a pleasing perspective and depth to the photo, making it look like it was taken by a skilled photographer.";
+        ". Sharp focus, depth of field, 8k photo, HDR, professional lighting, taken with Canon EOS R5, DSLR, 75mm lens, with impeccable attention to detail and composition.";
 
       const CINEMATIC =
-        ", cinematic shot, dynamic lighting, 75mm, Technicolor, Panavision, cinemascope, sharp focus, fine details, 8k, HDR, realism, realistic, key visual, film still, cinematic color grading, depth of field.";
+        ". Cinematic shot, dynamic lighting, 75mm, Technicolor, Panavision, cinemascope, sharp focus, fine details, 8k, HDR, realism, realistic, key visual, film still, cinematic color grading, depth of field.";
 
       const CCTV =
-        ", old CCTV footage, high-angle CCTV image, creepy and cursed, absolutely cursed photo, nope nope nope nope, what the actual f, unsettling photo, cursed_thing, cursedimages, no context, cursed image, bad photo, weird photo, very strange, color photo, creepy photo, nightmare fuel.";
+        ". Old CCTV footage, high-angle CCTV image, creepy and cursed, absolutely cursed photo, nope nope nope nope, what the actual f, unsettling photo, cursed_thing, cursedimages, no context, cursed image, bad photo, weird photo, very strange, color photo, creepy photo, nightmare fuel.";
 
       const CINEMATIC_EX =
-        ", cinematic shot, dynamic lighting, 75mm, Technicolor, Panavision, cinemascope, sharp focus, fine details, 8k, HDR, realism, realistic, key visual, film still, cinematic color grading, depth of field.\n\nOverall, it's an absolute world-class cinematic masterpiece. It's an aesthetically pleasing cinematic shot with impeccable attention to detail and impressive composition. The lighting is dramatic and expertly executed, creating a captivating atmosphere. The image is rendered in stunning 8k resolution with HDR, showcasing fine details and textures that contribute to its realism. The color grading is cinematic and visually striking, enhancing the overall mood and impact of the shot. This image stands out as a prime example of top-tier cinematic photography, evoking strong emotions and leaving a lasting impression on viewers.";
+        ". Cinematic shot, dynamic lighting, 75mm, Technicolor, Panavision, cinemascope, sharp focus, fine details, 8k, HDR, realism, realistic, key visual, film still, cinematic color grading, depth of field.\n\nOverall, it's an absolute world-class cinematic masterpiece. It's an aesthetically pleasing cinematic shot with impeccable attention to detail and impressive composition. The lighting is dramatic and expertly executed, creating a captivating atmosphere. The image is rendered in stunning 8k resolution with HDR, showcasing fine details and textures that contribute to its realism. The color grading is cinematic and visually striking, enhancing the overall mood and impact of the shot. This image stands out as a prime example of top-tier cinematic photography, evoking strong emotions and leaving a lasting impression on viewers.";
 
-      const TWOTHOUSANDS = ", grainy photograph, 1950s photo with film grain, 1950s photo with vignetting, retro, r/OldSchoolCool, 1950s photo, vintage photo.";
+      const TWO_THOUSANDS = ". Old early 2000s cellphone photo.";
 
-      const NINETIES = ", grainy photograph, 1950s photo with film grain, 1950s photo with vignetting, retro, r/OldSchoolCool, 1950s photo, vintage photo.";
+      const NINETIES = ". 90s home video, nostalgic 90s photo, taken with Kodak disposable camera.";
 
-      const EIGHTIES = ", grainy photograph, 1950s photo with film grain, 1950s photo with vignetting, retro, r/OldSchoolCool, 1950s photo, vintage photo.";
+      const EIGHTIES =
+        ". Grainy photograph, 80s photo with film grain, Kodacolor II 80s photo with vignetting, retro, r/OldSchoolCool, 80s photo with wear and tear and minor creasing and scratches, vintage color photo.";
 
-      const SEVENTIES = ", grainy photograph, 1950s photo with film grain, 1950s photo with vignetting, retro, r/OldSchoolCool, 1950s photo, vintage photo.";
+      const SEVENTIES = ". Grainy photograph, 1970s photo with film grain, 70s photo with vignetting, retro, r/OldSchoolCool, 70s photo, vintage photo.";
 
-      const SIXTIES = ", grainy photograph, 1950s photo with film grain, 1950s photo with vignetting, retro, r/OldSchoolCool, 1950s photo, vintage photo.";
+      const SIXTIES = ". Grainy photograph, 1960s photo with film grain, 60s photo with vignetting, retro, r/OldSchoolCool, 60s photo, vintage photo.";
 
-      const FIFTIES = ", grainy photograph, 1950s photo with film grain, 1950s photo with vignetting, retro, r/OldSchoolCool, 1950s photo, vintage photo.";
+      const FIFTIES = ". Grainy photograph, 1950s photo with film grain, 1950s photo with vignetting, retro, r/OldSchoolCool, 1950s photo, vintage photo.";
 
       const el = {
         prompt: document.getElementById("promptText"),
@@ -1600,7 +1602,7 @@
       window.toggleGallerySelectMode = function () {
         gallerySelectMode = !gallerySelectMode;
         el.gallerySelectModeBtn.textContent = gallerySelectMode ? "Cancel" : "Select";
-        
+
         // Update all items
         const items = el.galleryList.querySelectorAll(".gallery-item");
         items.forEach((item) => {
@@ -2281,17 +2283,17 @@
             if (style === "cinematic_ex") imagePrompt += CINEMATIC_EX;
             if (style === "cctv") imagePrompt += CCTV;
 
-            if (style === "twothousands") imagePrompt = "Famous vintage 2000s photo, " + imagePrompt + TWO_THOUSANDS;
-            if (style === "ninetees") imagePrompt = "Famous vintage 1990s photo, " + imagePrompt + NINETEES;
-            if (style === "eighties") imagePrompt = "Famous vintage 1980s photo, " + imagePrompt + EIGHTIES;
-            if (style === "seventies") imagePrompt = "Famous vintage 1970s photo, " + imagePrompt + SEVENTIES;
-            if (style === "sixties") imagePrompt = "Famous vintage 1960s photo, " + imagePrompt + SIXTIES;
-            if (style === "fifties") imagePrompt = "Famous vintage 1950s photo, " + imagePrompt + FIFTIES;
+            if (style === "twothousands") imagePrompt = "An early 2000s casual cellphone photo. \n" + imagePrompt + TWO_THOUSANDS;
+            if (style === "nineties") imagePrompt += NINETIES;
+            if (style === "eighties") imagePrompt = "Famous vintage 1980s photo. \n" + imagePrompt + EIGHTIES;
+            if (style === "seventies") imagePrompt = "Famous vintage 1970s photo. \n" + imagePrompt + SEVENTIES;
+            if (style === "sixties") imagePrompt = "Famous vintage 1960s photo. \n" + imagePrompt + SIXTIES;
+            if (style === "fifties") imagePrompt = "Famous vintage 1950s photo. \n" + imagePrompt + FIFTIES;
 
-            if (style === "casual") imagePrompt = "A casual photo of " + imagePrompt + CASUAL_PHOTO;
+            if (style === "casual") imagePrompt = "A casual photo of: \n" + imagePrompt + CASUAL_PHOTO;
 
-            if (style === "casual_snapchat") imagePrompt = "A casual Snapchat selfie photo of " + imagePrompt + SNAPCHAT_CASUAL_PHOTO;
-            if (style === "casual_raw") imagePrompt = "A casual photo of " + imagePrompt + RAW_CASUAL_PHOTO;
+            if (style === "casual_snapchat") imagePrompt = "A casual Snapchat selfie photo of: \n" + imagePrompt + SNAPCHAT_CASUAL_PHOTO;
+            if (style === "casual_raw") imagePrompt = "A casual photo of: \n" + imagePrompt + RAW_CASUAL_PHOTO;
             if (style === "professional") imagePrompt += PROFESSIONAL_PHOTO;
             if (style === "professional_ex") imagePrompt += PROFESSIONAL_PHOTO_EX;
 
@@ -2883,7 +2885,9 @@
         cursor: pointer;
         padding: 6px 10px;
         opacity: 0;
-        transition: opacity 0.2s ease, background 0.2s ease;
+        transition:
+          opacity 0.2s ease,
+          background 0.2s ease;
       }
 
       .gallery-item:hover .gallery-item-info-btn,
