@@ -104,6 +104,8 @@
             <option value="sixties">1960s</option>
             <option value="fifties">1950s</option>
             <option value="cctv">CCTV</option>
+            <option value="painted_anime">Painted Anime</option>
+            <option value="painted_anime_ex">Painted Anime (Extended)</option>
             <!-- <option value="macro">Macro Photo</option> -->
             <!-- <option value="studio">Studio Portrait</option> -->
             <option value="none">No Style</option>
@@ -249,10 +251,9 @@
 
       const SNAPCHAT_CASUAL_PHOTO = ". It's a casual Snapchat selfie photo.";
 
-      const PROFESSIONAL_PHOTO = ". {Sharp|Soft} focus, depth of field, 8k photo, HDR, professional lighting, taken with Canon EOS R5, DSLR, 75mm lens.";
+      const PROFESSIONAL_PHOTO = ". Sharp focus, depth of field, 8k photo, HDR, professional lighting, taken with Canon EOS R5, DSLR, 75mm lens.";
 
-      const PROFESSIONAL_PHOTO_EX =
-        ". Sharp focus, depth of field, 8k photo, HDR, professional lighting, taken with Canon EOS R5, DSLR, 75mm lens, with impeccable attention to detail and composition.";
+      const PROFESSIONAL_PHOTO_EX = ". Sharp focus, depth of field, 8k photo, HDR, professional lighting, taken with Canon EOS R5, DSLR, 75mm lens, with impeccable attention to detail.";
 
       const CINEMATIC =
         ". Cinematic shot, dynamic lighting, 75mm, Technicolor, Panavision, cinemascope, sharp focus, fine details, 8k, HDR, realism, realistic, key visual, film still, cinematic color grading, depth of field.";
@@ -275,6 +276,11 @@
       const SIXTIES = ". Grainy photograph, 1960s photo with film grain, 60s photo with vignetting, retro, r/OldSchoolCool, 60s photo, vintage photo.";
 
       const FIFTIES = ". Grainy photograph, 1950s photo with film grain, 1950s photo with vignetting, retro, r/OldSchoolCool, 1950s photo, vintage photo.";
+
+      const PAINTED_ANIME_EX = ". Painted anime style, vibrant colors, detailed character design, dynamic action scenes, 8k resolution, HDR, cinematic lighting.";
+
+      const PAINTED_ANIME =
+        ". Overall, it's an absolute world-class masterpiece painterly anime artwork. It's an aesthetically pleasing painterly anime artwork with impeccable attention to detail and impressive composition.";
 
       const el = {
         prompt: document.getElementById("promptText"),
@@ -2294,6 +2300,8 @@
 
             if (style === "casual_snapchat") imagePrompt = "A casual Snapchat selfie photo of: \n" + imagePrompt + SNAPCHAT_CASUAL_PHOTO;
             if (style === "casual_raw") imagePrompt = "A casual photo of: \n" + imagePrompt + RAW_CASUAL_PHOTO;
+            if (style === "painted_anime") imagePrompt = "Painterly anime artwork: \n" + imagePrompt + PAINTED_ANIME;
+            if (style === "painted_anime_ex") imagePrompt = "Painterly anime artwork: \n" + imagePrompt + PAINTED_ANIME_EX;
             if (style === "professional") imagePrompt += PROFESSIONAL_PHOTO;
             if (style === "professional_ex") imagePrompt += PROFESSIONAL_PHOTO_EX;
 
