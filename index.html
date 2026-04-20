@@ -242,18 +242,19 @@
       let pluginReady = false;
       let db = null;
 
-      const REALISM_ENFORCER = "Photorealistic photography, real skin texture, natural imperfections.";
+      const REALISM_ENFORCER = ". Photorealistic photography, real skin texture, natural imperfections.";
 
       // const REALISM_ENFORCER =
       //   "Photorealistic, real-world photography, natural lighting, real skin texture, life-like, natural imperfections. Overall, the image should look like a genuine photograph taken in the real world, not an AI-generated image. Avoid any elements that could make it look artificial or stylized.";
 
       const CASUAL_PHOTO = ". It's a casual photo.";
 
-      const RAW_CASUAL_PHOTO = ". Unedited RAW cellphone photo, wide-angle lens (28mm equivalent), shot on a smartphone camera with heavy Kodak Tri-X 400 black and white film grain, high contrast, natural film grain visible everywhere, hyperrealistic real-life photography, straight from the camera, zero post-processing, (photorealistic:2.5), (raw actual photography:2.3), natural daylight, visible skin pores and texture, subtle imperfections, no plastic skin, no waxy sheen, no artificial gloss, no beauty filter, 8k ultra photorealistic unedited image, best quality.";
+      // const RAW_CASUAL_PHOTO = ". Unedited RAW cellphone photo, wide-angle lens (28mm equivalent), shot on a smartphone camera with heavy Kodak Tri-X 400 black and white film grain, high contrast, natural film grain visible everywhere, hyperrealistic real-life photography, straight from the camera, zero post-processing, (photorealistic:2.5), (raw actual photography:2.3), natural daylight, visible skin pores and texture, subtle imperfections, no plastic skin, no waxy sheen, no artificial gloss, no beauty filter, 8k ultra photorealistic unedited image, best quality.";
+      const RAW_CASUAL_PHOTO = ". Real-life, low-quality, RAW cellphone camera photo with zero post-processing, subtle imperfections, slightly blurred.";
 
       const SNAPCHAT_CASUAL_PHOTO = ". It's a casual Snapchat selfie photo.";
 
-      const RANDOM_CASUAL_PHOTO = ".{ It's a casual photo| It's a casual Snapchat selfie| It's a casual spontaneous cellphone photo with sharp focus}.";
+      // const RANDOM_CASUAL_PHOTO = ".{ It's a casual photo| It's a casual Snapchat selfie| It's a casual spontaneous cellphone photo with sharp focus}.";
 
       const PROFESSIONAL_PHOTO = ". Sharp focus, depth of field, 8k photo, HDR, professional lighting, taken with Canon EOS R5, DSLR, 75mm lens.";
 
@@ -2289,7 +2290,7 @@
             if (style === "casual") imagePrompt = "A casual photo of: \n" + imagePrompt + CASUAL_PHOTO;
             if (style === "casual_snapchat") imagePrompt = "A casual Snapchat selfie photo of: \n" + imagePrompt + SNAPCHAT_CASUAL_PHOTO;
             if (style === "casual_raw") imagePrompt = "A casual photo of: \n" + imagePrompt + RAW_CASUAL_PHOTO;
-            if (style === "casual_random") imagePrompt += "\n{" + CASUAL_PHOTO + "|" + SNAPCHAT_CASUAL_PHOTO + "|" + RAW_CASUAL_PHOTO + "}.";
+            if (style === "casual_random") imagePrompt = "A casual photo of: \n\n" + imagePrompt + "\n\n{" + CASUAL_PHOTO + "|" + SNAPCHAT_CASUAL_PHOTO + "|" + RAW_CASUAL_PHOTO + "}.";
 
             if (style === "professional") imagePrompt += PROFESSIONAL_PHOTO;
             if (style === "professional_ex") imagePrompt += PROFESSIONAL_PHOTO_EX;
@@ -2311,7 +2312,7 @@
             if (style === "painted_anime_ex") imagePrompt = "Painterly anime artwork: \n" + imagePrompt + PAINTED_ANIME_EX;
 
             if (useRealismEnforcer) {
-              imagePrompt = imagePrompt + REALISM_ENFORCER;
+              imagePrompt = imagePrompt + "\n\n" + REALISM_ENFORCER;
             }
 
             // imagePrompt += `${res} ${negPromptFormatted} ${imageSeedFormatted} ${gs}`;
