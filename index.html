@@ -2015,12 +2015,6 @@
         const infoPanel = document.createElement("div");
         infoPanel.className = "tile-info-panel";
 
-        const promptLabel = document.createElement("div");
-        promptLabel.textContent = "Prompt:";
-        promptLabel.style.fontWeight = "600";
-        promptLabel.style.marginBottom = "4px";
-        promptLabel.style.fontSize = "11px";
-
         const promptArea = document.createElement("textarea");
         // promptArea.value = metadata.prompt;
         promptArea.value = metadata.prompt;
@@ -2054,12 +2048,6 @@
           }
           el.prompt.dispatchEvent(new Event("input", { bubbles: true }));
         };
-
-        const seedLabel = document.createElement("div");
-        seedLabel.textContent = "Seed:";
-        seedLabel.style.fontWeight = "600";
-        seedLabel.style.marginBottom = "4px";
-        seedLabel.style.fontSize = "11px";
 
         const seedContainer = document.createElement("div");
         seedContainer.style.display = "flex";
@@ -2115,10 +2103,8 @@
         backBtn.style.fontSize = "11px";
         backBtn.onclick = () => flipTileToImage(tile, imageUrl);
 
-        infoPanel.appendChild(promptLabel);
         infoPanel.appendChild(promptArea);
         infoPanel.appendChild(useAsPromptBtn);
-        infoPanel.appendChild(seedLabel);
         infoPanel.appendChild(seedContainer);
         infoPanel.appendChild(backBtn);
 
