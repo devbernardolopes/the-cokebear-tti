@@ -1449,13 +1449,16 @@ function closeModalInfoPanel() {
           el.historyModal.style.display = "flex";
           el.historyModal.style.alignItems = "center";
           el.historyModal.style.justifyContent = "center";
+          document.body.style.overflow = "hidden";
         } else {
           el.historyModal.style.display = "none";
+          document.body.style.overflow = "auto";
         }
       };
 
       window.closeHistoryModal = function () {
         el.historyModal.style.display = "none";
+        document.body.style.overflow = "auto";
       };
 
       el.historyModal.addEventListener("click", (e) => {
@@ -1676,10 +1679,12 @@ function closeModalInfoPanel() {
         selectedPromptIds = new Set();
         await loadManageHistory(false);
         el.manageHistoryModal.style.display = "flex";
+        document.body.style.overflow = "hidden";
       };
 
       window.closeManageHistoryModal = function () {
         el.manageHistoryModal.style.display = "none";
+        document.body.style.overflow = "auto";
       };
 
       el.manageHistoryModal.addEventListener("click", (e) => {
@@ -1804,11 +1809,13 @@ function closeModalInfoPanel() {
         el.gallerySelectModeBtn.textContent = "Select";
         await loadGallery(false);
         el.galleryModal.style.display = "flex";
+        document.body.style.overflow = "hidden";
       };
 
       window.closeGalleryModal = function () {
         galleryCurrentImage = null;
         el.galleryModal.style.display = "none";
+        document.body.style.overflow = "auto";
       };
 
       el.galleryModal.addEventListener("click", (e) => {
