@@ -355,6 +355,7 @@
       let currentModalIndex = -1;
       let currentGalleryIndex = -1;
       let isFromGenerated = false; // Track if current modal image is from generated set
+      let isModalInfoOpen = false; // Track if info panel is open in modal
       let currentGenerationId = 0; // Track which generation batch is active
       let isGenerating = false;
 
@@ -543,6 +544,11 @@
       };
 
       window.closeModal = function () {
+        isModalInfoOpen = false;
+        const existingPanel = el.modalImageContainer.querySelector(".modal-info-panel");
+        if (existingPanel) {
+          existingPanel.remove();
+        }
         el.imageModal.style.display = "none";
         document.body.style.overflow = "auto";
         currentModalImageSrc = null;
@@ -574,6 +580,7 @@
         }
         if (!metadata) return;
 
+        isModalInfoOpen = true;
         el.modalImage.style.display = "none";
         el.modalDownloadBtn.style.display = "none";
         el.saveToGalleryBtn.style.display = "none";
@@ -696,6 +703,7 @@
       };
 
       function closeModalInfoPanel() {
+        isModalInfoOpen = false;
         const existingPanel = el.modalImageContainer.querySelector(".modal-info-panel");
         if (existingPanel) {
           existingPanel.remove();
@@ -719,6 +727,7 @@
       };
 
       window.showNextImage = function () {
+        if (isModalInfoOpen) return;
         if (isFromGenerated && generatedImages.length > 0) {
           currentModalIndex = (currentModalIndex + 1) % generatedImages.length;
           currentModalImageSrc = generatedImages[currentModalIndex];
@@ -733,6 +742,7 @@
       };
 
       window.showPreviousImage = function () {
+        if (isModalInfoOpen) return;
         if (isFromGenerated && generatedImages.length > 0) {
           currentModalIndex = (currentModalIndex - 1 + generatedImages.length) % generatedImages.length;
           currentModalImageSrc = generatedImages[currentModalIndex];
@@ -756,6 +766,7 @@
       // Mouse wheel navigation in modal
       el.imageModal.addEventListener("wheel", (e) => {
         if (el.imageModal.style.display === "flex") {
+          if (isModalInfoOpen) return;
           e.preventDefault();
           if (e.deltaY > 0) {
             showNextImage();
@@ -3524,7 +3535,7 @@
 
       .modal-info-btn {
         position: absolute;
-        bottom: 10px;
+        top: 10px;
         left: 10px;
         width: 40px;
         height: 40px;
