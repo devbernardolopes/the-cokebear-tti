@@ -339,8 +339,10 @@
 
       // Track generated images for batch download
       let generatedImages = [];
+      let galleryImages = []; // Track gallery images for navigation
       let currentModalImageSrc = null;
       let currentModalIndex = -1;
+      let currentGalleryIndex = -1;
       let isFromGenerated = false; // Track if current modal image is from generated set
       let currentGenerationId = 0; // Track which generation batch is active
       let isGenerating = false;
@@ -534,6 +536,8 @@
         document.body.style.overflow = "auto";
         currentModalImageSrc = null;
         currentModalIndex = -1;
+        currentGalleryIndex = -1;
+        isFromGenerated = false;
         imageScale = 1;
         el.modalImage.style.transform = "";
         el.saveToGalleryBtn.style.display = "flex";
@@ -556,19 +560,31 @@
       };
 
       window.showNextImage = function () {
-        if (!isFromGenerated || generatedImages.length === 0) return;
-        currentModalIndex = (currentModalIndex + 1) % generatedImages.length;
-        currentModalImageSrc = generatedImages[currentModalIndex];
-        el.modalImage.src = currentModalImageSrc;
-        updateModalCounter();
+        if (isFromGenerated && generatedImages.length > 0) {
+          currentModalIndex = (currentModalIndex + 1) % generatedImages.length;
+          currentModalImageSrc = generatedImages[currentModalIndex];
+          el.modalImage.src = currentModalImageSrc;
+          updateModalCounter();
+        } else if (!isFromGenerated && galleryImages.length > 0) {
+          currentGalleryIndex = (currentGalleryIndex + 1) % galleryImages.length;
+          currentModalImageSrc = galleryImages[currentGalleryIndex].imageData;
+          el.modalImage.src = currentModalImageSrc;
+          el.modalCounter.textContent = `${currentGalleryIndex + 1}/${galleryImages.length}`;
+        }
       };
 
       window.showPreviousImage = function () {
-        if (!isFromGenerated || generatedImages.length === 0) return;
-        currentModalIndex = (currentModalIndex - 1 + generatedImages.length) % generatedImages.length;
-        currentModalImageSrc = generatedImages[currentModalIndex];
-        el.modalImage.src = currentModalImageSrc;
-        updateModalCounter();
+        if (isFromGenerated && generatedImages.length > 0) {
+          currentModalIndex = (currentModalIndex - 1 + generatedImages.length) % generatedImages.length;
+          currentModalImageSrc = generatedImages[currentModalIndex];
+          el.modalImage.src = currentModalImageSrc;
+          updateModalCounter();
+        } else if (!isFromGenerated && galleryImages.length > 0) {
+          currentGalleryIndex = (currentGalleryIndex - 1 + galleryImages.length) % galleryImages.length;
+          currentModalImageSrc = galleryImages[currentGalleryIndex].imageData;
+          el.modalImage.src = currentModalImageSrc;
+          el.modalCounter.textContent = `${currentGalleryIndex + 1}/${galleryImages.length}`;
+        }
       };
 
       // Close modal on Escape key
@@ -1521,6 +1537,7 @@
           if (!append) {
             galleryOffset = 0;
             el.galleryList.innerHTML = "";
+            galleryImages = [];
           }
 
           galleryTotalCount = await db.gallery.count();
@@ -1542,6 +1559,10 @@
             updateGalleryCount();
             return;
           }
+
+          items.forEach((item) => {
+            galleryImages.push({ id: item.id, imageData: item.imageData });
+          });
 
           items.forEach((item) => {
             const div = document.createElement("div");
@@ -1709,8 +1730,10 @@
           if (item) {
             galleryCurrentImage = item;
             currentModalImageSrc = item.imageData;
+            currentGalleryIndex = galleryImages.findIndex((img) => img.id === id);
+            isFromGenerated = false;
             el.modalImage.src = item.imageData;
-            el.modalCounter.textContent = "";
+            el.modalCounter.textContent = galleryImages.length > 0 ? `${currentGalleryIndex + 1}/${galleryImages.length}` : "";
             el.saveToGalleryBtn.style.display = "none";
             el.imageModal.style.display = "flex";
           }
