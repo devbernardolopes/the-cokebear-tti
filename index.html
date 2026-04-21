@@ -1882,7 +1882,8 @@ function closeModalInfoPanel() {
       window.saveToGallery = async function () {
         if (!db || !currentModalImageSrc) return;
         try {
-          const prompt = el.prompt.value;
+          const metadata = window.imageMetadata?.[currentModalImageSrc];
+          const prompt = metadata?.prompt || el.prompt.value;
           const guidance = el.guidance.value;
           const style = el.style.value;
           const resolution = el.resolution.value;
