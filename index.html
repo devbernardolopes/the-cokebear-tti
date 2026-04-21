@@ -1852,6 +1852,10 @@
             item.classList.add("select-mode");
           } else {
             item.classList.remove("select-mode", "selecting");
+            const checkmark = item.querySelector(".gallery-item-checkmark");
+            if (checkmark) {
+              checkmark.style.display = "none";
+            }
           }
         });
 
@@ -3246,6 +3250,13 @@
 
       .gallery-item.select-mode .gallery-item-checkmark {
         display: flex;
+      }
+
+      .gallery-item.select-mode .gallery-item-info-btn,
+      .gallery-item.select-mode .gallery-item-download-btn,
+      .gallery-item.select-mode .gallery-item-delete-btn {
+        opacity: 0;
+        pointer-events: none;
       }
 
       .gallery-item.selecting .gallery-item-info-btn,
