@@ -559,6 +559,10 @@
         if (existingPanel) {
           existingPanel.remove();
         }
+        let existingOverlay = document.getElementById("modalInfoOverlay");
+        if (existingOverlay) {
+          existingOverlay.remove();
+        }
         el.imageModal.style.display = "none";
         document.body.classList.remove("modal-open");
         currentModalImageSrc = null;
@@ -618,6 +622,20 @@
           border-radius: 8px !important;
         `;
 
+        const infoOverlay = document.createElement("div");
+        infoOverlay.id = "modalInfoOverlay";
+        infoOverlay.style.cssText = `
+          position: fixed !important;
+          top: 0 !important;
+          left: 0 !important;
+          width: 100% !important;
+          height: 100% !important;
+          z-index: 99998 !important;
+          background: rgba(0, 0, 0, 0.5) !important;
+        `;
+        infoOverlay.onclick = () => closeModalInfoPanel();
+
+        document.body.appendChild(infoOverlay);
         document.body.appendChild(infoPanel);
 
         const promptArea = document.createElement("textarea");
@@ -719,14 +737,18 @@
         infoPanel.appendChild(seedContainer);
         infoPanel.appendChild(backBtn);
 
-        el.modalImageContainer.appendChild(infoPanel);
+        document.body.appendChild(infoPanel);
       };
 
-function closeModalInfoPanel() {
+      function closeModalInfoPanel() {
         window.isModalInfoOpen = false;
         const existingPanel = document.getElementById("modalInfoPanelContainer");
         if (existingPanel) {
           existingPanel.remove();
+        }
+        const existingOverlay = document.getElementById("modalInfoOverlay");
+        if (existingOverlay) {
+          existingOverlay.remove();
         }
         el.modalImage.style.display = "block";
         el.modalDownloadBtn.style.display = "flex";
