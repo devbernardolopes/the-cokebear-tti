@@ -1911,7 +1911,7 @@
           const guidance = el.guidance.value;
           const style = el.style.value;
           const resolution = el.resolution.value;
-          const seeds = window.currentSeeds || [];
+          const seed = metadata?.seed || null;
 
           await db.gallery.add({
             imageData: currentModalImageSrc,
@@ -1919,7 +1919,7 @@
             guidance: guidance,
             style: style,
             resolution: resolution,
-            seeds: seeds,
+            seed: seed,
             timestamp: Date.now(),
           });
 
