@@ -70,6 +70,11 @@
             <span id="guidanceValue">14</span>
           </div>
 
+          <div class="seed-input-wrapper">
+            <input id="seed" type="text" placeholder="Seed (optional)" inputmode="numeric" pattern="[0-9]*" />
+            <button id="clearSeedBtn" type="button" title="Clear seed">x</button>
+          </div>
+
           <input id="negativePrompt" type="text" placeholder="Negative prompt..." />
 
           <label class="checkbox-label" aria-hidden="true">
@@ -84,10 +89,12 @@
         </div>
 
         <div class="controls-row">
-          <div class="seed-input-wrapper">
-            <input id="seed" type="text" placeholder="Seed (optional)" inputmode="numeric" pattern="[0-9]*" />
-            <button id="clearSeedBtn" type="button" title="Clear seed">x</button>
-          </div>
+          <select id="tileSize">
+            <option value="200" selected>Regular</option>
+            <option value="300">Large</option>
+            <option value="100">Small</option>
+            <option value="50">Extra Small</option>
+          </select>
 
           <select id="style">
             <option value="casual">Casual Photo</option>
@@ -133,12 +140,6 @@
           <button onclick="downloadAllImages()" id="downloadAllBtn" disabled>Download All</button>
           <button id="cancelGenBtn" onclick="cancelGeneration()">Cancel</button>
           <button onclick="generateImages()" id="generateBtn">Generate</button>
-          <select id="tileSize">
-            <option value="200" selected>Regular</option>
-            <option value="300">Large</option>
-            <option value="100">Small</option>
-            <option value="50">Extra Small</option>
-          </select>
         </div>
       </div>
     </div>
