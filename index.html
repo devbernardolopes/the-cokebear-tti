@@ -2604,8 +2604,9 @@
         font-size: 13px;
       }
 
-      #negativePrompt {
-        min-width: 200px;
+      #negativePrompt, #realismEnforcer, #enterToSend, #downloadAllBtn,
+      .checkbox-label:has(#realismEnforcer), .checkbox-label:has(#enterToSend) {
+        display: none;
       }
 
       .checkbox-label {
