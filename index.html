@@ -550,7 +550,7 @@
 
       window.closeModal = function () {
         window.isModalInfoOpen = false;
-        const existingPanel = document.getElementById("modalInfoPanelContainer");
+        let existingPanel = document.getElementById("modalInfoPanelContainer");
         if (existingPanel) {
           existingPanel.remove();
         }
@@ -596,13 +596,13 @@
         const infoPanel = document.createElement("div");
         infoPanel.id = "modalInfoPanelContainer";
         infoPanel.style.cssText = `
-          position: absolute !important;
+          position: fixed !important;
           top: 50% !important;
           left: 50% !important;
           transform: translate(-50%, -50%) !important;
-          width: 95% !important;
-          max-width: 800px !important;
-          max-height: 95% !important;
+          width: 500px !important;
+          max-width: 90vw !important;
+          max-height: 90vh !important;
           background: #161b22 !important;
           padding: 16px !important;
           overflow-y: auto !important;
@@ -612,6 +612,8 @@
           flex-direction: column !important;
           border-radius: 8px !important;
         `;
+
+        document.body.appendChild(infoPanel);
 
         const promptArea = document.createElement("textarea");
         promptArea.value = metadata.prompt || "";
@@ -715,7 +717,7 @@
         el.modalImageContainer.appendChild(infoPanel);
       };
 
-      function closeModalInfoPanel() {
+function closeModalInfoPanel() {
         window.isModalInfoOpen = false;
         const existingPanel = document.getElementById("modalInfoPanelContainer");
         if (existingPanel) {
