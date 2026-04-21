@@ -235,6 +235,16 @@
         >
           ✕
         </button>
+        <button
+          id="modalInfoBtn"
+          class="modal-info-btn"
+          onclick="
+            event.stopPropagation();
+            openModalInfoFromModal();
+          "
+        >
+          ℹ
+        </button>
         <div id="modalCounter" class="modal-counter"></div>
       </div>
     </div>
@@ -323,6 +333,7 @@
         modalImage: document.getElementById("modalImage"),
         modalDownloadBtn: document.getElementById("modalDownloadBtn"),
         modalCloseBtn: document.getElementById("modalCloseBtn"),
+        modalInfoBtn: document.getElementById("modalInfoBtn"),
         saveToGalleryBtn: document.getElementById("saveToGalleryBtn"),
         galleryModal: document.getElementById("galleryModal"),
         galleryList: document.getElementById("galleryList"),
@@ -549,6 +560,154 @@
         if (currentModalImageSrc) {
           await downloadImage(currentModalImageSrc);
         }
+      };
+
+      window.openModalInfoFromModal = function () {
+        const imageSrc = currentModalImageSrc;
+        if (!imageSrc) return;
+
+        let metadata = null;
+        if (isFromGenerated) {
+          metadata = window.imageMetadata?.[imageSrc];
+        } else {
+          metadata = galleryCurrentImage;
+        }
+        if (!metadata) return;
+
+        el.modalImage.style.display = "none";
+        el.modalDownloadBtn.style.display = "none";
+        el.saveToGalleryBtn.style.display = "none";
+        el.modalCloseBtn.style.display = "none";
+        el.modalInfoBtn.style.display = "none";
+        el.modalCounter.style.display = "none";
+
+        const infoPanel = document.createElement("div");
+        infoPanel.className = "modal-info-panel";
+        infoPanel.style.position = "absolute";
+        infoPanel.style.top = "0";
+        infoPanel.style.left = "0";
+        infoPanel.style.right = "0";
+        infoPanel.style.bottom = "0";
+        infoPanel.style.background = "#161b22";
+        infoPanel.style.padding = "16px";
+        infoPanel.style.overflowY = "auto";
+        infoPanel.style.zIndex = "1000";
+
+        const promptArea = document.createElement("textarea");
+        promptArea.value = metadata.prompt || "";
+        promptArea.readOnly = true;
+        promptArea.style.width = "100%";
+        promptArea.style.height = "120px";
+        promptArea.style.resize = "none";
+        promptArea.style.fontSize = "10px";
+        promptArea.style.padding = "6px";
+        promptArea.style.marginBottom = "8px";
+        promptArea.style.background = "#0d1117";
+        promptArea.style.color = "#c9d1d9";
+        promptArea.style.border = "1px solid #30363d";
+        promptArea.style.borderRadius = "4px";
+        promptArea.style.fontFamily = "monospace";
+
+        const useAsPromptBtn = document.createElement("button");
+        useAsPromptBtn.textContent = "Use as Prompt";
+        useAsPromptBtn.style.width = "100%";
+        useAsPromptBtn.style.padding = "6px";
+        useAsPromptBtn.style.fontSize = "11px";
+        useAsPromptBtn.style.marginBottom = "8px";
+        useAsPromptBtn.style.background = "#6e40c9";
+        useAsPromptBtn.style.border = "1px solid #8957e5";
+        useAsPromptBtn.style.borderRadius = "4px";
+        useAsPromptBtn.style.color = "#fff";
+        useAsPromptBtn.style.cursor = "pointer";
+        useAsPromptBtn.onclick = () => {
+          el.prompt.value = metadata.prompt || "";
+          if (el.prompt.value.trim()) {
+            autoAdjustPromptHeight();
+          }
+          el.prompt.dispatchEvent(new Event("input", { bubbles: true }));
+        };
+
+        const seedContainer = document.createElement("div");
+        seedContainer.style.display = "flex";
+        seedContainer.style.gap = "4px";
+        seedContainer.style.marginBottom = "8px";
+        seedContainer.style.width = "100%";
+        seedContainer.style.boxSizing = "border-box";
+
+        const seedInput = document.createElement("input");
+        seedInput.type = "text";
+        seedInput.value = metadata.seed || "";
+        seedInput.readOnly = true;
+        seedInput.style.flex = "1";
+        seedInput.style.minWidth = "0";
+        seedInput.style.fontSize = "11px";
+        seedInput.style.padding = "4px 6px";
+        seedInput.style.background = "#0d1117";
+        seedInput.style.color = "#c9d1d9";
+        seedInput.style.border = "1px solid #30363d";
+        seedInput.style.borderRadius = "4px";
+        seedInput.style.boxSizing = "border-box";
+
+        const copySeedBtn = document.createElement("button");
+        copySeedBtn.textContent = "Copy";
+        copySeedBtn.style.padding = "4px 8px";
+        copySeedBtn.style.fontSize = "10px";
+        copySeedBtn.style.background = "#238636";
+        copySeedBtn.style.border = "1px solid #2ea043";
+        copySeedBtn.style.borderRadius = "4px";
+        copySeedBtn.style.color = "#fff";
+        copySeedBtn.style.cursor = "pointer";
+        copySeedBtn.style.whiteSpace = "nowrap";
+        copySeedBtn.style.flexShrink = "0";
+        copySeedBtn.onclick = () => {
+          const seedInputElement = document.getElementById("seed");
+          if (seedInputElement) {
+            seedInputElement.value = metadata.seed || "";
+          }
+          copySeedBtn.textContent = "✓";
+          setTimeout(() => {
+            copySeedBtn.textContent = "Copy";
+          }, 1000);
+        };
+
+        seedContainer.appendChild(seedInput);
+        seedContainer.appendChild(copySeedBtn);
+
+        const backBtn = document.createElement("button");
+        backBtn.textContent = "← Back";
+        backBtn.style.width = "100%";
+        backBtn.style.padding = "6px";
+        backBtn.style.fontSize = "11px";
+        backBtn.style.background = "#30363d";
+        backBtn.style.border = "1px solid #484f58";
+        backBtn.style.borderRadius = "4px";
+        backBtn.style.color = "#c9d1d9";
+        backBtn.style.cursor = "pointer";
+        backBtn.onclick = () => {
+          closeModalInfoPanel();
+        };
+
+        infoPanel.appendChild(promptArea);
+        infoPanel.appendChild(useAsPromptBtn);
+        infoPanel.appendChild(seedContainer);
+        infoPanel.appendChild(backBtn);
+
+        el.modalImageContainer.appendChild(infoPanel);
+      };
+
+      function closeModalInfoPanel() {
+        const existingPanel = el.modalImageContainer.querySelector(".modal-info-panel");
+        if (existingPanel) {
+          existingPanel.remove();
+        }
+        el.modalImage.style.display = "block";
+        el.modalDownloadBtn.style.display = "flex";
+        if (isFromGenerated || (galleryImages.length > 0 && !isFromGenerated)) {
+          el.saveToGalleryBtn.style.display = "flex";
+        }
+        el.modalCloseBtn.style.display = "flex";
+        el.modalInfoBtn.style.display = "flex";
+        el.modalCounter.style.display = "block";
       };
 
       window.updateModalCounter = function () {
@@ -1749,7 +1908,8 @@
           const item = await db.gallery.get(id);
           if (item) {
             galleryCurrentImage = item;
-            openModalInfo(item);
+            currentModalImageSrc = item.imageData;
+            openModalInfoFromModal();
           }
         } catch (e) {
           console.warn("Failed to open gallery image info:", e);
@@ -3359,6 +3519,31 @@
 
       .modal-close-btn:hover {
         background: rgba(220, 0, 0, 1);
+        transform: scale(1.1);
+      }
+
+      .modal-info-btn {
+        position: absolute;
+        bottom: 10px;
+        left: 10px;
+        width: 40px;
+        height: 40px;
+        padding: 0;
+        background: rgba(110, 64, 201, 0.9);
+        border: 1px solid #8957e5;
+        border-radius: 8px;
+        color: #fff;
+        font-size: 20px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10000;
+        transition: all 0.2s ease;
+      }
+
+      .modal-info-btn:hover {
+        background: rgba(130, 84, 221, 1);
         transform: scale(1.1);
       }
 
