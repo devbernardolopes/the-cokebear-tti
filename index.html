@@ -542,7 +542,7 @@
         isFromGenerated = currentModalIndex >= 0;
         el.modalImage.src = imgSrc;
         el.imageModal.style.display = "flex";
-        document.body.style.overflow = "hidden";
+        document.body.classList.add("modal-open");
         imageScale = 1;
         el.modalImage.style.transform = "";
         updateModalCounter();
@@ -555,7 +555,7 @@
           existingPanel.remove();
         }
         el.imageModal.style.display = "none";
-        document.body.style.overflow = "auto";
+        document.body.classList.remove("modal-open");
         currentModalImageSrc = null;
         currentModalIndex = -1;
         currentGalleryIndex = -1;
@@ -1449,16 +1449,16 @@ function closeModalInfoPanel() {
           el.historyModal.style.display = "flex";
           el.historyModal.style.alignItems = "center";
           el.historyModal.style.justifyContent = "center";
-          document.body.style.overflow = "hidden";
+          document.body.classList.add("modal-open");
         } else {
           el.historyModal.style.display = "none";
-          document.body.style.overflow = "auto";
+          document.body.classList.remove("modal-open");
         }
       };
 
       window.closeHistoryModal = function () {
         el.historyModal.style.display = "none";
-        document.body.style.overflow = "auto";
+        document.body.classList.remove("modal-open");
       };
 
       el.historyModal.addEventListener("click", (e) => {
@@ -1679,12 +1679,12 @@ function closeModalInfoPanel() {
         selectedPromptIds = new Set();
         await loadManageHistory(false);
         el.manageHistoryModal.style.display = "flex";
-        document.body.style.overflow = "hidden";
+        document.body.classList.add("modal-open");
       };
 
       window.closeManageHistoryModal = function () {
         el.manageHistoryModal.style.display = "none";
-        document.body.style.overflow = "auto";
+        document.body.classList.remove("modal-open");
       };
 
       el.manageHistoryModal.addEventListener("click", (e) => {
@@ -1809,13 +1809,13 @@ function closeModalInfoPanel() {
         el.gallerySelectModeBtn.textContent = "Select";
         await loadGallery(false);
         el.galleryModal.style.display = "flex";
-        document.body.style.overflow = "hidden";
+        document.body.classList.add("modal-open");
       };
 
       window.closeGalleryModal = function () {
         galleryCurrentImage = null;
         el.galleryModal.style.display = "none";
-        document.body.style.overflow = "auto";
+        document.body.classList.remove("modal-open");
       };
 
       el.galleryModal.addEventListener("click", (e) => {
@@ -2599,6 +2599,10 @@ function closeModalInfoPanel() {
         padding: 14px;
         scrollbar-width: none;
         -ms-overflow-style: none;
+      }
+
+      body.modal-open {
+        overflow: hidden !important;
       }
 
       body::-webkit-scrollbar {
