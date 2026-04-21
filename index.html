@@ -2178,87 +2178,14 @@
         }
       }
 
-      async function addPngMetadata(dataUrl, prompt, seed) {
-        const base64 = dataUrl.split(",")[1];
-        const binary = atob(base64);
-        const bytes = new Uint8Array(binary.length);
-        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-
-        const header = bytes.slice(0, 8);
-        let pos = 8;
-        const chunks = [];
-
-        while (pos < bytes.length) {
-          const length = new DataView(bytes.slice(pos, pos + 4).buffer).getUint32(0, false);
-          const type = String.fromCharCode(...bytes.slice(pos + 4, pos + 8));
-          const fullChunk = bytes.slice(pos, pos + 12 + length);
-          if (type !== "tEXt") {
-            chunks.push(fullChunk);
-          }
-          if (type === "IEND") break;
-          pos += 12 + length;
-        }
-
-        function crc32(data) {
-          let crc = 0xffffffff;
-          const table = new Uint32Array(256);
-          for (let i = 0; i < 256; i++) {
-            let c = i;
-            for (let j = 0; j < 8; j++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
-            table[i] = c;
-          }
-          for (const byte of data) crc = table[(crc ^ byte) & 0xff] ^ (crc >>> 8);
-          return (crc ^ 0xffffffff) >>> 0;
-        }
-
-        function textChunk(keyword, text) {
-          const encoder = new TextEncoder();
-          const keywordBytes = encoder.encode(keyword);
-          const textBytes = encoder.encode(text);
-          const data = new Uint8Array(keywordBytes.length + 1 + textBytes.length);
-          data.set(keywordBytes, 0);
-          data[keywordBytes.length] = 0;
-          data.set(textBytes, keywordBytes.length + 1);
-
-          const type = "tEXt";
-          const typeBytes = encoder.encode(type);
-          const length = new Uint8Array(4);
-          new DataView(length.buffer).setUint32(0, data.length, false);
-
-          const crcData = [...typeBytes, ...data];
-          const crc = crc32(crcData);
-          const crcBytes = new Uint8Array(4);
-          new DataView(crcBytes.buffer).setUint32(0, crc, false);
-
-          return new Blob([length, typeBytes, data, crcBytes], {
-            type: "application/octet-stream",
-          });
-        }
-
-        const promptChunk = await textChunk("Prompt", prompt);
-        const seedChunk = await textChunk("Seed", String(seed));
-        const promptArr = new Uint8Array(await promptChunk.arrayBuffer());
-        const seedArr = new Uint8Array(await seedChunk.arrayBuffer());
-
-        const newPng = new Blob([header, ...chunks, promptArr, seedArr], {
-          type: "image/png",
-        });
-        return URL.createObjectURL(newPng);
-      }
-
-      async function downloadImage(dataUrl) {
+      function downloadImage(dataUrl) {
         const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, -5);
         const metadata = window.imageMetadata?.[dataUrl];
         const seed = metadata?.seed ?? "";
         const filename = seed ? `tti-${timestamp}-${seed}.png` : `tti-${timestamp}.png`;
 
-        let downloadUrl = dataUrl;
-        if (metadata?.prompt && metadata?.seed) {
-          downloadUrl = await addPngMetadata(dataUrl, metadata.prompt, metadata.seed);
-        }
-
         const link = document.createElement("a");
-        link.href = downloadUrl;
+        link.href = dataUrl;
         link.download = filename;
         document.body.appendChild(link);
         link.click();
@@ -2417,7 +2344,7 @@
         }
       });
 
-      window.downloadAllImages = async function () {
+      window.downloadAllImages = function () {
         if (generatedImages.length === 0) return;
 
         const baseTimestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, -5);
@@ -2429,18 +2356,12 @@
           const seedSuffix = seed ? `-${seed}` : "";
           const filename = `tti-${baseTimestamp}-${String(index + 1).padStart(2, "0")}${seedSuffix}.png`;
 
-          let downloadUrl = dataUrl;
-          if (metadata?.prompt && metadata?.seed) {
-            downloadUrl = await addPngMetadata(dataUrl, metadata.prompt, metadata.seed);
-          }
-
           const link = document.createElement("a");
-          link.href = downloadUrl;
+          link.href = dataUrl;
           link.download = filename;
           document.body.appendChild(link);
           link.click();
           document.body.removeChild(link);
-          await new Promise((r) => setTimeout(r, 100));
         }
       };
 
