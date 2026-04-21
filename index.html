@@ -42,7 +42,7 @@
 
         <button onclick="toggleScratchpad()" id="scratchpadBtn" class="scratchpad-toggle">Scratchpad</button>
         <button onclick="openGallery()" id="galleryBtn" class="gallery-toggle">Gallery</button>
-        <button id="clearPromptHeaderBtn" title="Clear Prompt">Clear</button>
+        <button id="clearPromptHeaderBtn">Clear</button>
       </div>
       <div id="scratchpadContainer">
         <textarea id="scratchpadText" placeholder="Define variables here, e.g., HAIR_COLOR = {black|brown|blond}"></textarea>
@@ -71,7 +71,7 @@
           </div>
 
           <div class="seed-input-wrapper">
-            <input id="seed" type="text" placeholder="Seed (optional)" inputmode="numeric" pattern="[0-9]*" />
+            <input id="seed" type="text" placeholder="Seed" inputmode="numeric" pattern="[0-9]*" />
             <button id="clearSeedBtn" type="button" title="Clear seed">x</button>
           </div>
 
@@ -90,12 +90,12 @@
 
         <div class="controls-row">
           <select id="tileSize">
-            <option value="50">Extra Small</option>
-            <option value="100">Small</option>
+            <option value="300">Extra Large</option>
+            <option value="250">Large</option>
             <option value="175">Medium</option>
             <option value="200" selected>Regular</option>
-            <option value="250">Large</option>
-            <option value="300">Extra Large</option>
+            <option value="100">Small</option>
+            <option value="50">Extra Small</option>
           </select>
 
           <select id="style">
@@ -121,6 +121,7 @@
             <!-- <option value="macro">Macro Photo</option> -->
             <!-- <option value="studio">Studio Portrait</option> -->
             <option value="none">No Style</option>
+            <option value="random_real">Random (Realistic)</option>
           </select>
 
           <select id="resolution">
@@ -132,7 +133,9 @@
           <select id="numImages">
             <option value="1">1</option>
             <option value="2">2</option>
+            <option value="3">3</option>
             <option value="4">4</option>
+            <option value="5">5</option>
             <option value="6">6</option>
             <option value="8">8</option>
             <option value="16">16</option>
@@ -217,17 +220,7 @@
         >
           ⬇
         </button>
-        <button
-          id="saveToGalleryBtn"
-          class="modal-save-btn"
-          onclick="
-            event.stopPropagation();
-            saveToGallery();
-          "
-          title="Save to Gallery"
-        >
-          💾
-        </button>
+        <button id="saveToGalleryBtn" class="modal-save-btn" onclick="event.stopPropagation(); saveToGallery();">💾</button>
         <button
           id="modalCloseBtn"
           class="modal-close-btn"
@@ -256,49 +249,46 @@
       let pluginReady = false;
       let db = null;
 
-      const REALISM_ENFORCER = ". Photorealistic photography, real skin texture, natural imperfections.";
+      const REALISM_ENFORCER = "\n\nPhotorealistic photography, real skin texture, natural imperfections.";
 
       // const REALISM_ENFORCER =
       //   "Photorealistic, real-world photography, natural lighting, real skin texture, life-like, natural imperfections. Overall, the image should look like a genuine photograph taken in the real world, not an AI-generated image. Avoid any elements that could make it look artificial or stylized.";
 
-      const CASUAL_PHOTO = ". It's a casual photo.";
+      const CASUAL_PHOTO = "\n\nIt's a casual photo.";
       
-      const CASUAL_PHOTO_HQ = ". Unedited RAW cellphone photo, wide-angle lens (28mm equivalent), shot on a smartphone camera with high contrast, natural film grain visible everywhere, hyperrealistic real-life photography, straight from the camera, zero post-processing, (photorealistic:2.5), (raw actual photography:2.3), visible skin pores and texture, subtle imperfections, no plastic skin, no waxy sheen, no artificial gloss, no beauty filter, 8k ultra photorealistic unedited image, best quality.";
+      const CASUAL_PHOTO_HQ = "\n\nUnedited RAW cellphone photo, wide-angle lens (28mm equivalent), shot on a smartphone camera with high contrast, natural film grain visible everywhere, hyperrealistic real-life photography, straight from the camera, zero post-processing, (photorealistic:2.5), (raw actual photography:2.3), visible skin pores and texture, subtle imperfections, no plastic skin, no waxy sheen, no artificial gloss, no beauty filter, 8k ultra photorealistic unedited image, best quality.";
 
-      // const RAW_CASUAL_PHOTO = ". Unedited RAW cellphone photo, wide-angle lens (28mm equivalent), shot on a smartphone camera with heavy Kodak Tri-X 400 black and white film grain, high contrast, natural film grain visible everywhere, hyperrealistic real-life photography, straight from the camera, zero post-processing, (photorealistic:2.5), (raw actual photography:2.3), natural daylight, visible skin pores and texture, subtle imperfections, no plastic skin, no waxy sheen, no artificial gloss, no beauty filter, 8k ultra photorealistic unedited image, best quality.";
-      const RAW_CASUAL_PHOTO = ". Real-life, low-quality, RAW cellphone camera photo with zero post-processing, subtle imperfections, slightly blurred.";
+      const RAW_CASUAL_PHOTO = "\n\nReal-life, low-quality, RAW cellphone camera photo with zero post-processing, subtle imperfections, slightly blurred.";
 
-      const SNAPCHAT_CASUAL_PHOTO = ". It's a casual Snapchat selfie photo.";
+      const SNAPCHAT_CASUAL_PHOTO = "\n\nIt's a casual Snapchat selfie photo.";
 
-      // const RANDOM_CASUAL_PHOTO = ".{ It's a casual photo| It's a casual Snapchat selfie| It's a casual spontaneous cellphone photo with sharp focus}.";
+      const PROFESSIONAL_PHOTO = "\n\nSoft focus, depth of field, 4k photo, taken with Canon EOS R5, DSLR, 75mm lens.";
 
-      const PROFESSIONAL_PHOTO = ". Sharp focus, depth of field, 8k photo, HDR, professional lighting, taken with Canon EOS R5, DSLR, 75mm lens.";
+      const PROFESSIONAL_PHOTO_EX = "\n\nSharp focus, depth of field, 8k photo, HDR, taken with Canon EOS R5, DSLR, 75mm lens, with impeccable attention to detail.";
 
-      const PROFESSIONAL_PHOTO_EX = ". Sharp focus, depth of field, 8k photo, HDR, professional lighting, taken with Canon EOS R5, DSLR, 75mm lens, with impeccable attention to detail.";
+      const CINEMATIC = "\n\nCinematic shot, 75mm, Technicolor, Panavision, cinemascope, sharp focus, fine details, 8k, HDR, realism, realistic, key visual, film still, cinematic color grading, depth of field.";
 
-      const CINEMATIC = ". Cinematic shot, dynamic lighting, 75mm, Technicolor, Panavision, cinemascope, sharp focus, fine details, 8k, HDR, realism, realistic, key visual, film still, cinematic color grading, depth of field.";
+      const CINEMATIC_EX = "\n\nCinematic shot, 75mm, Technicolor, Panavision, cinemascope, sharp focus, fine details, 8k, HDR, realism, realistic, key visual, film still, cinematic color grading, depth of field.\n\nOverall, it's an absolute world-class cinematic masterpiece. It's an aesthetically pleasing cinematic shot with impeccable attention to detail and impressive composition. The lighting is dramatic and expertly executed, creating a captivating atmosphere. The image is rendered in stunning 8k resolution with HDR, showcasing fine details and textures that contribute to its realism. The color grading is cinematic and visually striking, enhancing the overall mood and impact of the shot. This image stands out as a prime example of top-tier cinematic photography, evoking strong emotions and leaving a lasting impression on viewers.";
 
-      const CINEMATIC_EX = ". Cinematic shot, dynamic lighting, 75mm, Technicolor, Panavision, cinemascope, sharp focus, fine details, 8k, HDR, realism, realistic, key visual, film still, cinematic color grading, depth of field.\n\nOverall, it's an absolute world-class cinematic masterpiece. It's an aesthetically pleasing cinematic shot with impeccable attention to detail and impressive composition. The lighting is dramatic and expertly executed, creating a captivating atmosphere. The image is rendered in stunning 8k resolution with HDR, showcasing fine details and textures that contribute to its realism. The color grading is cinematic and visually striking, enhancing the overall mood and impact of the shot. This image stands out as a prime example of top-tier cinematic photography, evoking strong emotions and leaving a lasting impression on viewers.";
+      const CCTV = "\n\nOld CCTV footage, high-angle CCTV image.";
 
-      const CCTV = ". Old CCTV footage, high-angle CCTV image.";
+      const CURSED = "\n\nCreepy and cursed, absolutely cursed photo, nope nope nope nope, what the actual f, unsettling photo, cursed_thing, cursedimages, no context, cursed image, bad photo, weird photo, very strange, color photo, creepy photo, nightmare fuel.";
 
-      const CURSED = ". Creepy and cursed, absolutely cursed photo, nope nope nope nope, what the actual f, unsettling photo, cursed_thing, cursedimages, no context, cursed image, bad photo, weird photo, very strange, color photo, creepy photo, nightmare fuel.";
+      const TWO_THOUSANDS = "\n\nOld early 2000s cellphone photo.";
 
-      const TWO_THOUSANDS = ". Old early 2000s cellphone photo.";
+      const NINETIES = "\n\n90s home video, nostalgic 90s photo, taken with Kodak disposable camera.";
 
-      const NINETIES = ". 90s home video, nostalgic 90s photo, taken with Kodak disposable camera.";
+      const EIGHTIES = "\n\nGrainy photograph, 80s photo with film grain, Kodacolor II 80s photo with vignetting, retro, r/OldSchoolCool, 80s photo with wear and tear and minor creasing and scratches, vintage color photo.";
 
-      const EIGHTIES = ". Grainy photograph, 80s photo with film grain, Kodacolor II 80s photo with vignetting, retro, r/OldSchoolCool, 80s photo with wear and tear and minor creasing and scratches, vintage color photo.";
+      const SEVENTIES = "\n\nGrainy photograph, 1970s photo with film grain, 70s photo with vignetting, retro, r/OldSchoolCool, 70s photo, vintage photo.";
 
-      const SEVENTIES = ". Grainy photograph, 1970s photo with film grain, 70s photo with vignetting, retro, r/OldSchoolCool, 70s photo, vintage photo.";
+      const SIXTIES = "\n\nGrainy photograph, 1960s photo with film grain, 60s photo with vignetting, retro, r/OldSchoolCool, 60s photo, vintage photo.";
 
-      const SIXTIES = ". Grainy photograph, 1960s photo with film grain, 60s photo with vignetting, retro, r/OldSchoolCool, 60s photo, vintage photo.";
+      const FIFTIES = "\n\nGrainy photograph, 1950s photo with film grain, 1950s photo with vignetting, retro, r/OldSchoolCool, 1950s photo, vintage photo.";
 
-      const FIFTIES = ". Grainy photograph, 1950s photo with film grain, 1950s photo with vignetting, retro, r/OldSchoolCool, 1950s photo, vintage photo.";
+      const PAINTED_ANIME = "\n\nOverall, it's an absolute world-class masterpiece painterly anime artwork. It's an aesthetically pleasing painterly anime artwork with impeccable attention to detail and impressive composition.";
 
-      const PAINTED_ANIME = ". Overall, it's an absolute world-class masterpiece painterly anime artwork. It's an aesthetically pleasing painterly anime artwork with impeccable attention to detail and impressive composition.";
-
-      const PAINTED_ANIME_EX = ". Painted anime style, vibrant colors, detailed character design, dynamic action scenes, 8k resolution, HDR, cinematic lighting.";
+      const PAINTED_ANIME_EX = "\n\nPainted anime style, vibrant colors, detailed character design, dynamic action scenes, 8k resolution, HDR, cinematic lighting.";
 
       const el = {
         prompt: document.getElementById("promptText"),
@@ -2532,11 +2522,11 @@
             // Build prompt with this image's specific seed
             let imagePrompt = processedBasePrompt;
 
-            if (style === "casual") imagePrompt = "A casual photo of: \n" + imagePrompt + CASUAL_PHOTO;
-            if (style === "casual_hq") imagePrompt = "A high-quality casual photo of: \n" + imagePrompt + CASUAL_PHOTO_HQ;
-            if (style === "casual_raw") imagePrompt = "A casual photo of: \n" + imagePrompt + RAW_CASUAL_PHOTO;
-            if (style === "casual_snapchat") imagePrompt = "A casual Snapchat selfie photo of: \n" + imagePrompt + SNAPCHAT_CASUAL_PHOTO;
-            if (style === "casual_random") imagePrompt = "A casual photo of: \n\n" + imagePrompt + "\n\n{" + CASUAL_PHOTO + "|" + SNAPCHAT_CASUAL_PHOTO + "|" + RAW_CASUAL_PHOTO + "}.";
+            if (style === "casual") imagePrompt = "A casual photo of:\n\n" + imagePrompt + CASUAL_PHOTO;
+            if (style === "casual_hq") imagePrompt = "A high-quality casual photo of:\n\n" + imagePrompt + CASUAL_PHOTO_HQ;
+            if (style === "casual_raw") imagePrompt = "A casual photo of:\n\n" + imagePrompt + RAW_CASUAL_PHOTO;
+            if (style === "casual_snapchat") imagePrompt = "A casual Snapchat selfie photo of:\n\n" + imagePrompt + SNAPCHAT_CASUAL_PHOTO;
+            if (style === "casual_random") imagePrompt = "A casual photo of:\n\n" + imagePrompt + "{" + CASUAL_PHOTO_HQ + "|" + CASUAL_PHOTO + "|" + SNAPCHAT_CASUAL_PHOTO + "|" + RAW_CASUAL_PHOTO + "}";
 
             if (style === "professional") imagePrompt += PROFESSIONAL_PHOTO;
             if (style === "professional_ex") imagePrompt += PROFESSIONAL_PHOTO_EX;
@@ -2547,15 +2537,17 @@
             if (style === "cctv") imagePrompt += CCTV;
             if (style === "cursed") imagePrompt += CURSED;
 
-            if (style === "twothousands") imagePrompt = "An early 2000s casual cellphone photo. \n" + imagePrompt + TWO_THOUSANDS;
+            if (style === "twothousands") imagePrompt = "An early 2000s casual cellphone photo of:\n\n" + imagePrompt + TWO_THOUSANDS;
             if (style === "nineties") imagePrompt += NINETIES;
-            if (style === "eighties") imagePrompt = "Famous vintage 1980s photo. \n" + imagePrompt + EIGHTIES;
-            if (style === "seventies") imagePrompt = "Famous vintage 1970s photo. \n" + imagePrompt + SEVENTIES;
-            if (style === "sixties") imagePrompt = "Famous vintage 1960s photo. \n" + imagePrompt + SIXTIES;
-            if (style === "fifties") imagePrompt = "Famous vintage 1950s photo. \n" + imagePrompt + FIFTIES;
+            if (style === "eighties") imagePrompt = "Famous vintage 1980s photo. \n\n" + imagePrompt + EIGHTIES;
+            if (style === "seventies") imagePrompt = "Famous vintage 1970s photo. \n\n" + imagePrompt + SEVENTIES;
+            if (style === "sixties") imagePrompt = "Famous vintage 1960s photo. \n\n" + imagePrompt + SIXTIES;
+            if (style === "fifties") imagePrompt = "Famous vintage 1950s photo. \n\n" + imagePrompt + FIFTIES;
 
-            if (style === "painted_anime") imagePrompt = "Painterly anime artwork: \n" + imagePrompt + PAINTED_ANIME;
-            if (style === "painted_anime_ex") imagePrompt = "Painterly anime artwork: \n" + imagePrompt + PAINTED_ANIME_EX;
+            if (style === "painted_anime") imagePrompt = "Painterly anime artwork:\n\n" + imagePrompt + PAINTED_ANIME;
+            if (style === "painted_anime_ex") imagePrompt = "Painterly anime artwork:\n\n" + imagePrompt + PAINTED_ANIME_EX;
+
+            if (style === "random_real") imagePrompt += "{" + CURSED + "|" + CCTV + "|" + PROFESSIONAL_PHOTO + "|" + PROFESSIONAL_PHOTO_EX + "|" + CINEMATIC + "|" + CINEMATIC_EX + "|" + CASUAL_PHOTO_HQ + "|" + CASUAL_PHOTO + "|" + SNAPCHAT_CASUAL_PHOTO + "|" + RAW_CASUAL_PHOTO + "}";
 
             if (useRealismEnforcer) {
               imagePrompt = imagePrompt + "\n\n" + REALISM_ENFORCER;
