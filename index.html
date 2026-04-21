@@ -532,6 +532,11 @@
 
       // Modal functions
       window.openModal = function (imgSrc) {
+        window.isModalInfoOpen = false;
+        const existingPanel = document.getElementById("modalInfoPanelContainer");
+        if (existingPanel) {
+          existingPanel.remove();
+        }
         currentModalImageSrc = imgSrc;
         currentModalIndex = generatedImages.indexOf(imgSrc);
         isFromGenerated = currentModalIndex >= 0;
@@ -591,11 +596,13 @@
         const infoPanel = document.createElement("div");
         infoPanel.id = "modalInfoPanelContainer";
         infoPanel.style.cssText = `
-          position: fixed !important;
-          top: 0 !important;
-          left: 0 !important;
-          width: 100% !important;
-          height: 100% !important;
+          position: absolute !important;
+          top: 50% !important;
+          left: 50% !important;
+          transform: translate(-50%, -50%) !important;
+          width: 95% !important;
+          max-width: 800px !important;
+          max-height: 95% !important;
           background: #161b22 !important;
           padding: 16px !important;
           overflow-y: auto !important;
@@ -603,6 +610,7 @@
           box-sizing: border-box !important;
           display: flex !important;
           flex-direction: column !important;
+          border-radius: 8px !important;
         `;
 
         const promptArea = document.createElement("textarea");
@@ -1901,6 +1909,11 @@
 
       async function openGalleryImageModal(id) {
         if (!db) return;
+        window.isModalInfoOpen = false;
+        const existingPanel = document.getElementById("modalInfoPanelContainer");
+        if (existingPanel) {
+          existingPanel.remove();
+        }
         try {
           const item = await db.gallery.get(id);
           if (item) {
@@ -1925,7 +1938,13 @@
           if (item) {
             galleryCurrentImage = item;
             currentModalImageSrc = item.imageData;
-            openModalInfoFromModal();
+            currentGalleryIndex = galleryImages.findIndex((img) => img.id === id);
+            isFromGenerated = false;
+            el.modalImage.src = item.imageData;
+            el.modalCounter.textContent = galleryImages.length > 0 ? `${currentGalleryIndex + 1}/${galleryImages.length}` : "";
+            el.saveToGalleryBtn.style.display = "none";
+            el.imageModal.style.display = "flex";
+            setTimeout(() => openModalInfoFromModal(), 100);
           }
         } catch (e) {
           console.warn("Failed to open gallery image info:", e);
@@ -3091,6 +3110,24 @@
         transition:
           opacity 0.2s ease,
           background 0.2s ease;
+        z-index: 10;
+      }
+
+      .gallery-item-info-btn {
+        top: 8px;
+        left: 8px;
+        background: rgba(31, 111, 235, 0.9);
+        border: 1px solid #388bfd;
+        border-radius: 6px;
+        color: #fff;
+        font-size: 16px;
+        cursor: pointer;
+        padding: 0;
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
       }
 
       .gallery-item:hover .gallery-item-info-btn,
@@ -3099,14 +3136,31 @@
         opacity: 1;
       }
 
-      .gallery-item-info-btn {
-        top: 8px;
-        left: 8px;
+      .gallery-item-info-btn:hover {
+        background: rgba(56, 139, 253, 1);
+        transform: scale(1.05);
       }
 
       .gallery-item-download-btn {
         top: 8px;
         right: 8px;
+        background: rgba(35, 134, 54, 0.9);
+        border: 1px solid #2ea043;
+        border-radius: 6px;
+        color: #fff;
+        font-size: 16px;
+        cursor: pointer;
+        padding: 0;
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .gallery-item-download-btn:hover {
+        background: rgba(46, 160, 67, 1);
+        transform: scale(1.05);
       }
 
       .gallery-item-delete-btn {
@@ -3118,6 +3172,7 @@
 
       .gallery-item-delete-btn:hover {
         background: rgba(220, 0, 0, 1);
+        transform: scale(1.05);
       }
 
       .gallery-item-checkmark {
