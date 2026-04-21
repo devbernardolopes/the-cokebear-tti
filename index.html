@@ -1416,16 +1416,18 @@
               metaHtml += `<span class="history-badge">${escapeHtml(styleLabel)}</span>`;
             }
             if (item.guidance) {
-              metaHtml += `<span class="history-badge guidance-badge">CFG: ${escapeHtml(item.guidance)}</span>`;
+              metaHtml += `<span class="history-badge guidance-badge">${escapeHtml(item.guidance)}</span>`;
             }
             if (item.resolution) {
-              metaHtml += `<span class="history-badge">${escapeHtml(item.resolution)}</span>`;
+              const res = item.resolution;
+              const resLabel = res === "512x768" ? "POR" : res === "768x512" ? "LND" : "SQR";
+              metaHtml += `<span class="history-badge">${resLabel}</span>`;
             }
             if (item.seeds) {
               if (Array.isArray(item.seeds) && item.seeds.length > 0) {
                 metaHtml += `<span class="history-badge seed-badge" title="${item.seeds.join(", ")}">${item.seeds.length} seed${item.seeds.length > 1 ? "s" : ""}</span>`;
               } else if (!Array.isArray(item.seeds)) {
-                metaHtml += `<span class="history-badge seed-badge">Seed: ${item.seeds}</span>`;
+                metaHtml += `<span class="history-badge seed-badge">${item.seeds}</span>`;
               }
             }
             metaHtml += "</div>";
@@ -1635,16 +1637,18 @@
               metaHtml += `<span class="history-badge">${escapeHtml(styleLabel)}</span>`;
             }
             if (item.guidance) {
-              metaHtml += `<span class="history-badge guidance-badge">CFG: ${escapeHtml(item.guidance)}</span>`;
+              metaHtml += `<span class="history-badge guidance-badge">${escapeHtml(item.guidance)}</span>`;
             }
             if (item.resolution) {
-              metaHtml += `<span class="history-badge">${escapeHtml(item.resolution)}</span>`;
+              const res = item.resolution;
+              const resLabel = res === "512x768" ? "POR" : res === "768x512" ? "LND" : "SQR";
+              metaHtml += `<span class="history-badge">${resLabel}</span>`;
             }
             if (item.seeds) {
               if (Array.isArray(item.seeds) && item.seeds.length > 0) {
                 metaHtml += `<span class="history-badge seed-badge" title="${item.seeds.join(", ")}">${item.seeds.length} seed${item.seeds.length > 1 ? "s" : ""}</span>`;
               } else if (!Array.isArray(item.seeds)) {
-                metaHtml += `<span class="history-badge seed-badge">Seed: ${item.seeds}</span>`;
+                metaHtml += `<span class="history-badge seed-badge">${item.seeds}</span>`;
               }
             }
             metaHtml += "</div>";
