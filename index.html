@@ -42,7 +42,7 @@
 
         <button onclick="toggleScratchpad()" id="scratchpadBtn" class="scratchpad-toggle">Scratchpad</button>
         <button onclick="openGallery()" id="galleryBtn" class="gallery-toggle">Gallery</button>
-        <button id="clearPromptHeaderBtn" title="Clear Prompt">Clear Prompt</button>
+        <button id="clearPromptHeaderBtn" title="Clear Prompt">Clear</button>
       </div>
       <div id="scratchpadContainer">
         <textarea id="scratchpadText" placeholder="Define variables here, e.g., HAIR_COLOR = {black|brown|blond}"></textarea>
@@ -935,7 +935,8 @@
       window.toggleScratchpad = function () {
         if (el.scratchpadContainer.style.display === "none") {
           el.scratchpadContainer.style.display = "block";
-          el.scratchpadBtn.textContent = "Hide Scratchpad";
+          // el.scratchpadBtn.textContent = "Hide Scratchpad";
+          el.scratchpadBtn.textContent = "Scratchpad";
         } else {
           el.scratchpadContainer.style.display = "none";
           el.scratchpadBtn.textContent = "Scratchpad";
@@ -2489,7 +2490,6 @@
         background: #6e40c9;
         border-color: #8957e5;
         margin-bottom: 0;
-        min-width: 120px;
       }
 
       .scratchpad-toggle:hover {
