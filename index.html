@@ -3584,6 +3584,11 @@
         justify-content: center;
         z-index: 10000;
         transition: all 0.2s ease;
+        opacity: 0;
+      }
+
+      #modalImageContainer:hover .modal-download-btn {
+        opacity: 1;
       }
 
       .modal-download-btn:hover {
@@ -3609,6 +3614,11 @@
         justify-content: center;
         z-index: 10000;
         transition: all 0.2s ease;
+        opacity: 0;
+      }
+
+      #modalImageContainer:hover .modal-save-btn {
+        opacity: 1;
       }
 
       .modal-save-btn:hover {
@@ -3639,6 +3649,11 @@
         justify-content: center;
         z-index: 10000;
         transition: all 0.2s ease;
+        opacity: 0;
+      }
+
+      #modalImageContainer:hover .modal-close-btn {
+        opacity: 1;
       }
 
       .modal-close-btn:hover {
@@ -3664,6 +3679,11 @@
         justify-content: center;
         z-index: 10000;
         transition: all 0.2s ease;
+        opacity: 0;
+      }
+
+      #modalImageContainer:hover .modal-info-btn {
+        opacity: 1;
       }
 
       .modal-info-btn:hover {
@@ -3693,6 +3713,18 @@
         }
         .tile-with-image:active .tile-download-btn,
         .tile-with-image:active .tile-info-btn {
+          opacity: 1;
+        }
+        .modal-download-btn,
+        .modal-save-btn,
+        .modal-close-btn,
+        .modal-info-btn {
+          opacity: 0.7;
+        }
+        #modalImageContainer:active .modal-download-btn,
+        #modalImageContainer:active .modal-save-btn,
+        #modalImageContainer:active .modal-close-btn,
+        #modalImageContainer:active .modal-info-btn {
           opacity: 1;
         }
       }
