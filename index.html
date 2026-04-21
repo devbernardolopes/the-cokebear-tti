@@ -196,8 +196,8 @@
     <div id="error"></div>
     <div id="mosaic"></div>
 
-    <div id="imageModal">
-      <div id="modalImageContainer" onclick="if (!window.isModalInfoOpen) closeModal();">
+    <div id="imageModal" onclick="if (!window.isModalInfoOpen) closeModal();">
+      <div id="modalImageContainer" onclick="event.stopPropagation()">
         <img
           id="modalImage"
           src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMSIgaGVpZ2h0PSIxIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxyZWN0IHdpZHRoPSIxIiBoZWlnaHQ9IjEiIGZpbGw9InRyYW5zcGFyZW50Ii8+PC9zdmc+"
