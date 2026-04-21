@@ -2590,6 +2590,25 @@ function closeModalInfoPanel() {
         color: #c9d1d9;
         margin: 0;
         padding: 14px;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+      }
+
+      body::-webkit-scrollbar {
+        display: none;
+      }
+
+      #scratchpadText,
+      #galleryList,
+      #promptText {
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+      }
+
+      #scratchpadText::-webkit-scrollbar,
+      #galleryList::-webkit-scrollbar,
+      #promptText::-webkit-scrollbar {
+        display: none;
       }
 
       .page-title {
@@ -2959,7 +2978,7 @@ function closeModalInfoPanel() {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 16px;
+        padding: 6px;
         border-bottom: 1px solid #30363d;
       }
 
