@@ -595,6 +595,8 @@
         el.modalCloseBtn.style.display = "none";
         el.modalInfoBtn.style.display = "none";
         el.modalCounter.style.display = "none";
+        const modalBadges = document.getElementById("modalBadges");
+        if (modalBadges) modalBadges.style.display = "none";
 
         const infoPanel = document.createElement("div");
         infoPanel.id = "modalInfoPanelContainer";
@@ -752,6 +754,13 @@
         el.modalCloseBtn.style.display = "flex";
         el.modalInfoBtn.style.display = "flex";
         el.modalCounter.style.display = "block";
+        const modalBadges = document.getElementById("modalBadges");
+        if (modalBadges) {
+          modalBadges.style.display = "flex";
+        }
+        if (currentModalImageSrc) {
+          updateModalBadges(currentModalImageSrc);
+        }
       };
 
       window.updateModalCounter = function () {
@@ -1806,7 +1815,7 @@
           }
 
           items.forEach((item) => {
-            galleryImages.push({ id: item.id, imageData: item.imageData });
+            galleryImages.push(item);
           });
 
           items.forEach((item) => {
@@ -3504,6 +3513,8 @@
         width: 100%;
         height: 100%;
         object-fit: cover;
+        position: relative;
+        z-index: 1;
       }
 
       .tile-download-btn {
@@ -3608,12 +3619,13 @@
         gap: 4px;
         opacity: 0;
         transition: opacity 0.2s ease;
-        z-index: 10;
+        z-index: 20;
         flex-wrap: wrap;
         max-width: calc(100% - 16px);
       }
 
-      .tile-with-image:hover .tile-badges {
+      .tile-with-image:hover .tile-badges,
+      .gallery-item:hover .tile-badges {
         opacity: 1;
       }
 
@@ -3633,20 +3645,8 @@
       }
 
       .gallery-item .tile-badges {
-        position: absolute;
         bottom: 8px;
         left: 8px;
-        display: flex;
-        gap: 4px;
-        opacity: 0;
-        transition: opacity 0.2s ease;
-        z-index: 10;
-        flex-wrap: wrap;
-        max-width: calc(100% - 16px);
-      }
-
-      .gallery-item:hover .tile-badges {
-        opacity: 1;
       }
 
       .gallery-item .tile-badge {
@@ -3664,6 +3664,11 @@
         flex-wrap: wrap;
         justify-content: center;
         max-width: 90%;
+        opacity: 1;
+      }
+
+      .modal-badges:empty {
+        display: none;
       }
 
       .modal-badges .tile-badge {
@@ -3872,6 +3877,7 @@
         font-weight: 600;
         pointer-events: none;
         user-select: none;
+        z-index: 100;
       }
 
       @media (hover: none) {
