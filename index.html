@@ -3188,13 +3188,13 @@
       }
 
       #galleryDeleteSelectedBtn {
-        background: #da3633;
-        border: 1px solid #f85149;
-        color: #fff;
+        background: #da3633 !important;
+        border: 1px solid #f85149 !important;
+        color: #fff !important;
       }
 
       #galleryDeleteSelectedBtn:hover {
-        background: #f85149;
+        background: #f85149 !important;
       }
 
       .gallery-item.select-mode .tile-badges {
@@ -3721,15 +3721,17 @@
 
       .tile-badges {
         position: absolute;
-        bottom: 8px;
-        left: 8px;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
         display: flex;
         gap: 4px;
         opacity: 0;
         transition: opacity 0.2s ease;
         z-index: 20;
         flex-wrap: wrap;
-        max-width: calc(100% - 16px);
+        max-width: 90%;
+        justify-content: center;
       }
 
       .tile-with-image:hover .tile-badges,
@@ -3753,8 +3755,9 @@
       }
 
       .gallery-item .tile-badges {
-        bottom: 8px;
-        left: 8px;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
       }
 
       .gallery-item .tile-badge {
@@ -3763,9 +3766,9 @@
 
       .modal-badges {
         position: absolute;
-        bottom: 16px;
+        top: 50%;
         left: 50%;
-        transform: translateX(-50%);
+        transform: translate(-50%, -50%);
         display: flex;
         gap: 6px;
         z-index: 100;
