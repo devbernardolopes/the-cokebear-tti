@@ -2041,6 +2041,7 @@
             el.saveToGalleryBtn.style.display = "none";
             el.modalCopyBtn.style.display = "flex";
             el.imageModal.style.display = "flex";
+            el.modalInfoBtn.style.display = "flex";
             updateModalBadges(item.imageData);
           }
         } catch (e) {
@@ -2060,6 +2061,7 @@
             el.modalImage.src = item.imageData;
             el.modalCounter.textContent = galleryImages.length > 0 ? `${currentGalleryIndex + 1}/${galleryImages.length}` : "";
             el.saveToGalleryBtn.style.display = "none";
+            el.modalInfoBtn.style.display = "flex";
             el.imageModal.style.display = "flex";
             setTimeout(() => openModalInfoFromModal(), 100);
           }
