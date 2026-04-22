@@ -2102,10 +2102,10 @@
         try {
           const metadata = window.imageMetadata?.[imageUrl];
           const prompt = metadata?.prompt || el.prompt.value;
-          const guidance = metadata?.guidance || el.guidance.value;
-          const style = metadata?.style || el.style.value;
-          const resolution = metadata?.resolution || el.resolution.value;
-          const seed = metadata?.seed || null;
+          const guidance = metadata?.guidance ?? el.guidance.value;
+          const style = metadata?.style ?? el.style.value;
+          const resolution = metadata?.resolution ?? el.resolution.value;
+          const seed = metadata?.seed ?? null;
 
           await db.gallery.add({
             imageData: imageUrl,
