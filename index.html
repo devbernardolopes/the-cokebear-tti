@@ -783,11 +783,6 @@
         if (metadata.guidance) {
           modalBadges.innerHTML += `<span class="tile-badge guidance-badge">${escapeHtml(metadata.guidance)}</span>`;
         }
-        if (metadata.resolution) {
-          const res = metadata.resolution;
-          const resLabel = res === "512x768" ? "POR" : res === "768x512" ? "LND" : "SQR";
-          modalBadges.innerHTML += `<span class="tile-badge">${resLabel}</span>`;
-        }
       };
 
       window.showNextImage = function () {
@@ -1830,11 +1825,6 @@
             if (item.guidance) {
               badgesHtml += `<span class="tile-badge guidance-badge">${escapeHtml(item.guidance)}</span>`;
             }
-            if (item.resolution) {
-              const res = item.resolution;
-              const resLabel = res === "512x768" ? "POR" : res === "768x512" ? "LND" : "SQR";
-              badgesHtml += `<span class="tile-badge">${resLabel}</span>`;
-            }
 
             div.innerHTML = `
               <img src="${item.imageData}" alt="${escapeHtml(item.prompt || "")}" />
@@ -2282,11 +2272,6 @@
             }
             if (meta.guidance) {
               badgesContainer.innerHTML += `<span class="tile-badge guidance-badge">${escapeHtml(meta.guidance)}</span>`;
-            }
-            if (meta.resolution) {
-              const res = meta.resolution;
-              const resLabel = res === "512x768" ? "POR" : res === "768x512" ? "LND" : "SQR";
-              badgesContainer.innerHTML += `<span class="tile-badge">${resLabel}</span>`;
             }
 
             tile.innerHTML = "";
