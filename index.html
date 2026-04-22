@@ -2086,7 +2086,12 @@
       window.copyGalleryImageToPrompt = async function (id) {
         if (!db) return;
         try {
-          const item = await db.gallery.get(id);
+          let item = null;
+          if (id) {
+            item = await db.gallery.get(id);
+          } else if (galleryCurrentImage) {
+            item = galleryCurrentImage;
+          }
           if (item) {
             el.prompt.value = item.prompt || "";
             el.guidance.value = item.guidance ?? el.guidance.defaultValue;
