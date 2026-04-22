@@ -38,10 +38,12 @@
       </div>
       <div id="buttonRow">
         <h1 class="page-title">The Cokebear TTI</h1>
-        <button id="toggleInfoBtn">Info</button>
+        <button id="toggleInfoBtn">ℹ</button>
 
-        <button onclick="toggleScratchpad()" id="scratchpadBtn" class="scratchpad-toggle">Scratchpad</button>
-        <button onclick="openGallery()" id="galleryBtn" class="gallery-toggle">Gallery</button>
+        <button onclick="toggleScratchpad()" id="scratchpadBtn" class="scratchpad-toggle">📄</button>
+        <button onclick="toggleHistory()" id="historyBtn">⌛</button>
+        <button onclick="openManageHistoryModal()" id="manageHistoryBtn">⌛⚙</button>
+        <button onclick="openGallery()" id="galleryBtn" class="gallery-toggle">🎞</button>
         <button id="clearPromptHeaderBtn">Clear</button>
       </div>
       <div id="scratchpadContainer">
@@ -55,8 +57,6 @@
 
       <div class="controls">
         <div class="controls-row">
-          <button onclick="toggleHistory()" id="historyBtn">History</button>
-          <button onclick="openManageHistoryModal()" id="manageHistoryBtn">Manage History</button>
 
           <select id="concurrency">
             <option value="1">1x</option>
@@ -92,14 +92,15 @@
           <select id="tileSize">
             <option value="300">Extra Large</option>
             <option value="250">Large</option>
-            <option value="175">Medium</option>
             <option value="200" selected>Regular</option>
-            <option value="100">Small</option>
+            <option value="175">Medium</option>
+            <option value="125">Small</option>
+            <option value="100">Smaller</option>
             <option value="50">Extra Small</option>
           </select>
 
           <select id="style">
-            <option value="casual">Casual Photo</option>
+            <option value="casual" selected>Casual Photo</option>
             <option value="casual_hq">Casual Photo (HQ)</option>
             <option value="casual_raw">Casual Photo (Raw)</option>
             <option value="casual_snapchat">Casual Photo (Snapchat)</option>
@@ -118,20 +119,18 @@
             <option value="fifties">1950s</option>
             <option value="painted_anime">Painted Anime</option>
             <option value="painted_anime_ex">Painted Anime (Extended)</option>
-            <!-- <option value="macro">Macro Photo</option> -->
-            <!-- <option value="studio">Studio Portrait</option> -->
-            <option value="none">No Style</option>
             <option value="random_real">Random (Realistic)</option>
+            <option value="none">No Style</option>
           </select>
 
           <select id="resolution">
-            <option value="512x768">Portrait</option>
+            <option value="512x768" selected>Portrait</option>
             <option value="512x512">Square</option>
             <option value="768x512">Landscape</option>
           </select>
 
           <select id="numImages">
-            <option value="1">1</option>
+            <option value="1" selected>1</option>
             <option value="2">2</option>
             <option value="3">3</option>
             <option value="4">4</option>
@@ -239,26 +238,8 @@
         </button>
         <button id="saveToGalleryBtn" class="modal-save-btn" onclick="event.stopPropagation(); saveToGallery();">💾</button>
         <button id="modalCopyBtn" class="modal-copy-btn" onclick="event.stopPropagation(); copyGalleryImageToPrompt();">📋</button>
-        <button
-          id="modalCloseBtn"
-          class="modal-close-btn"
-          onclick="
-            event.stopPropagation();
-            closeModal();
-          "
-        >
-          ✕
-        </button>
-        <button
-          id="modalInfoBtn"
-          class="modal-info-btn"
-          onclick="
-            event.stopPropagation();
-            openModalInfoFromModal();
-          "
-        >
-          ℹ
-        </button>
+        <button id="modalCloseBtn" class="modal-close-btn" onclick="event.stopPropagation();closeModal();">❌</button>
+        <button id="modalInfoBtn" class="modal-info-btn" onclick="event.stopPropagation(); openModalInfoFromModal();">ℹ</button>
         <div id="modalCounter" class="modal-counter"></div>
         <div id="modalBadges" class="modal-badges"></div>
       </div>
@@ -1205,10 +1186,10 @@
         if (el.scratchpadContainer.style.display === "none") {
           el.scratchpadContainer.style.display = "block";
           // el.scratchpadBtn.textContent = "Hide Scratchpad";
-          el.scratchpadBtn.textContent = "Scratchpad";
+          el.scratchpadBtn.textContent = "📄";
         } else {
           el.scratchpadContainer.style.display = "none";
-          el.scratchpadBtn.textContent = "Scratchpad";
+          el.scratchpadBtn.textContent = "📄";
         }
       };
 
@@ -3029,8 +3010,7 @@
         font-size: 13px;
       }
 
-      #negativePrompt, #realismEnforcer, #enterToSend, #downloadAllBtn,
-      .checkbox-label:has(#realismEnforcer), .checkbox-label:has(#enterToSend) {
+      #negativePrompt, #realismEnforcer, #enterToSend, #downloadAllBtn, #modalInfoBtn, .checkbox-label:has(#realismEnforcer), .checkbox-label:has(#enterToSend) {
         display: none;
       }
 
@@ -3083,7 +3063,7 @@
       #historyBtn {
         background: #1f6feb;
         border-color: #388bfd;
-        min-width: 100px;
+        /* min-width: 100px; */
       }
 
       #historyBtn:hover {
