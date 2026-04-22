@@ -238,6 +238,7 @@
           ⬇
         </button>
         <button id="saveToGalleryBtn" class="modal-save-btn" onclick="event.stopPropagation(); saveToGallery();">💾</button>
+        <button id="modalCopyBtn" class="modal-copy-btn" onclick="event.stopPropagation(); copyGalleryImageToPrompt();">📋</button>
         <button
           id="modalCloseBtn"
           class="modal-close-btn"
@@ -347,6 +348,7 @@
         modalDownloadBtn: document.getElementById("modalDownloadBtn"),
         modalCloseBtn: document.getElementById("modalCloseBtn"),
         modalInfoBtn: document.getElementById("modalInfoBtn"),
+        modalCopyBtn: document.getElementById("modalCopyBtn"),
         saveToGalleryBtn: document.getElementById("saveToGalleryBtn"),
         galleryModal: document.getElementById("galleryModal"),
         galleryList: document.getElementById("galleryList"),
@@ -556,6 +558,7 @@
         el.modalImage.src = imgSrc;
         el.imageModal.style.display = "flex";
         document.body.classList.add("modal-open");
+        el.modalCopyBtn.style.display = "none";
         imageScale = 1;
         el.modalImage.style.transform = "";
         updateModalCounter();
@@ -581,6 +584,7 @@
         imageScale = 1;
         el.modalImage.style.transform = "";
         el.saveToGalleryBtn.style.display = "flex";
+        el.modalCopyBtn.style.display = "none";
         el.saveToGalleryBtn.classList.remove("saved");
         el.saveToGalleryBtn.textContent = "💾";
         const modalBadges = document.getElementById("modalBadges");
@@ -609,6 +613,7 @@
         el.modalImage.style.display = "none";
         el.modalDownloadBtn.style.display = "none";
         el.saveToGalleryBtn.style.display = "none";
+        el.modalCopyBtn.style.display = "none";
         el.modalCloseBtn.style.display = "none";
         el.modalInfoBtn.style.display = "none";
         el.modalCounter.style.display = "none";
@@ -767,6 +772,9 @@
         el.modalDownloadBtn.style.display = "flex";
         if (isFromGenerated) {
           el.saveToGalleryBtn.style.display = "flex";
+        }
+        if (!isFromGenerated) {
+          el.modalCopyBtn.style.display = "flex";
         }
         el.modalCloseBtn.style.display = "flex";
         el.modalInfoBtn.style.display = "flex";
@@ -1855,6 +1863,7 @@
             div.innerHTML = `
               <img src="${item.imageData}" alt="${escapeHtml(item.prompt || "")}" />
               <div class="gallery-item-checkmark" style="${checkmarkDisplay}">✓</div>
+              <button class="gallery-item-copy-btn" onclick="event.stopPropagation(); copyGalleryImageToPrompt(${item.id})">📋</button>
               <button class="gallery-item-info-btn" onclick="event.stopPropagation(); openGalleryImageInfo(${item.id})">ℹ</button>
               <button class="gallery-item-download-btn" onclick="event.stopPropagation(); downloadGalleryImage(${item.id})">⬇</button>
               <button class="gallery-item-delete-btn" onclick="event.stopPropagation(); deleteGalleryImage(${item.id})">🗑</button>
@@ -2049,6 +2058,7 @@
             el.modalImage.src = item.imageData;
             el.modalCounter.textContent = galleryImages.length > 0 ? `${currentGalleryIndex + 1}/${galleryImages.length}` : "";
             el.saveToGalleryBtn.style.display = "none";
+            el.modalCopyBtn.style.display = "flex";
             el.imageModal.style.display = "flex";
             updateModalBadges(item.imageData);
           }
@@ -2089,6 +2099,27 @@
           }
         } catch (e) {
           console.warn("Failed to download gallery image:", e);
+        }
+      };
+
+      window.copyGalleryImageToPrompt = async function (id) {
+        if (!db) return;
+        try {
+          const item = await db.gallery.get(id);
+          if (item) {
+            el.prompt.value = item.prompt || "";
+            el.guidance.value = item.guidance ?? el.guidance.defaultValue;
+            el.guidance.dispatchEvent(new Event("input"));
+            if (item.seed !== undefined && item.seed !== null) {
+              el.seed.value = item.seed;
+            }
+            if (item.resolution) {
+              el.resolution.value = item.resolution;
+            }
+            closeGalleryModal();
+          }
+        } catch (e) {
+          console.warn("Failed to copy gallery image to prompt:", e);
         }
       };
 
@@ -3413,6 +3444,42 @@
         transform: scale(1.05);
       }
 
+      .gallery-item-copy-btn {
+        position: absolute;
+        bottom: 8px;
+        left: 8px;
+        width: 32px;
+        height: 32px;
+        padding: 0;
+        background: rgba(0, 150, 100, 0.9);
+        border: 1px solid #00996c;
+        border-radius: 6px;
+        color: #fff;
+        font-size: 16px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10;
+        opacity: 0;
+        transition: opacity 0.2s ease, background 0.2s ease, transform 0.2s ease;
+      }
+
+      .gallery-item:hover .gallery-item-copy-btn {
+        opacity: 1;
+      }
+
+      .gallery-item-copy-btn:hover {
+        background: rgba(0, 180, 120, 1);
+        transform: scale(1.05);
+      }
+
+      .gallery-item.select-mode .gallery-item-copy-btn,
+      .gallery-item.selecting .gallery-item-copy-btn {
+        opacity: 0;
+        pointer-events: none;
+      }
+
       .gallery-item-checkmark {
         position: absolute;
         top: 8px;
@@ -3942,6 +4009,31 @@
         border-color: #00aa44;
       }
 
+      .modal-copy-btn {
+        position: absolute;
+        bottom: 10px;
+        right: 110px;
+        width: 40px;
+        height: 40px;
+        padding: 0;
+        background: rgba(0, 150, 100, 0.9);
+        border: 1px solid #00996c;
+        border-radius: 8px;
+        color: #fff;
+        font-size: 18px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10000;
+        transition: all 0.2s ease;
+        opacity: 0;
+      }
+
+      #modalImageContainer:hover .modal-copy-btn {
+        opacity: 1;
+      }
+
       .modal-close-btn {
         position: absolute;
         bottom: 10px;
@@ -3970,6 +4062,10 @@
       .modal-close-btn:hover {
         background: rgba(220, 0, 0, 1);
         transform: scale(1.1);
+      }
+
+      #modalImageContainer:hover .modal-copy-btn {
+        opacity: 1;
       }
 
       .modal-info-btn {
