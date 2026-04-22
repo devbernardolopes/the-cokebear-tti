@@ -1717,10 +1717,31 @@
             checkbox.addEventListener("change", (e) => {
               if (e.target.checked) {
                 selectedPromptIds.add(item.id);
+                div.classList.add("selected");
               } else {
                 selectedPromptIds.delete(item.id);
+                div.classList.remove("selected");
               }
               updateManageHistoryCount();
+            });
+
+            if (checkbox.checked) {
+              div.classList.add("selected");
+            }
+
+            div.addEventListener("click", (e) => {
+              if (!e.target.closest(".history-delete")) {
+                if (selectedPromptIds.has(item.id)) {
+                  selectedPromptIds.delete(item.id);
+                  checkbox.checked = false;
+                  div.classList.remove("selected");
+                } else {
+                  selectedPromptIds.add(item.id);
+                  checkbox.checked = true;
+                  div.classList.add("selected");
+                }
+                updateManageHistoryCount();
+              }
             });
 
             el.manageHistoryList.appendChild(div);
@@ -3616,6 +3637,11 @@
 
       .history-item:hover {
         background: #161b22;
+      }
+
+      #manageHistoryList .history-item.selected {
+        background: #1f6feb20;
+        border-color: #388bfd;
       }
 
       .history-prompt {
