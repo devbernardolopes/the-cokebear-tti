@@ -242,6 +242,7 @@
           ℹ
         </button>
         <div id="modalCounter" class="modal-counter"></div>
+        <div id="modalBadges" class="modal-badges"></div>
       </div>
     </div>
 
@@ -541,6 +542,7 @@
         imageScale = 1;
         el.modalImage.style.transform = "";
         updateModalCounter();
+        updateModalBadges(imgSrc);
       };
 
       window.closeModal = function () {
@@ -564,6 +566,8 @@
         el.saveToGalleryBtn.style.display = "flex";
         el.saveToGalleryBtn.classList.remove("saved");
         el.saveToGalleryBtn.textContent = "💾";
+        const modalBadges = document.getElementById("modalBadges");
+        if (modalBadges) modalBadges.innerHTML = "";
       };
 
       window.downloadModalImage = async function () {
@@ -758,6 +762,34 @@
         }
       };
 
+      window.updateModalBadges = function (imgSrc) {
+        const modalBadges = document.getElementById("modalBadges");
+        if (!modalBadges) return;
+        modalBadges.innerHTML = "";
+
+        let metadata = null;
+        if (isFromGenerated) {
+          metadata = window.imageMetadata?.[imgSrc];
+        } else {
+          metadata = galleryCurrentImage;
+        }
+
+        if (!metadata) return;
+
+        if (metadata.style) {
+          const styleLabel = metadata.style.replace(/_/g, " ");
+          modalBadges.innerHTML += `<span class="tile-badge">${escapeHtml(styleLabel)}</span>`;
+        }
+        if (metadata.guidance) {
+          modalBadges.innerHTML += `<span class="tile-badge guidance-badge">${escapeHtml(metadata.guidance)}</span>`;
+        }
+        if (metadata.resolution) {
+          const res = metadata.resolution;
+          const resLabel = res === "512x768" ? "POR" : res === "768x512" ? "LND" : "SQR";
+          modalBadges.innerHTML += `<span class="tile-badge">${resLabel}</span>`;
+        }
+      };
+
       window.showNextImage = function () {
         if (window.isModalInfoOpen) return;
         if (isFromGenerated && generatedImages.length > 0) {
@@ -765,11 +797,14 @@
           currentModalImageSrc = generatedImages[currentModalIndex];
           el.modalImage.src = currentModalImageSrc;
           updateModalCounter();
+          updateModalBadges(currentModalImageSrc);
         } else if (!isFromGenerated && galleryImages.length > 0) {
           currentGalleryIndex = (currentGalleryIndex + 1) % galleryImages.length;
           currentModalImageSrc = galleryImages[currentGalleryIndex].imageData;
+          galleryCurrentImage = galleryImages[currentGalleryIndex];
           el.modalImage.src = currentModalImageSrc;
           el.modalCounter.textContent = `${currentGalleryIndex + 1}/${galleryImages.length}`;
+          updateModalBadges(currentModalImageSrc);
         }
       };
 
@@ -780,11 +815,14 @@
           currentModalImageSrc = generatedImages[currentModalIndex];
           el.modalImage.src = currentModalImageSrc;
           updateModalCounter();
+          updateModalBadges(currentModalImageSrc);
         } else if (!isFromGenerated && galleryImages.length > 0) {
           currentGalleryIndex = (currentGalleryIndex - 1 + galleryImages.length) % galleryImages.length;
           currentModalImageSrc = galleryImages[currentGalleryIndex].imageData;
+          galleryCurrentImage = galleryImages[currentGalleryIndex];
           el.modalImage.src = currentModalImageSrc;
           el.modalCounter.textContent = `${currentGalleryIndex + 1}/${galleryImages.length}`;
+          updateModalBadges(currentModalImageSrc);
         }
       };
 
@@ -1783,12 +1821,28 @@
 
             const isSelected = selectedGalleryIds.has(item.id) ? "selecting" : "";
             const checkmarkDisplay = selectedGalleryIds.has(item.id) ? "" : "display: none;";
+
+            let badgesHtml = "";
+            if (item.style) {
+              const styleLabel = item.style.replace(/_/g, " ");
+              badgesHtml += `<span class="tile-badge">${escapeHtml(styleLabel)}</span>`;
+            }
+            if (item.guidance) {
+              badgesHtml += `<span class="tile-badge guidance-badge">${escapeHtml(item.guidance)}</span>`;
+            }
+            if (item.resolution) {
+              const res = item.resolution;
+              const resLabel = res === "512x768" ? "POR" : res === "768x512" ? "LND" : "SQR";
+              badgesHtml += `<span class="tile-badge">${resLabel}</span>`;
+            }
+
             div.innerHTML = `
               <img src="${item.imageData}" alt="${escapeHtml(item.prompt || "")}" />
               <div class="gallery-item-checkmark" style="${checkmarkDisplay}">✓</div>
               <button class="gallery-item-info-btn" onclick="event.stopPropagation(); openGalleryImageInfo(${item.id})">ℹ</button>
               <button class="gallery-item-download-btn" onclick="event.stopPropagation(); downloadGalleryImage(${item.id})">⬇</button>
               <button class="gallery-item-delete-btn" onclick="event.stopPropagation(); deleteGalleryImage(${item.id})">🗑</button>
+              ${badgesHtml ? `<div class="tile-badges">${badgesHtml}</div>` : ""}
             `;
 
             if (gallerySelectMode) {
@@ -1960,6 +2014,7 @@
             el.modalCounter.textContent = galleryImages.length > 0 ? `${currentGalleryIndex + 1}/${galleryImages.length}` : "";
             el.saveToGalleryBtn.style.display = "none";
             el.imageModal.style.display = "flex";
+            updateModalBadges(item.imageData);
           }
         } catch (e) {
           console.warn("Failed to open gallery image:", e);
@@ -2000,6 +2055,51 @@
           console.warn("Failed to download gallery image:", e);
         }
       };
+
+      async function saveTileImageToGallery(imageUrl, tileElement) {
+        if (!db || !imageUrl) return;
+        const btn = tileElement?.querySelector(".tile-save-btn");
+        if (btn) {
+          btn.textContent = "⏳";
+          btn.disabled = true;
+        }
+        try {
+          const metadata = window.imageMetadata?.[imageUrl];
+          const prompt = metadata?.prompt || el.prompt.value;
+          const guidance = metadata?.guidance || el.guidance.value;
+          const style = metadata?.style || el.style.value;
+          const resolution = metadata?.resolution || el.resolution.value;
+          const seed = metadata?.seed || null;
+
+          await db.gallery.add({
+            imageData: imageUrl,
+            prompt: prompt,
+            guidance: guidance,
+            style: style,
+            resolution: resolution,
+            seed: seed,
+            timestamp: Date.now(),
+          });
+
+          if (btn) {
+            btn.textContent = "✓";
+            btn.style.background = "rgba(35, 134, 54, 0.9)";
+          }
+          setTimeout(() => {
+            if (btn) {
+              btn.textContent = "💾";
+              btn.style.background = "";
+              btn.disabled = false;
+            }
+          }, 1500);
+        } catch (e) {
+          console.warn("Failed to save image to gallery:", e);
+          if (btn) {
+            btn.textContent = "💾";
+            btn.disabled = false;
+          }
+        }
+      }
 
       function escapeHtml(text) {
         const div = document.createElement("div");
@@ -2162,10 +2262,39 @@
               await downloadImage(r.dataUrl);
             };
 
+            // Create save to gallery button overlay
+            const saveToGalleryBtn = document.createElement("button");
+            saveToGalleryBtn.className = "tile-save-btn";
+            saveToGalleryBtn.innerHTML = "💾";
+            saveToGalleryBtn.title = "Save to Gallery";
+            saveToGalleryBtn.onclick = async (e) => {
+              e.stopPropagation();
+              await saveTileImageToGallery(r.dataUrl, tile);
+            };
+
+            // Create badges overlay
+            const badgesContainer = document.createElement("div");
+            badgesContainer.className = "tile-badges";
+            const meta = window.imageMetadata?.[r.dataUrl] || {};
+            if (meta.style) {
+              const styleLabel = meta.style.replace(/_/g, " ");
+              badgesContainer.innerHTML += `<span class="tile-badge">${escapeHtml(styleLabel)}</span>`;
+            }
+            if (meta.guidance) {
+              badgesContainer.innerHTML += `<span class="tile-badge guidance-badge">${escapeHtml(meta.guidance)}</span>`;
+            }
+            if (meta.resolution) {
+              const res = meta.resolution;
+              const resLabel = res === "512x768" ? "POR" : res === "768x512" ? "LND" : "SQR";
+              badgesContainer.innerHTML += `<span class="tile-badge">${resLabel}</span>`;
+            }
+
             tile.innerHTML = "";
             tile.appendChild(img);
             tile.appendChild(infoBtn);
             tile.appendChild(downloadBtn);
+            tile.appendChild(saveToGalleryBtn);
+            tile.appendChild(badgesContainer);
             tile.classList.add("tile-with-image");
             tile.dataset.imageUrl = r.dataUrl;
             updateGenerationUI();
@@ -2488,6 +2617,9 @@
             const metadata = {
               prompt: imagePrompt,
               seed: imageSeedValue,
+              guidance: el.guidance.value,
+              style: style,
+              resolution: res,
             };
 
             const result = await generateOne(imagePrompt, tile, thisGenerationId, metadata);
@@ -2927,7 +3059,7 @@
         background: #161b22;
         border: 1px solid #30363d;
         border-radius: 12px;
-        width: 90%;
+        width: 80%;
         max-width: 1300px;
         max-height: 90vh;
         display: flex;
@@ -3027,8 +3159,8 @@
 
       #galleryList {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(var(--tile-size, 200px), max-content));
-        gap: 10px;
+        grid-template-columns: repeat(auto-fit, minmax(var(--tile-size, 128px), max-content));
+        gap: 1px;
         justify-content: center;
         padding: 10px;
         overflow-y: auto;
@@ -3046,8 +3178,8 @@
         overflow: hidden;
         cursor: pointer;
         transition: transform 0.2s ease;
-        width: var(--tile-size, 200px);
-        height: var(--tile-size, 200px);
+        width: var(--tile-size, 128px);
+        height: var(--tile-size, 128px);
       }
 
       .gallery-item:hover {
@@ -3447,6 +3579,121 @@
       .tile-info-btn:hover {
         background: rgba(56, 139, 253, 1);
         transform: scale(1.05);
+      }
+
+      .tile-save-btn {
+        position: absolute;
+        bottom: 8px;
+        right: 8px;
+        width: 32px;
+        height: 32px;
+        padding: 0;
+        background: rgba(110, 64, 201, 0.9);
+        border: 1px solid #8957e5;
+        border-radius: 6px;
+        color: #fff;
+        font-size: 16px;
+        cursor: pointer;
+        opacity: 0;
+        transition: opacity 0.2s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10;
+      }
+
+      .tile-with-image:hover .tile-save-btn {
+        opacity: 1;
+      }
+
+      .tile-save-btn:hover {
+        background: rgba(163, 113, 247, 1);
+        transform: scale(1.05);
+      }
+
+      .tile-save-btn:disabled {
+        cursor: wait;
+      }
+
+      .tile-badges {
+        position: absolute;
+        bottom: 8px;
+        left: 8px;
+        display: flex;
+        gap: 4px;
+        opacity: 0;
+        transition: opacity 0.2s ease;
+        z-index: 10;
+        flex-wrap: wrap;
+        max-width: calc(100% - 16px);
+      }
+
+      .tile-with-image:hover .tile-badges {
+        opacity: 1;
+      }
+
+      .tile-badge {
+        font-size: 10px;
+        padding: 2px 6px;
+        border-radius: 3px;
+        background: rgba(48, 54, 61, 0.9);
+        color: #8b949e;
+        text-transform: capitalize;
+        white-space: nowrap;
+      }
+
+      .tile-badge.guidance-badge {
+        background: rgba(56, 139, 253, 0.3);
+        color: #58a6ff;
+      }
+
+      .gallery-item .tile-badges {
+        position: absolute;
+        bottom: 8px;
+        left: 8px;
+        display: flex;
+        gap: 4px;
+        opacity: 0;
+        transition: opacity 0.2s ease;
+        z-index: 10;
+        flex-wrap: wrap;
+        max-width: calc(100% - 16px);
+      }
+
+      .gallery-item:hover .tile-badges {
+        opacity: 1;
+      }
+
+      .gallery-item .tile-badge {
+        background: rgba(48, 54, 61, 0.9);
+      }
+
+      .modal-badges {
+        position: absolute;
+        bottom: 16px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        gap: 6px;
+        z-index: 100;
+        flex-wrap: wrap;
+        justify-content: center;
+        max-width: 90%;
+      }
+
+      .modal-badges .tile-badge {
+        font-size: 12px;
+        padding: 4px 10px;
+        border-radius: 4px;
+        background: rgba(48, 54, 61, 0.9);
+        color: #8b949e;
+        text-transform: capitalize;
+        border: 1px solid rgba(48, 54, 61, 0.9);
+      }
+
+      .modal-badges .tile-badge.guidance-badge {
+        background: rgba(56, 139, 253, 0.3);
+        color: #58a6ff;
       }
 
       .tile-info-panel {
