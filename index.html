@@ -2491,11 +2491,23 @@
           await saveTileImageToGallery(imageUrl, tile);
         };
 
+        const meta = window.imageMetadata?.[imageUrl] || {};
+        const badgesContainer = document.createElement("div");
+        badgesContainer.className = "tile-badges";
+        if (meta.style) {
+          const styleLabel = meta.style.replace(/_/g, " ");
+          badgesContainer.innerHTML += `<span class="tile-badge">${escapeHtml(styleLabel)}</span>`;
+        }
+        if (meta.guidance !== undefined && meta.guidance !== null) {
+          badgesContainer.innerHTML += `<span class="tile-badge guidance-badge">${escapeHtml(String(meta.guidance))}</span>`;
+        }
+
         tile.innerHTML = "";
         tile.appendChild(img);
         tile.appendChild(infoBtn);
         tile.appendChild(downloadBtn);
         tile.appendChild(saveToGalleryBtn);
+        tile.appendChild(badgesContainer);
         tile.classList.remove("tile-flipped");
       }
 
