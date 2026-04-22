@@ -190,11 +190,28 @@
         </div>
         <div id="galleryControls">
           <button onclick="toggleGallerySelectMode()" id="gallerySelectModeBtn">Select</button>
-          <button onclick="deleteSelectedGalleryImages()" id="galleryDeleteSelectedBtn" disabled>Delete Selected</button>
+          <button onclick="showDeleteConfirmation()" id="galleryDeleteSelectedBtn" disabled>Delete Selected</button>
           <span id="galleryCount"></span>
         </div>
         <div id="galleryList"></div>
         <button id="galleryLoadMoreBtn" style="display: none">Load More</button>
+      </div>
+    </div>
+
+    <div id="deleteConfirmModal" class="modal">
+      <div id="deleteConfirmContent" onclick="event.stopPropagation()">
+        <div class="modal-header">
+          <h3>Delete Images</h3>
+          <button onclick="closeDeleteConfirmModal()">x</button>
+        </div>
+        <div id="deleteConfirmMessage">
+          <p>Are you sure you want to delete <span id="deleteConfirmCount">0</span> selected image(s)?</p>
+          <p style="font-size: 12px; color: #f85149;">This action cannot be undone.</p>
+        </div>
+        <div id="deleteConfirmActions">
+          <button onclick="closeDeleteConfirmModal()" id="deleteConfirmCancelBtn">Cancel</button>
+          <button onclick="confirmDeleteGalleryImages()" id="deleteConfirmDeleteBtn">Delete</button>
+        </div>
       </div>
     </div>
 
@@ -1945,8 +1962,22 @@
         }
       };
 
-      window.deleteSelectedGalleryImages = async function () {
+      window.showDeleteConfirmation = function () {
+        if (selectedGalleryIds.size === 0) return;
+        const count = selectedGalleryIds.size;
+        document.getElementById("deleteConfirmCount").textContent = count;
+        document.getElementById("deleteConfirmModal").style.display = "flex";
+        document.body.classList.add("modal-open");
+      };
+
+      window.closeDeleteConfirmModal = function () {
+        document.getElementById("deleteConfirmModal").style.display = "none";
+        document.body.classList.remove("modal-open");
+      };
+
+      window.confirmDeleteGalleryImages = async function () {
         if (!db || selectedGalleryIds.size === 0) return;
+        closeDeleteConfirmModal();
         const ids = Array.from(selectedGalleryIds);
         try {
           await db.gallery.bulkDelete(ids);
@@ -1958,6 +1989,12 @@
           console.warn("Failed to delete selected gallery images:", e);
         }
       };
+
+      document.getElementById("deleteConfirmModal").addEventListener("click", (e) => {
+        if (e.target === document.getElementById("deleteConfirmModal")) {
+          closeDeleteConfirmModal();
+        }
+      });
 
       el.galleryLoadMoreBtn.addEventListener("click", () => {
         galleryOffset += galleryLimit;
@@ -3034,7 +3071,8 @@
 
       #historyModal,
       #manageHistoryModal,
-      #galleryModal {
+      #galleryModal,
+      #deleteConfirmModal {
         position: fixed;
         top: 0;
         left: 0;
@@ -3049,7 +3087,8 @@
 
       #historyModalContent,
       #manageHistoryModalContent,
-      #galleryModalContent {
+      #galleryModalContent,
+      #deleteConfirmContent {
         background: #161b22;
         border: 1px solid #30363d;
         border-radius: 12px;
@@ -3143,6 +3182,72 @@
       #galleryControls button:disabled {
         opacity: 0.5;
         cursor: not-allowed;
+      }
+
+      #galleryDeleteSelectedBtn {
+        background: #da3633;
+        border: 1px solid #f85149;
+        color: #fff;
+      }
+
+      #galleryDeleteSelectedBtn:hover {
+        background: #f85149;
+      }
+
+      .gallery-item.select-mode .tile-badges {
+        display: none;
+      }
+
+      #deleteConfirmContent {
+        width: 90%;
+        max-width: 400px;
+        padding: 0;
+      }
+
+      #deleteConfirmMessage {
+        padding: 20px;
+        text-align: center;
+        color: #c9d1d9;
+      }
+
+      #deleteConfirmMessage p {
+        margin: 0 0 10px 0;
+      }
+
+      #deleteConfirmActions {
+        display: flex;
+        gap: 10px;
+        padding: 16px 20px;
+        border-top: 1px solid #30363d;
+        justify-content: center;
+      }
+
+      #deleteConfirmCancelBtn {
+        padding: 8px 16px;
+        background: #21262d;
+        border: 1px solid #30363d;
+        border-radius: 6px;
+        color: #c9d1d9;
+        font-size: 13px;
+        cursor: pointer;
+      }
+
+      #deleteConfirmCancelBtn:hover {
+        background: #30363d;
+      }
+
+      #deleteConfirmDeleteBtn {
+        padding: 8px 16px;
+        background: #da3633;
+        border: 1px solid #f85149;
+        border-radius: 6px;
+        color: #fff;
+        font-size: 13px;
+        cursor: pointer;
+      }
+
+      #deleteConfirmDeleteBtn:hover {
+        background: #f85149;
       }
 
       #galleryCount {
