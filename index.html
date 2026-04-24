@@ -4,15 +4,31 @@
     <meta charset="utf-8" />
     <title>TTI Generator</title>
     <script>
-      const _originalFetch = window.fetch;
-      window.fetch = async function (...args) {
-        const url = typeof args[0] === "string" ? args[0] : args[0]?.url;
-        if (url && url.includes("/api/generate") && !url.includes("getUserQueuePosition")) {
-          console.log("API request to:", url);
-        }
-        return _originalFetch.apply(this, args);
-      };
-    </script>
+const _originalFetch = window.fetch;
+const tileRequestIdMap = new Map(); // requestId → tileId
+const requestIdTileIdMap = new Map(); // tileId → requestId
+
+window.fetch = async function (...args) {
+  const url = typeof args[0] === "string" ? args[0] : args[0]?.url;
+
+  // Capture requestId correlation for generate requests
+  if (url && url.includes("/api/generate") && !url.includes("getUserQueuePosition")) {
+    try {
+      const urlObj = new URL(url);
+      const requestId = urlObj.searchParams.get("requestId");
+      const tileId = urlObj.searchParams.get("_tileId");
+      if (requestId && tileId) {
+        tileRequestIdMap.set(requestId, tileId);
+        requestIdTileIdMap.set(tileId, requestId);
+      }
+    } catch (e) {
+      // Ignore invalid URL
+    }
+  }
+
+return _originalFetch.apply(this, args);
+};
+</script>
     <script src="https://unpkg.com/dexie@3.2.4/dist/dexie.min.js"></script>
   </head>
 
@@ -385,15 +401,35 @@
           const clonedResponse = response.clone();
           try {
             const data = await clonedResponse.json();
-            if (data.position !== undefined && data.total !== undefined && data.position > 0) {
-              requestAnimationFrame(() => {
-                waitingTiles.forEach((tile) => {
-                  const placeholder = tile.querySelector(".placeholder");
-                  if (placeholder && (placeholder.textContent.startsWith("Generating") || placeholder.textContent.startsWith("Queued"))) {
-                    placeholder.textContent = `Queued (${data.position}/${data.total})`;
+            const urlObj = new URL(url);
+            const requestId = urlObj.searchParams.get("requestId");
+            const tileId = requestId ? tileRequestIdMap.get(requestId) : null;
+
+            if (tileId) {
+              const tile = document.querySelector(`[data-id="${tileId}"]`);
+              if (tile) {
+                const placeholder = tile.querySelector(".placeholder");
+                requestAnimationFrame(() => {
+                  if (placeholder) {
+                    if (data.position > 0) {
+                      placeholder.textContent = `Queued (${data.position}/${data.total})`;
+                    } else if (data.status === "not_in_queue") {
+                      placeholder.textContent = "Generating...";
+                    }
                   }
                 });
-              });
+              }
+            } else {
+              if (data.position !== undefined && data.total !== undefined && data.position > 0) {
+                requestAnimationFrame(() => {
+                  waitingTiles.forEach((tile) => {
+                    const placeholder = tile.querySelector(".placeholder");
+                    if (placeholder && (placeholder.textContent.startsWith("Generating") || placeholder.textContent.startsWith("Queued"))) {
+                      placeholder.textContent = `Queued (${data.position}/${data.total})`;
+                    }
+                  });
+                });
+              }
             }
           } catch (e) {
             // Ignore
@@ -2288,6 +2324,7 @@
             negativePrompt: el.negativePrompt.value,
             seed: metadata.seed,
             resolution: el.resolution.value,
+            _tileId: tile.id,
           };
 
           const r = await image(promptData);
@@ -2295,6 +2332,14 @@
 
           // Remove from waiting set
           waitingTiles.delete(tile);
+
+          // Clean up requestId mapping
+          const tileId = tile.id;
+          if (tileId && requestIdTileIdMap.has(tileId)) {
+            const requestId = requestIdTileIdMap.get(tileId);
+            tileRequestIdMap.delete(requestId);
+            requestIdTileIdMap.delete(tileId);
+          }
 
           // If it took more than 500ms, show processing state
           if (duration > 500) {
