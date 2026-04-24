@@ -1878,6 +1878,12 @@ return _originalFetch.apply(this, args);
       async function loadGallery(append = false) {
         if (!db) return;
         try {
+          // Save scroll position before reload
+          let savedScrollPosition = 0;
+          if (append) {
+            savedScrollPosition = el.galleryList.scrollTop;
+          }
+
           if (!append) {
             galleryOffset = 0;
             el.galleryList.innerHTML = "";
@@ -1889,40 +1895,43 @@ return _originalFetch.apply(this, args);
           galleryTotalCount = await db.gallery.count();
           const searchQuery = gallerySearchQuery.toLowerCase();
 
-          // Load favorites first (without pagination, they should all appear)
-          galleryFavorites = [];
-          if (!searchQuery) {
-            const allItems = await db.gallery.toArray();
-            galleryFavorites = allItems.filter((item) => item.favorite);
-            if (!gallerySortDesc) {
-              galleryFavorites.reverse();
-            }
-          } else {
-            const allFavorites = await db.gallery.where("favorite").equals(1).toArray();
-            galleryFavorites = allFavorites.filter((item) => {
-              const promptMatch = item.prompt && item.prompt.toLowerCase().includes(searchQuery);
-              let seedMatch = false;
-              if (item.seed) {
-                seedMatch = String(item.seed).includes(searchQuery);
+          // Load favorites - only when not appending
+          if (!append) {
+            galleryFavorites = [];
+            if (!searchQuery) {
+              const allItems = await db.gallery.toArray();
+              galleryFavorites = allItems.filter((item) => item.favorite);
+              if (!gallerySortDesc) {
+                galleryFavorites.reverse();
               }
-              return promptMatch || seedMatch;
-            });
-            if (gallerySortDesc) {
-              galleryFavorites.sort((a, b) => b.timestamp - a.timestamp);
             } else {
-              galleryFavorites.sort((a, b) => a.timestamp - b.timestamp);
+              const allFavorites = await db.gallery.toArray();
+              galleryFavorites = allFavorites.filter((item) => {
+                if (!item.favorite) return false;
+                const promptMatch = item.prompt && item.prompt.toLowerCase().includes(searchQuery);
+                let seedMatch = false;
+                if (item.seed) {
+                  seedMatch = String(item.seed).includes(searchQuery);
+                }
+                return promptMatch || seedMatch;
+              });
+              if (gallerySortDesc) {
+                galleryFavorites.sort((a, b) => b.timestamp - a.timestamp);
+              } else {
+                galleryFavorites.sort((a, b) => a.timestamp - b.timestamp);
+              }
             }
-          }
-          galleryFavoritesTotalCount = galleryFavorites.length;
+            galleryFavoritesTotalCount = galleryFavorites.length;
 
-          // Show/hide favorites section
-          if (galleryFavorites.length > 0) {
-            el.galleryFavoritesHeader.style.display = "flex";
-            el.galleryFavoritesList.style.display = "grid";
-            renderGalleryItems(galleryFavorites, el.galleryFavoritesList, true);
-          } else {
-            el.galleryFavoritesHeader.style.display = "none";
-            el.galleryFavoritesList.style.display = "none";
+            // Show/hide favorites section
+            if (galleryFavorites.length > 0) {
+              el.galleryFavoritesHeader.style.display = "flex";
+              el.galleryFavoritesList.style.display = "grid";
+              renderGalleryItems(galleryFavorites, el.galleryFavoritesList, true);
+            } else {
+              el.galleryFavoritesHeader.style.display = "none";
+              el.galleryFavoritesList.style.display = "none";
+            }
           }
 
           let items;
@@ -1987,6 +1996,11 @@ return _originalFetch.apply(this, args);
           const hasMore = galleryOffset + items.length < galleryTotalCountFiltered;
           el.galleryLoadMoreBtn.style.display = hasMore ? "block" : "none";
           updateGalleryCount();
+
+          // Restore scroll position after reload
+          if (append && savedScrollPosition > 0) {
+            el.galleryList.scrollTop = savedScrollPosition;
+          }
         } catch (e) {
           console.warn("Failed to load gallery:", e);
         }
@@ -2122,7 +2136,27 @@ return _originalFetch.apply(this, args);
         if (!db) return;
         try {
           await db.gallery.delete(id);
-          await loadGallery(false);
+          
+          // Remove from both grids without full reload
+          const divFav = el.galleryFavoritesList.querySelector(`[data-id="${id}"]`);
+          const divMain = el.galleryList.querySelector(`[data-id="${id}"]`);
+          
+          if (divFav) {
+            divFav.remove();
+            // Check if favorites grid is empty
+            if (el.galleryFavoritesList.children.length === 0) {
+              el.galleryFavoritesHeader.style.display = "none";
+              el.galleryFavoritesList.style.display = "none";
+            }
+          }
+          if (divMain) {
+            divMain.remove();
+          }
+          
+          // Update count
+          galleryTotalCount = await db.gallery.count();
+          galleryFavoritesTotalCount = await db.gallery.filter((item) => item.favorite).count();
+          updateGalleryCount();
         } catch (e) {
           console.warn("Failed to delete gallery image:", e);
         }
