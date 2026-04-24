@@ -256,6 +256,7 @@ return _originalFetch.apply(this, args);
         </button>
         <button id="saveToGalleryBtn" class="modal-save-btn" onclick="event.stopPropagation(); saveToGallery();">💾</button>
         <button id="modalCopyBtn" class="modal-copy-btn" onclick="event.stopPropagation(); copyGalleryImageToPrompt();">📋</button>
+        <button id="modalFavoriteBtn" class="modal-favorite-btn" onclick="event.stopPropagation(); toggleModalImageFavorite();">🤍</button>
         <button id="modalCloseBtn" class="modal-close-btn" onclick="event.stopPropagation();closeModal();">❌</button>
         <button id="modalInfoBtn" class="modal-info-btn" onclick="event.stopPropagation(); openModalInfoFromModal();">ℹ</button>
         <div id="modalCounter" class="modal-counter"></div>
@@ -348,6 +349,7 @@ return _originalFetch.apply(this, args);
         modalCloseBtn: document.getElementById("modalCloseBtn"),
         modalInfoBtn: document.getElementById("modalInfoBtn"),
         modalCopyBtn: document.getElementById("modalCopyBtn"),
+        modalFavoriteBtn: document.getElementById("modalFavoriteBtn"),
         saveToGalleryBtn: document.getElementById("saveToGalleryBtn"),
         galleryModal: document.getElementById("galleryModal"),
         galleryList: document.getElementById("galleryList"),
@@ -584,6 +586,7 @@ return _originalFetch.apply(this, args);
         el.imageModal.style.display = "flex";
         document.body.classList.add("modal-open");
         el.modalCopyBtn.style.display = "none";
+        el.modalFavoriteBtn.style.display = "none";
         el.modalInfoBtn.style.display = "flex";
         imageScale = 1;
         el.modalImage.style.transform = "";
@@ -611,6 +614,7 @@ return _originalFetch.apply(this, args);
         el.modalImage.style.transform = "";
         el.saveToGalleryBtn.style.display = "flex";
         el.modalCopyBtn.style.display = "none";
+        el.modalFavoriteBtn.style.display = "none";
         el.saveToGalleryBtn.classList.remove("saved");
         el.saveToGalleryBtn.textContent = "💾";
         const modalBadges = document.getElementById("modalBadges");
@@ -640,6 +644,7 @@ return _originalFetch.apply(this, args);
         el.modalDownloadBtn.style.display = "none";
         el.saveToGalleryBtn.style.display = "none";
         el.modalCopyBtn.style.display = "none";
+        el.modalFavoriteBtn.style.display = "none";
         el.modalCloseBtn.style.display = "none";
         el.modalInfoBtn.style.display = "none";
         el.modalCounter.style.display = "none";
@@ -1261,6 +1266,11 @@ return _originalFetch.apply(this, args);
             prompts: "++id, prompt, timestamp, bookmarked",
             settings: "key, value",
             gallery: "++id, timestamp",
+          });
+          db.version(6).stores({
+            prompts: "++id, prompt, timestamp, bookmarked",
+            settings: "key, value",
+            gallery: "++id, timestamp, favorite",
           });
           await db.open();
 
@@ -1928,6 +1938,8 @@ return _originalFetch.apply(this, args);
 
             const isSelected = selectedGalleryIds.has(item.id) ? "selecting" : "";
             const checkmarkDisplay = selectedGalleryIds.has(item.id) ? "" : "display: none;";
+            const favoriteClass = item.favorite ? "favorite-active" : "";
+            const favoriteBtnText = item.favorite ? "❤️" : "🤍";
 
             let badgesHtml = "";
             if (item.style) {
@@ -1941,6 +1953,7 @@ return _originalFetch.apply(this, args);
             div.innerHTML = `
               <img src="${item.imageData}" alt="${escapeHtml(item.prompt || "")}" />
               <div class="gallery-item-checkmark" style="${checkmarkDisplay}">✓</div>
+              <button class="gallery-item-favorite-btn ${favoriteClass}" onclick="event.stopPropagation(); toggleGalleryImageFavorite(${item.id})">${favoriteBtnText}</button>
               <button class="gallery-item-copy-btn" onclick="event.stopPropagation(); copyGalleryImageToPrompt(${item.id})">📋</button>
               <button class="gallery-item-info-btn" onclick="event.stopPropagation(); openGalleryImageInfo(${item.id})">ℹ</button>
               <button class="gallery-item-download-btn" onclick="event.stopPropagation(); downloadGalleryImage(${item.id})">⬇</button>
@@ -2156,9 +2169,11 @@ return _originalFetch.apply(this, args);
             el.modalCounter.textContent = galleryImages.length > 0 ? `${currentGalleryIndex + 1}/${galleryImages.length}` : "";
             el.saveToGalleryBtn.style.display = "none";
             el.modalCopyBtn.style.display = "flex";
+            el.modalFavoriteBtn.style.display = "flex";
             el.imageModal.style.display = "flex";
             el.modalInfoBtn.style.display = "flex";
             updateModalBadges(item.imageData);
+            updateFavoriteBtnInModal(item.favorite);
           }
         } catch (e) {
           console.warn("Failed to open gallery image:", e);
@@ -2229,6 +2244,46 @@ return _originalFetch.apply(this, args);
         } catch (e) {
           console.warn("Failed to copy gallery image to prompt:", e);
         }
+      };
+
+      window.toggleGalleryImageFavorite = async function (id) {
+        if (!db) return;
+        try {
+          const item = await db.gallery.get(id);
+          if (!item) return;
+          const newFavorite = !item.favorite;
+          await db.gallery.update(id, { favorite: newFavorite });
+          // Update local item reference if it's the current modal image
+          if (galleryCurrentImage && galleryCurrentImage.id === id) {
+            galleryCurrentImage.favorite = newFavorite;
+          }
+          // Update the gallery view
+          const div = el.galleryList.querySelector(`[data-id="${id}"]`);
+          if (div) {
+            const btn = div.querySelector(".gallery-item-favorite-btn");
+            if (btn) {
+              btn.textContent = newFavorite ? "❤️" : "🤍";
+              btn.classList.toggle("favorite-active", newFavorite);
+            }
+          }
+          // Update the modal view if open
+          updateFavoriteBtnInModal(newFavorite);
+        } catch (e) {
+          console.warn("Failed to toggle gallery image favorite:", e);
+        }
+      };
+
+      function updateFavoriteBtnInModal(isFavorite) {
+        const btn = document.getElementById("modalFavoriteBtn");
+        if (btn) {
+          btn.textContent = isFavorite ? "❤️" : "🤍";
+          btn.classList.toggle("favorite-active", isFavorite);
+        }
+      }
+
+      window.toggleModalImageFavorite = function () {
+        if (!galleryCurrentImage || isFromGenerated) return;
+        toggleGalleryImageFavorite(galleryCurrentImage.id);
       };
 
       async function saveTileImageToGallery(imageUrl, tileElement) {
@@ -3641,13 +3696,38 @@ return _originalFetch.apply(this, args);
         font-size: 14px;
       }
 
+      .gallery-item-favorite-btn {
+        position: absolute;
+        top: 48px;
+        left: 8px;
+        width: 28px;
+        height: 28px;
+        background: rgba(33, 38, 45, 0.9);
+        border: 1px solid #30363d;
+        border-radius: 6px;
+        color: #fff;
+        font-size: 14px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10;
+        opacity: 1;
+      }
+
+      .gallery-item-favorite-btn.favorite-active {
+        background: rgba(220, 38, 45, 0.9);
+        border-color: #dc3545;
+      }
+
       .gallery-item.select-mode .gallery-item-checkmark {
         display: flex;
       }
 
       .gallery-item.select-mode .gallery-item-info-btn,
       .gallery-item.select-mode .gallery-item-download-btn,
-      .gallery-item.select-mode .gallery-item-delete-btn {
+      .gallery-item.select-mode .gallery-item-delete-btn,
+      .gallery-item.select-mode .gallery-item-favorite-btn {
         opacity: 0;
         pointer-events: none;
       }
@@ -4180,7 +4260,34 @@ return _originalFetch.apply(this, args);
         opacity: 0;
       }
 
-      #modalImageContainer:hover .modal-copy-btn {
+      .modal-favorite-btn {
+        position: absolute;
+        bottom: 10px;
+        right: 160px;
+        width: 40px;
+        height: 40px;
+        padding: 0;
+        background: rgba(33, 38, 45, 0.9);
+        border: 1px solid #30363d;
+        border-radius: 8px;
+        color: #fff;
+        font-size: 18px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10000;
+        transition: all 0.2s ease;
+        opacity: 0;
+      }
+
+      .modal-favorite-btn.favorite-active {
+        background: rgba(220, 38, 45, 0.9);
+        border-color: #dc3545;
+      }
+
+      #modalImageContainer:hover .modal-copy-btn,
+      #modalImageContainer:hover .modal-favorite-btn {
         opacity: 1;
       }
 
