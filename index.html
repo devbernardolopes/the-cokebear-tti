@@ -210,7 +210,11 @@ return _originalFetch.apply(this, args);
           <button onclick="showDeleteConfirmation()" id="galleryDeleteSelectedBtn" disabled>Delete Selected</button>
           <span id="galleryCount"></span>
         </div>
-        <div id="galleryList"></div>
+        <div id="galleryFavoritesHeader" class="gallery-section-header" style="display: none;">
+          <span>Favorites</span>
+        </div>
+        <div id="galleryFavoritesList" class="gallery-grid"></div>
+        <div id="galleryList" class="gallery-grid"></div>
         <button id="galleryLoadMoreBtn" style="display: none">Load More</button>
       </div>
     </div>
@@ -353,6 +357,8 @@ return _originalFetch.apply(this, args);
         saveToGalleryBtn: document.getElementById("saveToGalleryBtn"),
         galleryModal: document.getElementById("galleryModal"),
         galleryList: document.getElementById("galleryList"),
+        galleryFavoritesList: document.getElementById("galleryFavoritesList"),
+        galleryFavoritesHeader: document.getElementById("galleryFavoritesHeader"),
         galleryLoadMoreBtn: document.getElementById("galleryLoadMoreBtn"),
         galleryCount: document.getElementById("galleryCount"),
         gallerySelectModeBtn: document.getElementById("gallerySelectModeBtn"),
@@ -401,6 +407,8 @@ return _originalFetch.apply(this, args);
       let gallerySearchQuery = "";
       let galleryDebounceTimer = null;
       let galleryTotalCountFiltered = 0;
+      let galleryFavorites = [];
+      let galleryFavoritesTotalCount = 0;
 
       window.fetch = async function (...args) {
         const url = typeof args[0] === "string" ? args[0] : args[0]?.url;
@@ -1873,11 +1881,49 @@ return _originalFetch.apply(this, args);
           if (!append) {
             galleryOffset = 0;
             el.galleryList.innerHTML = "";
+            el.galleryFavoritesList.innerHTML = "";
             galleryImages = [];
+            galleryFavorites = [];
           }
 
           galleryTotalCount = await db.gallery.count();
           const searchQuery = gallerySearchQuery.toLowerCase();
+
+          // Load favorites first (without pagination, they should all appear)
+          galleryFavorites = [];
+          if (!searchQuery) {
+            const allItems = await db.gallery.toArray();
+            galleryFavorites = allItems.filter((item) => item.favorite);
+            if (!gallerySortDesc) {
+              galleryFavorites.reverse();
+            }
+          } else {
+            const allFavorites = await db.gallery.where("favorite").equals(1).toArray();
+            galleryFavorites = allFavorites.filter((item) => {
+              const promptMatch = item.prompt && item.prompt.toLowerCase().includes(searchQuery);
+              let seedMatch = false;
+              if (item.seed) {
+                seedMatch = String(item.seed).includes(searchQuery);
+              }
+              return promptMatch || seedMatch;
+            });
+            if (gallerySortDesc) {
+              galleryFavorites.sort((a, b) => b.timestamp - a.timestamp);
+            } else {
+              galleryFavorites.sort((a, b) => a.timestamp - b.timestamp);
+            }
+          }
+          galleryFavoritesTotalCount = galleryFavorites.length;
+
+          // Show/hide favorites section
+          if (galleryFavorites.length > 0) {
+            el.galleryFavoritesHeader.style.display = "flex";
+            el.galleryFavoritesList.style.display = "grid";
+            renderGalleryItems(galleryFavorites, el.galleryFavoritesList, true);
+          } else {
+            el.galleryFavoritesHeader.style.display = "none";
+            el.galleryFavoritesList.style.display = "none";
+          }
 
           let items;
           if (searchQuery) {
@@ -1886,8 +1932,9 @@ return _originalFetch.apply(this, args);
             if (gallerySortDesc) {
               allItems = allItems.reverse();
             }
-            // Client-side filter for search
+            // Client-side filter for search (exclude favorites)
             let filteredItems = allItems.filter((item) => {
+              if (item.favorite) return false; // Already shown in favorites
               const promptMatch = item.prompt && item.prompt.toLowerCase().includes(searchQuery);
               let seedMatch = false;
               if (item.seed) {
@@ -1901,13 +1948,17 @@ return _originalFetch.apply(this, args);
             const end = start + galleryLimit;
             items = filteredItems.slice(start, end);
           } else {
-            // No search - use existing query logic
-            let query = db.gallery.orderBy("timestamp");
+            // No search - load non-favorites with pagination
+            const allNonFavorites = await db.gallery.filter((item) => !item.favorite).toArray();
             if (gallerySortDesc) {
-              query = query.reverse();
+              allNonFavorites.sort((a, b) => b.timestamp - a.timestamp);
+            } else {
+              allNonFavorites.sort((a, b) => a.timestamp - b.timestamp);
             }
-            items = await query.offset(galleryOffset).limit(galleryLimit).toArray();
-            galleryTotalCountFiltered = galleryTotalCount;
+            galleryTotalCountFiltered = allNonFavorites.length;
+            const start = galleryOffset;
+            const end = start + galleryLimit;
+            items = allNonFavorites.slice(start, end);
           }
 
           if (!append) {
@@ -1931,53 +1982,7 @@ return _originalFetch.apply(this, args);
             galleryImages.push(item);
           });
 
-          items.forEach((item) => {
-            const div = document.createElement("div");
-            div.className = "gallery-item";
-            div.dataset.id = item.id;
-
-            const isSelected = selectedGalleryIds.has(item.id) ? "selecting" : "";
-            const checkmarkDisplay = selectedGalleryIds.has(item.id) ? "" : "display: none;";
-            const favoriteClass = item.favorite ? "favorite-active" : "";
-            const favoriteBtnText = item.favorite ? "❤️" : "🤍";
-
-            let badgesHtml = "";
-            if (item.style) {
-              const styleLabel = item.style.replace(/_/g, " ");
-              badgesHtml += `<span class="tile-badge">${escapeHtml(styleLabel)}</span>`;
-            }
-            if (item.guidance) {
-              badgesHtml += `<span class="tile-badge guidance-badge">${escapeHtml(item.guidance)}</span>`;
-            }
-
-            div.innerHTML = `
-              <img src="${item.imageData}" alt="${escapeHtml(item.prompt || "")}" />
-              <div class="gallery-item-checkmark" style="${checkmarkDisplay}">✓</div>
-              <button class="gallery-item-favorite-btn ${favoriteClass}" onclick="event.stopPropagation(); toggleGalleryImageFavorite(${item.id})">${favoriteBtnText}</button>
-              <button class="gallery-item-copy-btn" onclick="event.stopPropagation(); copyGalleryImageToPrompt(${item.id})">📋</button>
-              <button class="gallery-item-info-btn" onclick="event.stopPropagation(); openGalleryImageInfo(${item.id})">ℹ</button>
-              <button class="gallery-item-download-btn" onclick="event.stopPropagation(); downloadGalleryImage(${item.id})">⬇</button>
-              <button class="gallery-item-delete-btn" onclick="event.stopPropagation(); deleteGalleryImage(${item.id})">🗑</button>
-              ${badgesHtml ? `<div class="tile-badges">${badgesHtml}</div>` : ""}
-            `;
-
-            if (gallerySelectMode) {
-              div.classList.add("select-mode");
-              if (selectedGalleryIds.has(item.id)) {
-                div.classList.add("selecting");
-              }
-            }
-
-            div.addEventListener("click", (e) => {
-              if (gallerySelectMode) {
-                toggleGallerySelection(item.id, div);
-              } else {
-                openGalleryImageModal(item.id);
-              }
-            });
-
-            el.galleryList.appendChild(div);
-          });
+          renderGalleryItems(items, el.galleryList, false);
 
           const hasMore = galleryOffset + items.length < galleryTotalCountFiltered;
           el.galleryLoadMoreBtn.style.display = hasMore ? "block" : "none";
@@ -1985,6 +1990,57 @@ return _originalFetch.apply(this, args);
         } catch (e) {
           console.warn("Failed to load gallery:", e);
         }
+      }
+
+      function renderGalleryItems(items, container, isFavorites) {
+        items.forEach((item) => {
+          const div = document.createElement("div");
+          div.className = "gallery-item";
+          div.dataset.id = item.id;
+
+          const isSelected = selectedGalleryIds.has(item.id) ? "selecting" : "";
+          const checkmarkDisplay = selectedGalleryIds.has(item.id) ? "" : "display: none;";
+          const favoriteClass = item.favorite ? "favorite-active" : "";
+          const favoriteBtnText = item.favorite ? "❤️" : "🤍";
+
+          let badgesHtml = "";
+          if (item.style) {
+            const styleLabel = item.style.replace(/_/g, " ");
+            badgesHtml += `<span class="tile-badge">${escapeHtml(styleLabel)}</span>`;
+          }
+          if (item.guidance) {
+            badgesHtml += `<span class="tile-badge guidance-badge">${escapeHtml(item.guidance)}</span>`;
+          }
+
+          div.innerHTML = `
+            <img src="${item.imageData}" alt="${escapeHtml(item.prompt || "")}" />
+            <div class="gallery-item-checkmark" style="${checkmarkDisplay}">✓</div>
+            ${item.favorite ? '<div class="gallery-item-favorite-indicator">❤️</div>' : ''}
+            <button class="gallery-item-favorite-btn ${favoriteClass}" onclick="event.stopPropagation(); toggleGalleryImageFavorite(${item.id})">${favoriteBtnText}</button>
+            <button class="gallery-item-copy-btn" onclick="event.stopPropagation(); copyGalleryImageToPrompt(${item.id})">📋</button>
+            <button class="gallery-item-info-btn" onclick="event.stopPropagation(); openGalleryImageInfo(${item.id})">ℹ</button>
+            <button class="gallery-item-download-btn" onclick="event.stopPropagation(); downloadGalleryImage(${item.id})">⬇</button>
+            <button class="gallery-item-delete-btn" onclick="event.stopPropagation(); deleteGalleryImage(${item.id})">🗑</button>
+            ${badgesHtml ? `<div class="tile-badges">${badgesHtml}</div>` : ""}
+          `;
+
+          if (gallerySelectMode) {
+            div.classList.add("select-mode");
+            if (selectedGalleryIds.has(item.id)) {
+              div.classList.add("selecting");
+            }
+          }
+
+          div.addEventListener("click", (e) => {
+            if (gallerySelectMode) {
+              toggleGallerySelection(item.id, div);
+            } else {
+              openGalleryImageModal(item.id);
+            }
+          });
+
+          container.appendChild(div);
+        });
       }
 
       function updateGalleryCount() {
@@ -1999,6 +2055,7 @@ return _originalFetch.apply(this, args);
         gallerySearchQuery = "";
         el.gallerySearch.value = "";
         el.galleryList.innerHTML = "";
+        el.galleryFavoritesList.innerHTML = "";
         el.gallerySelectModeBtn.textContent = "Select";
         await loadGallery(false);
         el.galleryModal.style.display = "flex";
@@ -2257,15 +2314,8 @@ return _originalFetch.apply(this, args);
           if (galleryCurrentImage && galleryCurrentImage.id === id) {
             galleryCurrentImage.favorite = newFavorite;
           }
-          // Update the gallery view
-          const div = el.galleryList.querySelector(`[data-id="${id}"]`);
-          if (div) {
-            const btn = div.querySelector(".gallery-item-favorite-btn");
-            if (btn) {
-              btn.textContent = newFavorite ? "❤️" : "🤍";
-              btn.classList.toggle("favorite-active", newFavorite);
-            }
-          }
+          // Reload gallery to update both grids
+          await loadGallery(false);
           // Update the modal view if open
           updateFavoriteBtnInModal(newFavorite);
         } catch (e) {
@@ -3512,7 +3562,8 @@ return _originalFetch.apply(this, args);
         font-size: 13px;
       }
 
-      #galleryList {
+      #galleryList,
+      #galleryFavoritesList {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(var(--tile-size, 128px), max-content));
         gap: 1px;
@@ -3696,6 +3747,20 @@ return _originalFetch.apply(this, args);
         font-size: 14px;
       }
 
+      .gallery-item-favorite-indicator {
+        position: absolute;
+        top: 8px;
+        left: 8px;
+        width: 24px;
+        height: 24px;
+        font-size: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 5;
+        pointer-events: none;
+      }
+
       .gallery-item-favorite-btn {
         position: absolute;
         top: 48px;
@@ -3712,12 +3777,31 @@ return _originalFetch.apply(this, args);
         align-items: center;
         justify-content: center;
         z-index: 10;
-        opacity: 1;
+        opacity: 0;
+        transition: opacity 0.2s ease;
       }
 
       .gallery-item-favorite-btn.favorite-active {
         background: rgba(220, 38, 45, 0.9);
         border-color: #dc3545;
+      }
+
+      .gallery-item:hover .gallery-item-favorite-btn {
+        opacity: 1;
+      }
+
+      .gallery-item-favorite-indicator {
+        position: absolute;
+        top: 8px;
+        left: 8px;
+        width: 24px;
+        height: 24px;
+        font-size: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 5;
+        pointer-events: none;
       }
 
       .gallery-item.select-mode .gallery-item-checkmark {
@@ -3736,6 +3820,30 @@ return _originalFetch.apply(this, args);
       .gallery-item.selecting .gallery-item-download-btn,
       .gallery-item.selecting .gallery-item-delete-btn {
         display: none;
+      }
+
+      #galleryFavoritesList {
+        display: none;
+        grid-template-columns: repeat(auto-fit, minmax(var(--tile-size, 128px), max-content));
+        gap: 1px;
+        justify-content: center;
+        padding: 10px;
+        overflow-y: auto;
+      }
+
+      #galleryFavoritesHeader {
+        display: none;
+        padding: 8px 12px;
+        font-weight: 600;
+        color: #f85149;
+        font-size: 14px;
+        border-bottom: 1px solid #30363d;
+      }
+
+      .gallery-section-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
       }
 
       #historyList,
