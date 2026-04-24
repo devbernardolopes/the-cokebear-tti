@@ -210,9 +210,9 @@ return _originalFetch.apply(this, args);
           <button onclick="showDeleteConfirmation()" id="galleryDeleteSelectedBtn" disabled>Delete Selected</button>
           <span id="galleryCount"></span>
         </div>
-        <div id="galleryFavoritesHeader" class="gallery-section-header" style="display: none;">
+        <!-- <div id="galleryFavoritesHeader" class="gallery-section-header" style="display: none;">
           <span>Favorites</span>
-        </div>
+        </div> -->
         <div id="galleryFavoritesList" class="gallery-grid"></div>
         <div id="galleryList" class="gallery-grid"></div>
         <button id="galleryLoadMoreBtn" style="display: none">Load More</button>
@@ -358,7 +358,7 @@ return _originalFetch.apply(this, args);
         galleryModal: document.getElementById("galleryModal"),
         galleryList: document.getElementById("galleryList"),
         galleryFavoritesList: document.getElementById("galleryFavoritesList"),
-        galleryFavoritesHeader: document.getElementById("galleryFavoritesHeader"),
+        // galleryFavoritesHeader: document.getElementById("galleryFavoritesHeader"),
         galleryLoadMoreBtn: document.getElementById("galleryLoadMoreBtn"),
         galleryCount: document.getElementById("galleryCount"),
         gallerySelectModeBtn: document.getElementById("gallerySelectModeBtn"),
@@ -1925,11 +1925,11 @@ return _originalFetch.apply(this, args);
 
             // Show/hide favorites section
             if (galleryFavorites.length > 0) {
-              el.galleryFavoritesHeader.style.display = "flex";
+              // el.galleryFavoritesHeader.style.display = "flex";
               el.galleryFavoritesList.style.display = "grid";
               renderGalleryItems(galleryFavorites, el.galleryFavoritesList, true);
             } else {
-              el.galleryFavoritesHeader.style.display = "none";
+              // el.galleryFavoritesHeader.style.display = "none";
               el.galleryFavoritesList.style.display = "none";
             }
           }
@@ -2145,7 +2145,7 @@ return _originalFetch.apply(this, args);
             divFav.remove();
             // Check if favorites grid is empty
             if (el.galleryFavoritesList.children.length === 0) {
-              el.galleryFavoritesHeader.style.display = "none";
+              // el.galleryFavoritesHeader.style.display = "none";
               el.galleryFavoritesList.style.display = "none";
             }
           }
@@ -3863,15 +3863,6 @@ return _originalFetch.apply(this, args);
         justify-content: center;
         padding: 10px;
         overflow-y: auto;
-      }
-
-      #galleryFavoritesHeader {
-        display: none;
-        padding: 8px 12px;
-        font-weight: 600;
-        color: #f85149;
-        font-size: 14px;
-        border-bottom: 1px solid #30363d;
       }
 
       .gallery-section-header {
