@@ -204,6 +204,8 @@ return _originalFetch.apply(this, args);
           <button onclick="closeGalleryModal()">x</button>
         </div>
         <div id="galleryControls">
+          <input type="text" id="gallerySearch" placeholder="Search prompts & seeds..." />
+          <button onclick="toggleGallerySort()" id="gallerySortBtn">Newest First</button>
           <button onclick="toggleGallerySelectMode()" id="gallerySelectModeBtn">Select</button>
           <button onclick="showDeleteConfirmation()" id="galleryDeleteSelectedBtn" disabled>Delete Selected</button>
           <span id="galleryCount"></span>
@@ -353,6 +355,8 @@ return _originalFetch.apply(this, args);
         galleryCount: document.getElementById("galleryCount"),
         gallerySelectModeBtn: document.getElementById("gallerySelectModeBtn"),
         galleryDeleteSelectedBtn: document.getElementById("galleryDeleteSelectedBtn"),
+        gallerySortBtn: document.getElementById("gallerySortBtn"),
+        gallerySearch: document.getElementById("gallerySearch"),
         modalCounter: document.getElementById("modalCounter"),
         downloadAllBtn: document.getElementById("downloadAllBtn"),
         generateBtn: document.getElementById("generateBtn"),
@@ -391,6 +395,10 @@ return _originalFetch.apply(this, args);
       let gallerySelectMode = false;
       let selectedGalleryIds = new Set();
       let galleryCurrentImage = null; // For info modal when opened from gallery
+      let gallerySortDesc = true; // true = newest first, false = oldest first
+      let gallerySearchQuery = "";
+      let galleryDebounceTimer = null;
+      let galleryTotalCountFiltered = 0;
 
       window.fetch = async function (...args) {
         const url = typeof args[0] === "string" ? args[0] : args[0]?.url;
@@ -1859,14 +1867,45 @@ return _originalFetch.apply(this, args);
           }
 
           galleryTotalCount = await db.gallery.count();
-          const items = await db.gallery.orderBy("timestamp").reverse().offset(galleryOffset).limit(galleryLimit).toArray();
+          const searchQuery = gallerySearchQuery.toLowerCase();
+
+          let items;
+          if (searchQuery) {
+            // For search, load all and filter
+            let allItems = await db.gallery.orderBy("timestamp").toArray();
+            if (gallerySortDesc) {
+              allItems = allItems.reverse();
+            }
+            // Client-side filter for search
+            let filteredItems = allItems.filter((item) => {
+              const promptMatch = item.prompt && item.prompt.toLowerCase().includes(searchQuery);
+              let seedMatch = false;
+              if (item.seed) {
+                seedMatch = String(item.seed).includes(searchQuery);
+              }
+              return promptMatch || seedMatch;
+            });
+            galleryTotalCountFiltered = filteredItems.length;
+            // Apply pagination after filtering
+            const start = galleryOffset;
+            const end = start + galleryLimit;
+            items = filteredItems.slice(start, end);
+          } else {
+            // No search - use existing query logic
+            let query = db.gallery.orderBy("timestamp");
+            if (gallerySortDesc) {
+              query = query.reverse();
+            }
+            items = await query.offset(galleryOffset).limit(galleryLimit).toArray();
+            galleryTotalCountFiltered = galleryTotalCount;
+          }
 
           if (!append) {
             el.galleryList.innerHTML = "";
           }
 
           if (items.length === 0 && !append) {
-            el.galleryList.innerHTML = '<div class="history-empty">No images saved to gallery yet</div>';
+            el.galleryList.innerHTML = searchQuery ? '<div class="history-empty">No matching images found</div>' : '<div class="history-empty">No images saved to gallery yet</div>';
             el.galleryLoadMoreBtn.style.display = "none";
             updateGalleryCount();
             return;
@@ -1927,7 +1966,7 @@ return _originalFetch.apply(this, args);
             el.galleryList.appendChild(div);
           });
 
-          const hasMore = galleryOffset + items.length < galleryTotalCount;
+          const hasMore = galleryOffset + items.length < galleryTotalCountFiltered;
           el.galleryLoadMoreBtn.style.display = hasMore ? "block" : "none";
           updateGalleryCount();
         } catch (e) {
@@ -1944,6 +1983,8 @@ return _originalFetch.apply(this, args);
         galleryOffset = 0;
         gallerySelectMode = false;
         selectedGalleryIds.clear();
+        gallerySearchQuery = "";
+        el.gallerySearch.value = "";
         el.galleryList.innerHTML = "";
         el.gallerySelectModeBtn.textContent = "Select";
         await loadGallery(false);
@@ -1985,6 +2026,13 @@ return _originalFetch.apply(this, args);
           selectedGalleryIds.clear();
           updateGalleryCount();
         }
+      };
+
+      window.toggleGallerySort = async function () {
+        gallerySortDesc = !gallerySortDesc;
+        el.gallerySortBtn.textContent = gallerySortDesc ? "Newest First" : "Oldest First";
+        galleryOffset = 0;
+        await loadGallery(false);
       };
 
       function toggleGallerySelection(id, div) {
@@ -2047,6 +2095,16 @@ return _originalFetch.apply(this, args);
       el.galleryLoadMoreBtn.addEventListener("click", () => {
         galleryOffset += galleryLimit;
         loadGallery(true);
+      });
+
+      // Gallery search with debounce
+      el.gallerySearch.addEventListener("input", (e) => {
+        clearTimeout(galleryDebounceTimer);
+        galleryDebounceTimer = setTimeout(() => {
+          gallerySearchQuery = e.target.value;
+          galleryOffset = 0;
+          loadGallery(false);
+        }, 300);
       });
 
       window.saveToGallery = async function () {
@@ -3305,6 +3363,26 @@ return _originalFetch.apply(this, args);
       #galleryControls button:disabled {
         opacity: 0.5;
         cursor: not-allowed;
+      }
+
+      #gallerySearch {
+        padding: 6px 10px;
+        background: #0d1117;
+        border: 1px solid #30363d;
+        border-radius: 6px;
+        color: #c9d1d9;
+        font-size: 13px;
+        width: 180px;
+        box-sizing: border-box;
+      }
+
+      #gallerySearch:focus {
+        outline: none;
+        border-color: #58a6ff;
+      }
+
+      #gallerySearch::placeholder {
+        color: #8b949e;
       }
 
       #galleryDeleteSelectedBtn {
