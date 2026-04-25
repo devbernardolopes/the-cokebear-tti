@@ -1721,6 +1721,10 @@ return _originalFetch.apply(this, args);
             const itemEl = el.historyList.querySelector(`[data-id="${id}"]`);
             if (itemEl) itemEl.remove();
             historyTotalCount--;
+            historyLoadedCount--;
+            selectedHistoryIds.delete(id);
+            el.selectAllHistory.checked = selectedHistoryIds.size > 0 && historyLoadedCount > 0;
+            updateHistoryExportBtn();
           }
         } catch (e) {
           console.warn("Failed to delete prompt:", e);
