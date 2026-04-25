@@ -180,7 +180,7 @@ return _originalFetch.apply(this, args);
         <div id="historyControlsContainer">
           <input type="checkbox" id="selectAllHistory" />
           <span>Select All</span>
-          <button onclick="showHistoryDeleteConfirmation()" id="deleteHistorySelectedBtn" disabled>Delete Selected</button>
+          <button onclick="showHistoryDeleteConfirmation()" id="deleteHistorySelectedBtn" disabled>💥</button>
         </div>
         <div id="historyList"></div>
         <button id="loadMoreBtn" style="display: none">Load More</button>
@@ -203,7 +203,7 @@ return _originalFetch.apply(this, args);
         <button id="manageLoadMoreBtn" style="display: none">Load More</button>
         <div class="modal-footer">
           <span id="manageHistoryCount"></span>
-          <button onclick="deleteSelectedPrompts()" id="deleteSelectedBtn" disabled>Delete Selected</button>
+          <button onclick="deleteSelectedPrompts()" id="deleteSelectedBtn" disabled>💥</button>
         </div>
       </div>
     </div>
@@ -218,7 +218,7 @@ return _originalFetch.apply(this, args);
           <input type="text" id="gallerySearch" placeholder="Search prompts & seeds..." />
           <button onclick="toggleGallerySort()" id="gallerySortBtn">⬇</button>
           <button onclick="toggleGallerySelectMode()" id="gallerySelectModeBtn">Select</button>
-          <button onclick="showDeleteConfirmation()" id="galleryDeleteSelectedBtn" disabled>Delete Selected</button>
+          <button onclick="showDeleteConfirmation()" id="galleryDeleteSelectedBtn" disabled>💥</button>
           <span id="galleryCount"></span>
         </div>
         <!-- <div id="galleryFavoritesHeader" class="gallery-section-header" style="display: none;">
