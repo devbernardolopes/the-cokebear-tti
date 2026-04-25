@@ -1727,6 +1727,14 @@ return _originalFetch.apply(this, args);
             selectedHistoryIds.delete(id);
             el.selectAllHistory.checked = selectedHistoryIds.size > 0 && historyLoadedCount > 0;
             updateHistoryExportBtn();
+
+            // Auto-load more entries to fill the current chunk
+            const effectiveTotal = historySearchQuery ? historyTotalCountFiltered : historyTotalCount;
+            const targetLoaded = Math.floor(historyOffset / historyLimit) * historyLimit;
+            if (historyLoadedCount < targetLoaded && historyOffset < effectiveTotal) {
+              historyOffset += historyLimit;
+              await loadHistory(true);
+            }
           }
         } catch (e) {
           console.warn("Failed to delete prompt:", e);
@@ -1795,14 +1803,22 @@ return _originalFetch.apply(this, args);
       window.confirmDeleteHistoryEntries = async function () {
         if (!db || selectedHistoryIds.size === 0) return;
         try {
+          const deletedCount = selectedHistoryIds.size;
           for (const id of selectedHistoryIds) {
             await db.prompts.delete(id);
           }
           selectedHistoryIds.clear();
           el.selectAllHistory.checked = false;
-          historyOffset = 0;
-          historyLoadedCount = 0;
-          await loadHistory(false);
+          historyLoadedCount -= deletedCount;
+
+          // Auto-load more entries to fill the current chunk
+          const effectiveTotal = historySearchQuery ? historyTotalCountFiltered : historyTotalCount;
+          const targetLoaded = Math.floor(historyOffset / historyLimit) * historyLimit;
+          while (historyLoadedCount < targetLoaded && historyOffset < effectiveTotal) {
+            historyOffset += historyLimit;
+            await loadHistory(true);
+          }
+          updateHistoryExportBtn();
           closeHistoryDeleteConfirmModal();
         } catch (e) {
           console.warn("Failed to delete history entries:", e);
