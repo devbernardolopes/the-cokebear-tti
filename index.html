@@ -173,6 +173,9 @@ return _originalFetch.apply(this, args);
         </div>
         <div id="historySearchContainer">
           <input type="text" id="historySearch" placeholder="Search prompts..." />
+          <button onclick="exportSelectedHistory()" id="exportHistoryBtn" disabled>Export</button>
+          <button onclick="importHistory()" id="importHistoryBtn">Import</button>
+          <input type="file" id="historyImportFile" accept=".json" style="display: none;" />
         </div>
         <div id="historyList"></div>
         <button id="loadMoreBtn" style="display: none">Load More</button>
@@ -338,6 +341,9 @@ return _originalFetch.apply(this, args);
         historyList: document.getElementById("historyList"),
         historyBtn: document.getElementById("historyBtn"),
         historySearch: document.getElementById("historySearch"),
+        exportHistoryBtn: document.getElementById("exportHistoryBtn"),
+        importHistoryBtn: document.getElementById("importHistoryBtn"),
+        historyImportFile: document.getElementById("historyImportFile"),
         loadMoreBtn: document.getElementById("loadMoreBtn"),
         manageHistoryModal: document.getElementById("manageHistoryModal"),
         manageHistoryModalContent: document.getElementById("manageHistoryModalContent"),
@@ -395,6 +401,8 @@ return _originalFetch.apply(this, args);
       let historyTotalCount = 0;
       let historySearchQuery = "";
       let historyDebounceTimer = null;
+      let historyTotalCountFiltered = 0;
+      let selectedHistoryIds = new Set();
 
       // Gallery state
       let galleryOffset = 0;
@@ -1385,6 +1393,7 @@ return _originalFetch.apply(this, args);
         historyDebounceTimer = setTimeout(() => {
           historySearchQuery = e.target.value;
           historyOffset = 0;
+          historyTotalCountFiltered = 0;
           loadHistory(false);
         }, 300);
       });
@@ -1545,14 +1554,30 @@ return _originalFetch.apply(this, args);
 
             const starClass = item.bookmarked ? "history-star starred" : "history-star";
             const starIcon = item.bookmarked ? "★" : "☆";
+            const isChecked = selectedHistoryIds.has(item.id) ? "checked" : "";
             div.innerHTML = `
+                    <input type="checkbox" class="history-checkbox" data-id="${item.id}" ${isChecked} />
                     <button class="${starClass}" onclick="toggleBookmark(${item.id})">${starIcon}</button>
                     <span class="history-prompt">${escapeHtml(item.prompt)}</span>
                     ${metaHtml}
                     <button class="history-delete" onclick="deletePrompt(${item.id})">x</button>
                   `;
+            const checkbox = div.querySelector('.history-checkbox');
+            checkbox.addEventListener("change", (e) => {
+              if (e.target.checked) {
+                selectedHistoryIds.add(item.id);
+                div.classList.add("selected");
+              } else {
+                selectedHistoryIds.delete(item.id);
+                div.classList.remove("selected");
+              }
+              updateHistoryExportBtn();
+            });
+            if (checkbox.checked) {
+              div.classList.add("selected");
+            }
             div.onclick = (e) => {
-              if (!e.target.classList.contains("history-delete") && !e.target.classList.contains("history-star")) {
+              if (!e.target.classList.contains("history-delete") && !e.target.classList.contains("history-star") && e.target.type !== "checkbox") {
                 usePrompt(item.id);
               }
             };
@@ -1574,12 +1599,15 @@ return _originalFetch.apply(this, args);
           // Reset pagination and search when opening
           historyOffset = 0;
           historySearchQuery = "";
+          historyTotalCountFiltered = 0;
+          selectedHistoryIds.clear();
           el.historySearch.value = "";
           await loadHistory(false);
           el.historyModal.style.display = "flex";
           el.historyModal.style.alignItems = "center";
           el.historyModal.style.justifyContent = "center";
           document.body.classList.add("modal-open");
+          updateHistoryExportBtn();
         } else {
           el.historyModal.style.display = "none";
           document.body.classList.remove("modal-open");
@@ -1677,6 +1705,89 @@ return _originalFetch.apply(this, args);
           console.warn("Failed to toggle bookmark:", e);
         }
       };
+
+      function updateHistoryExportBtn() {
+        el.exportHistoryBtn.disabled = selectedHistoryIds.size === 0;
+      }
+
+      window.exportSelectedHistory = async function () {
+        if (!db || selectedHistoryIds.size === 0) return;
+        try {
+          const items = [];
+          for (const id of selectedHistoryIds) {
+            const item = await db.prompts.get(id);
+            if (item) {
+              items.push({
+                prompt: item.prompt,
+                timestamp: item.timestamp,
+                guidance: item.guidance,
+                style: item.style,
+                resolution: item.resolution,
+                seeds: item.seeds,
+                bookmarked: item.bookmarked,
+              });
+            }
+          }
+          const json = JSON.stringify(items, null, 2);
+          const blob = new Blob([json], { type: "application/json" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `history-export-${new Date().toISOString().slice(0, 10)}.json`;
+          a.click();
+          URL.revokeObjectURL(url);
+        } catch (e) {
+          console.warn("Failed to export history:", e);
+        }
+      };
+
+      window.importHistory = function () {
+        el.historyImportFile.click();
+      };
+
+      el.historyImportFile.addEventListener("change", async function (e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        try {
+          const text = await file.text();
+          const items = JSON.parse(text);
+          if (!Array.isArray(items)) {
+            alert("Invalid import file format");
+            return;
+          }
+          let importedCount = 0;
+          let skippedCount = 0;
+          for (const item of items) {
+            if (!item.prompt) continue;
+            const existing = await db.prompts.where("prompt").equals(item.prompt).first();
+            if (existing) {
+              if (existing.guidance === item.guidance &&
+                  existing.style === item.style &&
+                  existing.resolution === item.resolution &&
+                  JSON.stringify(existing.seeds) === JSON.stringify(item.seeds)) {
+                skippedCount++;
+                continue;
+              }
+            }
+            await db.prompts.add({
+              prompt: item.prompt,
+              timestamp: item.timestamp || Date.now(),
+              guidance: item.guidance,
+              style: item.style,
+              resolution: item.resolution,
+              seeds: item.seeds,
+              bookmarked: item.bookmarked || 0,
+            });
+            importedCount++;
+          }
+          await loadHistory();
+          alert(`Imported ${importedCount} entries. ${skippedCount} duplicates skipped.`);
+        } catch (e) {
+          console.warn("Failed to import history:", e);
+          alert("Failed to import file");
+        }
+        e.target.value = "";
+      });
 
       // Manage History Modal state
       let manageHistoryOffset = 0;
@@ -3476,6 +3587,26 @@ return _originalFetch.apply(this, args);
         color: #8b949e;
       }
 
+      #exportHistoryBtn,
+      #importHistoryBtn {
+        padding: 6px 12px;
+        background: #21262d;
+        border: 1px solid #30363d;
+        border-radius: 6px;
+        color: #c9d1d9;
+        cursor: pointer;
+      }
+
+      #exportHistoryBtn:hover,
+      #importHistoryBtn:hover {
+        background: #30363d;
+      }
+
+      #exportHistoryBtn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
       #galleryControls {
         display: flex;
         gap: 8px;
@@ -3975,6 +4106,7 @@ return _originalFetch.apply(this, args);
         background: #161b22;
       }
 
+      #historyList .history-item.selected,
       #manageHistoryList .history-item.selected {
         background: #1f6feb20;
         border-color: #388bfd;
