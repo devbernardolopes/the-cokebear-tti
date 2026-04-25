@@ -403,6 +403,7 @@ return _originalFetch.apply(this, args);
       let historyOffset = 0;
       const historyLimit = 50;
       let historyTotalCount = 0;
+      let historyLoadedCount = 0;
       let historySearchQuery = "";
       let historyDebounceTimer = null;
       let historyTotalCountFiltered = 0;
@@ -1397,6 +1398,7 @@ return _originalFetch.apply(this, args);
         historyDebounceTimer = setTimeout(() => {
           historySearchQuery = e.target.value;
           historyOffset = 0;
+          historyLoadedCount = 0;
           historyTotalCountFiltered = 0;
           loadHistory(false);
         }, 300);
@@ -1513,7 +1515,9 @@ return _originalFetch.apply(this, args);
 
           if (!append) {
             el.historyList.innerHTML = "";
+            historyLoadedCount = 0;
           }
+          historyLoadedCount += items.length;
 
           if (items.length === 0 && !append) {
             el.historyList.innerHTML = searchQuery ? '<div class="history-empty">No matching prompts found</div>' : '<div class="history-empty">No history yet</div>';
@@ -1603,6 +1607,7 @@ return _originalFetch.apply(this, args);
         if (el.historyModal.style.display === "none") {
           // Reset pagination and search when opening
           historyOffset = 0;
+          historyLoadedCount = 0;
           historySearchQuery = "";
           historyTotalCountFiltered = 0;
           selectedHistoryIds.clear();
@@ -1718,8 +1723,7 @@ return _originalFetch.apply(this, args);
 
       async function updateHistoryCount() {
         const total = await db?.prompts.count() || 0;
-        const shown = historyTotalCountFiltered > 0 ? historyTotalCountFiltered : historyTotalCount;
-        el.historyCount.textContent = `${selectedHistoryIds.size} of ${total} selected (${shown} shown)`;
+        el.historyCount.textContent = `${selectedHistoryIds.size} of ${total} selected (${historyLoadedCount} loaded)`;
       }
 
       window.exportSelectedHistory = async function () {
