@@ -179,6 +179,9 @@ return _originalFetch.apply(this, args);
         </div>
         <div id="historyList"></div>
         <button id="loadMoreBtn" style="display: none">Load More</button>
+        <div class="modal-footer">
+          <span id="historyCount"></span>
+        </div>
       </div>
     </div>
 
@@ -344,6 +347,7 @@ return _originalFetch.apply(this, args);
         exportHistoryBtn: document.getElementById("exportHistoryBtn"),
         importHistoryBtn: document.getElementById("importHistoryBtn"),
         historyImportFile: document.getElementById("historyImportFile"),
+        historyCount: document.getElementById("historyCount"),
         loadMoreBtn: document.getElementById("loadMoreBtn"),
         manageHistoryModal: document.getElementById("manageHistoryModal"),
         manageHistoryModalContent: document.getElementById("manageHistoryModalContent"),
@@ -1589,6 +1593,7 @@ return _originalFetch.apply(this, args);
           const effectiveTotal = searchQuery ? historyTotalCountFiltered : historyTotalCount;
           const hasMore = historyOffset + items.length < effectiveTotal;
           el.loadMoreBtn.style.display = hasMore ? "block" : "none";
+          updateHistoryCount();
         } catch (e) {
           console.warn("Failed to load history:", e);
         }
@@ -1708,6 +1713,13 @@ return _originalFetch.apply(this, args);
 
       function updateHistoryExportBtn() {
         el.exportHistoryBtn.disabled = selectedHistoryIds.size === 0;
+        updateHistoryCount();
+      }
+
+      async function updateHistoryCount() {
+        const total = await db?.prompts.count() || 0;
+        const shown = historyTotalCountFiltered > 0 ? historyTotalCountFiltered : historyTotalCount;
+        el.historyCount.textContent = `${selectedHistoryIds.size} of ${total} selected (${shown} shown)`;
       }
 
       window.exportSelectedHistory = async function () {
@@ -4037,7 +4049,8 @@ return _originalFetch.apply(this, args);
         border-top: 1px solid #30363d;
       }
 
-      #manageHistoryCount {
+      #manageHistoryCount,
+      #historyCount {
         color: #8b949e;
         font-size: 13px;
       }
