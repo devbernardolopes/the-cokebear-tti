@@ -88,7 +88,7 @@ return _originalFetch.apply(this, args);
 
           <div class="seed-input-wrapper">
             <input id="seed" type="text" placeholder="Seed" inputmode="numeric" pattern="[0-9]*" />
-            <button id="clearSeedBtn" type="button" title="Clear seed">x</button>
+            <button id="clearSeedBtn" type="button" title="Clear seed">❌</button>
           </div>
 
           <input id="negativePrompt" type="text" placeholder="Negative prompt..." />
@@ -169,7 +169,7 @@ return _originalFetch.apply(this, args);
       <div id="historyModalContent" onclick="event.stopPropagation()">
         <div class="modal-header">
           <h3>History</h3>
-          <button onclick="closeHistoryModal()">x</button>
+          <button onclick="closeHistoryModal()">❌</button>
         </div>
         <div id="historySearchContainer">
           <input type="text" id="historySearch" placeholder="Search prompts..." />
@@ -194,7 +194,7 @@ return _originalFetch.apply(this, args);
       <div id="manageHistoryModalContent" onclick="event.stopPropagation()">
         <div class="modal-header">
           <h3>Manage History</h3>
-          <button onclick="closeManageHistoryModal()">x</button>
+          <button onclick="closeManageHistoryModal()">❌</button>
         </div>
         <div id="manageHistorySearchContainer">
           <input type="text" id="manageHistorySearch" placeholder="Search prompts..." />
@@ -212,11 +212,11 @@ return _originalFetch.apply(this, args);
       <div id="galleryModalContent" onclick="event.stopPropagation()">
         <div class="modal-header">
           <h3>Gallery</h3>
-          <button onclick="closeGalleryModal()">x</button>
+          <button onclick="closeGalleryModal()">❌</button>
         </div>
         <div id="galleryControls">
           <input type="text" id="gallerySearch" placeholder="Search prompts & seeds..." />
-          <button onclick="toggleGallerySort()" id="gallerySortBtn">Newest First</button>
+          <button onclick="toggleGallerySort()" id="gallerySortBtn">⬇</button>
           <button onclick="toggleGallerySelectMode()" id="gallerySelectModeBtn">Select</button>
           <button onclick="showDeleteConfirmation()" id="galleryDeleteSelectedBtn" disabled>Delete Selected</button>
           <span id="galleryCount"></span>
@@ -234,7 +234,7 @@ return _originalFetch.apply(this, args);
       <div id="deleteConfirmContent" onclick="event.stopPropagation()">
         <div class="modal-header">
           <h3>Delete Images</h3>
-          <button onclick="closeDeleteConfirmModal()">x</button>
+          <button onclick="closeDeleteConfirmModal()">❌</button>
         </div>
         <div id="deleteConfirmMessage">
           <p>Are you sure you want to delete <span id="deleteConfirmCount">0</span> selected image(s)?</p>
@@ -251,7 +251,7 @@ return _originalFetch.apply(this, args);
       <div id="historyDeleteConfirmContent" onclick="event.stopPropagation()">
         <div class="modal-header">
           <h3>Delete History</h3>
-          <button onclick="closeHistoryDeleteConfirmModal()">x</button>
+          <button onclick="closeHistoryDeleteConfirmModal()">❌</button>
         </div>
         <div id="historyDeleteConfirmMessage">
           <p>Are you sure you want to delete <span id="historyDeleteConfirmCount">0</span> selected history entry(s)?</p>
@@ -440,7 +440,7 @@ return _originalFetch.apply(this, args);
       let gallerySelectMode = false;
       let selectedGalleryIds = new Set();
       let galleryCurrentImage = null; // For info modal when opened from gallery
-      let gallerySortDesc = true; // true = newest first, false = oldest first
+      let gallerySortDesc = true; // true = newest first (⬇), false = oldest first (⬆)
       let gallerySearchQuery = "";
       let galleryDebounceTimer = null;
       let galleryTotalCountFiltered = 0;
@@ -1594,7 +1594,7 @@ return _originalFetch.apply(this, args);
                     <button class="${starClass}" onclick="toggleBookmark(${item.id})">${starIcon}</button>
                     <span class="history-prompt">${escapeHtml(item.prompt)}</span>
                     ${metaHtml}
-                    <button class="history-delete" onclick="deletePrompt(${item.id})">x</button>
+                    <button class="history-delete" onclick="deletePrompt(${item.id})">❌</button>
                   `;
             const checkbox = div.querySelector('.history-checkbox');
             checkbox.addEventListener("change", (e) => {
@@ -2004,7 +2004,7 @@ return _originalFetch.apply(this, args);
                     <button class="${starClass}" onclick="return false;">${starIcon}</button>
                     <span class="history-prompt">${escapeHtml(item.prompt)}</span>
                     ${metaHtml}
-                    <button class="history-delete" onclick="deletePrompt(${item.id})">x</button>
+                    <button class="history-delete" onclick="deletePrompt(${item.id})">❌</button>
                   `;
 
             const checkbox = div.querySelector('input[type="checkbox"]');
@@ -2346,7 +2346,7 @@ return _originalFetch.apply(this, args);
 
       window.toggleGallerySort = async function () {
         gallerySortDesc = !gallerySortDesc;
-        el.gallerySortBtn.textContent = gallerySortDesc ? "Newest First" : "Oldest First";
+        el.gallerySortBtn.textContent = gallerySortDesc ? "⬇" : "⬆";
         galleryOffset = 0;
         await loadGallery(false);
       };
