@@ -177,6 +177,11 @@ return _originalFetch.apply(this, args);
           <button onclick="importHistory()" id="importHistoryBtn">🔻</button>
           <input type="file" id="historyImportFile" accept=".json" style="display: none;" />
         </div>
+        <div id="historyControlsContainer">
+          <input type="checkbox" id="selectAllHistory" />
+          <span>Select All</span>
+          <button onclick="showHistoryDeleteConfirmation()" id="deleteHistorySelectedBtn" disabled>Delete Selected</button>
+        </div>
         <div id="historyList"></div>
         <button id="loadMoreBtn" style="display: none">Load More</button>
         <div class="modal-footer">
@@ -238,6 +243,23 @@ return _originalFetch.apply(this, args);
         <div id="deleteConfirmActions">
           <button onclick="closeDeleteConfirmModal()" id="deleteConfirmCancelBtn">Cancel</button>
           <button onclick="confirmDeleteGalleryImages()" id="deleteConfirmDeleteBtn">Delete</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="historyDeleteConfirmModal" class="modal">
+      <div id="historyDeleteConfirmContent" onclick="event.stopPropagation()">
+        <div class="modal-header">
+          <h3>Delete History</h3>
+          <button onclick="closeHistoryDeleteConfirmModal()">x</button>
+        </div>
+        <div id="historyDeleteConfirmMessage">
+          <p>Are you sure you want to delete <span id="historyDeleteConfirmCount">0</span> selected history entry(s)?</p>
+          <p style="font-size: 12px; color: #f85149;">This action cannot be undone.</p>
+        </div>
+        <div id="historyDeleteConfirmActions">
+          <button onclick="closeHistoryDeleteConfirmModal()" id="historyDeleteConfirmCancelBtn">Cancel</button>
+          <button onclick="confirmDeleteHistoryEntries()" id="historyDeleteConfirmDeleteBtn">Delete</button>
         </div>
       </div>
     </div>
@@ -348,6 +370,8 @@ return _originalFetch.apply(this, args);
         importHistoryBtn: document.getElementById("importHistoryBtn"),
         historyImportFile: document.getElementById("historyImportFile"),
         historyCount: document.getElementById("historyCount"),
+        selectAllHistory: document.getElementById("selectAllHistory"),
+        deleteHistorySelectedBtn: document.getElementById("deleteHistorySelectedBtn"),
         loadMoreBtn: document.getElementById("loadMoreBtn"),
         manageHistoryModal: document.getElementById("manageHistoryModal"),
         manageHistoryModalContent: document.getElementById("manageHistoryModalContent"),
@@ -1627,6 +1651,7 @@ return _originalFetch.apply(this, args);
       window.closeHistoryModal = function () {
         el.historyModal.style.display = "none";
         document.body.classList.remove("modal-open");
+        document.getElementById("historyDeleteConfirmModal").style.display = "none";
       };
 
       el.historyModal.addEventListener("click", (e) => {
@@ -1718,6 +1743,7 @@ return _originalFetch.apply(this, args);
 
       function updateHistoryExportBtn() {
         el.exportHistoryBtn.disabled = selectedHistoryIds.size === 0;
+        el.deleteHistorySelectedBtn.disabled = selectedHistoryIds.size === 0;
         updateHistoryCount();
       }
 
@@ -1725,6 +1751,57 @@ return _originalFetch.apply(this, args);
         const total = await db?.prompts.count() || 0;
         el.historyCount.textContent = `${selectedHistoryIds.size} of ${total} selected (${historyLoadedCount} loaded)`;
       }
+
+      el.selectAllHistory.addEventListener("change", (e) => {
+        const checkboxes = el.historyList.querySelectorAll(".history-checkbox");
+        checkboxes.forEach((cb) => {
+          cb.checked = e.target.checked;
+          const id = parseInt(cb.dataset.id, 10);
+          if (e.target.checked) {
+            selectedHistoryIds.add(id);
+            cb.closest(".history-item").classList.add("selected");
+          } else {
+            selectedHistoryIds.delete(id);
+            cb.closest(".history-item").classList.remove("selected");
+          }
+        });
+        updateHistoryExportBtn();
+      });
+
+      window.showHistoryDeleteConfirmation = function () {
+        if (selectedHistoryIds.size === 0) return;
+        document.getElementById("historyDeleteConfirmCount").textContent = selectedHistoryIds.size;
+        document.getElementById("historyDeleteConfirmModal").style.display = "flex";
+        document.body.classList.add("modal-open");
+      };
+
+      window.closeHistoryDeleteConfirmModal = function () {
+        document.getElementById("historyDeleteConfirmModal").style.display = "none";
+        document.body.classList.remove("modal-open");
+      };
+
+      document.getElementById("historyDeleteConfirmModal").addEventListener("click", (e) => {
+        if (e.target === document.getElementById("historyDeleteConfirmModal")) {
+          closeHistoryDeleteConfirmModal();
+        }
+      });
+
+      window.confirmDeleteHistoryEntries = async function () {
+        if (!db || selectedHistoryIds.size === 0) return;
+        try {
+          for (const id of selectedHistoryIds) {
+            await db.prompts.delete(id);
+          }
+          selectedHistoryIds.clear();
+          el.selectAllHistory.checked = false;
+          historyOffset = 0;
+          historyLoadedCount = 0;
+          await loadHistory(false);
+          closeHistoryDeleteConfirmModal();
+        } catch (e) {
+          console.warn("Failed to delete history entries:", e);
+        }
+      };
 
       window.exportSelectedHistory = async function () {
         if (!db || selectedHistoryIds.size === 0) return;
@@ -3519,7 +3596,8 @@ return _originalFetch.apply(this, args);
       #historyModal,
       #manageHistoryModal,
       #galleryModal,
-      #deleteConfirmModal {
+      #deleteConfirmModal,
+      #historyDeleteConfirmModal {
         position: fixed;
         top: 0;
         left: 0;
@@ -3535,7 +3613,8 @@ return _originalFetch.apply(this, args);
       #historyModalContent,
       #manageHistoryModalContent,
       #galleryModalContent,
-      #deleteConfirmContent {
+      #deleteConfirmContent,
+      #historyDeleteConfirmContent {
         background: #161b22;
         border: 1px solid #30363d;
         border-radius: 12px;
@@ -3544,6 +3623,50 @@ return _originalFetch.apply(this, args);
         max-height: 90vh;
         display: flex;
         flex-direction: column;
+      }
+
+      #historyDeleteConfirmContent {
+        max-width: 400px;
+        padding: 20px;
+      }
+
+      #historyDeleteConfirmMessage p {
+        margin: 12px 0;
+        color: #c9d1d9;
+        font-size: 14px;
+      }
+
+      #historyDeleteConfirmActions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+        margin-top: 16px;
+      }
+
+      #historyDeleteConfirmCancelBtn {
+        padding: 8px 16px;
+        background: #21262d;
+        border: 1px solid #30363d;
+        border-radius: 6px;
+        color: #c9d1d9;
+        cursor: pointer;
+      }
+
+      #historyDeleteConfirmCancelBtn:hover {
+        background: #30363d;
+      }
+
+      #historyDeleteConfirmDeleteBtn {
+        padding: 8px 16px;
+        background: #da3633;
+        border: 1px solid #da3633;
+        border-radius: 6px;
+        color: #fff;
+        cursor: pointer;
+      }
+
+      #historyDeleteConfirmDeleteBtn:hover {
+        background: #f85149;
       }
 
       .modal-header {
@@ -3573,10 +3696,41 @@ return _originalFetch.apply(this, args);
       }
 
       #historySearchContainer,
+      #historyControlsContainer,
       #manageHistorySearchContainer,
       #galleryControls {
         padding: 8px 12px;
         border-bottom: 1px solid #30363d;
+      }
+
+      #historyControlsContainer {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      #historyControlsContainer span {
+        font-size: 13px;
+        color: #c9d1d9;
+      }
+
+      #deleteHistorySelectedBtn {
+        padding: 6px 12px;
+        background: #da3633;
+        border: 1px solid #da3633;
+        border-radius: 6px;
+        color: #fff;
+        cursor: pointer;
+        margin-left: auto;
+      }
+
+      #deleteHistorySelectedBtn:hover {
+        background: #f85149;
+      }
+
+      #deleteHistorySelectedBtn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
       }
 
       #historySearch,
