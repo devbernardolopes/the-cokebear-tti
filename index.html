@@ -224,8 +224,8 @@ return _originalFetch.apply(this, args);
         <!-- <div id="galleryFavoritesHeader" class="gallery-section-header" style="display: none;">
           <span>Favorites</span>
         </div> -->
-        <div id="galleryFavoritesList" class="gallery-grid"></div>
-        <div id="galleryList" class="gallery-grid"></div>
+        <div id="galleryFavoritesList"></div>
+        <div id="galleryList"></div>
         <button id="galleryLoadMoreBtn" style="display: none">Load More</button>
       </div>
     </div>
@@ -3696,6 +3696,12 @@ return _originalFetch.apply(this, args);
       #historyDeleteConfirmDeleteBtn:hover {
         background: #f85149;
       }
+/* 
+      .gallery-grid-favorites {
+        display: flex;
+        grid-auto-flow: dense;
+        flex-direction: row;
+      } */
 
       .modal-header {
         display: flex;
