@@ -1652,6 +1652,8 @@ return _originalFetch.apply(this, args);
         el.historyModal.style.display = "none";
         document.body.classList.remove("modal-open");
         document.getElementById("historyDeleteConfirmModal").style.display = "none";
+        el.selectAllHistory.checked = false;
+        selectedHistoryIds.clear();
       };
 
       el.historyModal.addEventListener("click", (e) => {
