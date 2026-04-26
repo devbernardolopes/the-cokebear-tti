@@ -1876,18 +1876,66 @@ return _originalFetch.apply(this, args);
           el.promptGeneratorList.innerHTML = '<div class="prompt-pieces-empty">No prompt pieces yet</div>';
           return;
         }
-        promptPieces.forEach((piece) => {
+
+        const savedOrder = JSON.parse(localStorage.getItem("promptGenOrder") || "null");
+        let orderedPieces = promptPieces;
+        if (savedOrder) {
+          orderedPieces = promptPieces.slice().sort((a, b) => {
+            const idxA = savedOrder.indexOf(a.key);
+            const idxB = savedOrder.indexOf(b.key);
+            if (idxA === -1 && idxB === -1) return 0;
+            if (idxA === -1) return 1;
+            if (idxB === -1) return -1;
+            return idxA - idxB;
+          });
+        }
+
+        orderedPieces.forEach((piece) => {
           const pieceKey = piece.key.replace("promptPiece_", "");
           const pieceData = piece.value || "";
           const values = pieceData.split(/[;|]/).map((v) => v.trim()).filter((v) => v);
 
           const row = document.createElement("div");
           row.className = "prompt-generator-row";
+          row.draggable = true;
+          row.dataset.key = piece.key;
 
           const collapsedKeys = JSON.parse(localStorage.getItem("promptGenCollapsed") || "{}");
           if (collapsedKeys[pieceKey]) {
             row.classList.add("collapsed");
           }
+
+          const dragHandle = document.createElement("span");
+          dragHandle.className = "prompt-gen-drag-handle";
+          dragHandle.textContent = "⋮⋮";
+          dragHandle.addEventListener("mousedown", (e) => {
+            e.preventDefault();
+          });
+
+          row.addEventListener("dragstart", (e) => {
+            row.classList.add("dragging");
+            e.dataTransfer.effectAllowed = "move";
+          });
+
+          row.addEventListener("dragend", () => {
+            row.classList.remove("dragging");
+            const newOrder = Array.from(el.promptGeneratorList.querySelectorAll(".prompt-generator-row")).map((r) => r.dataset.key);
+            localStorage.setItem("promptGenOrder", JSON.stringify(newOrder));
+          });
+
+          row.addEventListener("dragover", (e) => {
+            e.preventDefault();
+            const dragging = el.promptGeneratorList.querySelector(".dragging");
+            if (dragging && dragging !== row) {
+              const rect = row.getBoundingClientRect();
+              const midY = rect.top + rect.height / 2;
+              if (e.clientY < midY) {
+                row.parentNode.insertBefore(dragging, row);
+              } else {
+                row.parentNode.insertBefore(dragging, row.nextSibling);
+              }
+            }
+          });
 
           const nameSpan = document.createElement("span");
           nameSpan.className = "prompt-generator-name";
@@ -1914,6 +1962,7 @@ return _originalFetch.apply(this, args);
             valuesContainer.appendChild(btn);
           });
 
+          row.appendChild(dragHandle);
           row.appendChild(nameSpan);
           row.appendChild(valuesContainer);
           el.promptGeneratorList.appendChild(row);
@@ -5052,6 +5101,23 @@ return _originalFetch.apply(this, args);
         padding: 8px 12px;
         background: #21262d;
         border-radius: 6px;
+      }
+
+      .prompt-gen-drag-handle {
+        cursor: grab;
+        color: #8b949e;
+        font-size: 14px;
+        user-select: none;
+        padding: 2px 4px;
+      }
+
+      .prompt-gen-drag-handle:active {
+        cursor: grabbing;
+      }
+
+      .prompt-generator-row.dragging {
+        opacity: 0.5;
+        background: #30363d;
       }
 
       .prompt-generator-name {
