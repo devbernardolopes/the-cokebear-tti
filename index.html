@@ -1980,12 +1980,6 @@ return _originalFetch.apply(this, args);
           nameSpan.className = "prompt-generator-name";
           nameSpan.textContent = pieceKey;
           nameSpan.insertAdjacentHTML("beforeend", ' <span class="prompt-gen-chevron">▾</span>');
-          nameSpan.addEventListener("click", () => {
-            row.classList.toggle("collapsed");
-            const collapsedKeys = JSON.parse(localStorage.getItem("promptGenCollapsed") || "{}");
-            collapsedKeys[pieceKey] = row.classList.contains("collapsed");
-            localStorage.setItem("promptGenCollapsed", JSON.stringify(collapsedKeys));
-          });
 
           const valuesContainer = document.createElement("div");
           valuesContainer.className = "prompt-generator-values";
@@ -2008,10 +2002,18 @@ return _originalFetch.apply(this, args);
             valuesContainer.appendChild(btn);
           });
 
-          row.appendChild(dragHandle);
+row.appendChild(dragHandle);
           row.appendChild(nameSpan);
           row.appendChild(valuesContainer);
-          updateNameColor(row, selectedForKey.length > 0);
+
+          row.addEventListener("click", (e) => {
+            if (e.target.closest(".prompt-gen-drag-handle") || e.target.closest(".prompt-generator-toggle")) return;
+            row.classList.toggle("collapsed");
+            const collapsedKeys = JSON.parse(localStorage.getItem("promptGenCollapsed") || "{}");
+            collapsedKeys[pieceKey] = row.classList.contains("collapsed");
+            localStorage.setItem("promptGenCollapsed", JSON.stringify(collapsedKeys));
+          });
+
           el.promptGeneratorList.appendChild(row);
         });
       }
