@@ -1871,14 +1871,30 @@ return _originalFetch.apply(this, args);
         const savedSelections = JSON.parse(localStorage.getItem("promptGenSelections") || "{}");
         const currentKeys = new Set(promptPieces.map((p) => p.key));
         let changed = false;
+        const newSelections = {};
         for (const key of Object.keys(savedSelections)) {
           if (!currentKeys.has(key)) {
-            delete savedSelections[key];
+            changed = true;
+            continue;
+          }
+          const piece = promptPieces.find((p) => p.key === key);
+          if (!piece) {
+            changed = true;
+            continue;
+          }
+          const currentValues = (piece.value || "").split(/[;|]/).map((v) => v.trim()).filter((v) => v);
+          const validSelections = savedSelections[key].filter((v) => currentValues.includes(v));
+          if (validSelections.length > 0) {
+            newSelections[key] = validSelections;
+            if (validSelections.length !== savedSelections[key].length) {
+              changed = true;
+            }
+          } else {
             changed = true;
           }
         }
         if (changed) {
-          localStorage.setItem("promptGenSelections", JSON.stringify(savedSelections));
+          localStorage.setItem("promptGenSelections", JSON.stringify(newSelections));
         }
       }
 
@@ -1903,6 +1919,7 @@ return _originalFetch.apply(this, args);
         } catch (e) {
           console.warn("Failed to load prompt pieces:", e);
           promptPieces = [];
+          cleanPromptGenSelections();
           renderPromptGenerator();
         }
         el.promptGeneratorModal.style.display = "flex";
