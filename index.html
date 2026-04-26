@@ -43,6 +43,7 @@ return _originalFetch.apply(this, args);
           <p>
             <b>Shortcuts:</b><br />
             • <b>Ctrl+Shift+S</b>: Toggle Scratchpad<br />
+            • <b>Ctrl+Shift+P</b>: Toggle Prompt Pieces<br />
             • <b>Ctrl+Shift+H</b>: Toggle History<br />
             • <b>Ctrl+Shift+E</b>: Auto-adjust prompt height<br />
             • <b>Ctrl+Shift+Q</b>: Cancel generation (when enabled)<br />
@@ -57,6 +58,7 @@ return _originalFetch.apply(this, args);
         <button id="toggleInfoBtn" style="display: none;">ℹ</button>
 
         <button onclick="toggleScratchpad()" id="scratchpadBtn" class="scratchpad-toggle">📄</button>
+        <button onclick="togglePromptPieces()" id="promptPiecesBtn" class="scratchpad-toggle">🖥</button>
         <button onclick="toggleHistory()" id="historyBtn">⌛</button>
         <!-- <button onclick="openManageHistoryModal()" id="manageHistoryBtn">⌛⚙</button> -->
         <button onclick="openGallery()" id="galleryBtn" class="gallery-toggle">🎥</button>
@@ -281,6 +283,56 @@ return _originalFetch.apply(this, args);
       </div>
     </div>
 
+    <div id="promptPiecesModal" class="modal">
+      <div id="promptPiecesModalContent" onclick="event.stopPropagation()">
+        <div class="modal-header">
+          <h3>Prompt Pieces</h3>
+          <button onclick="closePromptPiecesModal()">❌</button>
+        </div>
+        <div id="promptPiecesControlsContainer">
+          <button onclick="openAddPromptPieceModal()" id="addPromptPieceBtn">ADD</button>
+          <input type="checkbox" id="selectAllPromptPieces" />
+          <span>Select All</span>
+          <button onclick="showPromptPiecesDeleteConfirmation()" id="deletePromptPiecesSelectedBtn" disabled>💥</button>
+        </div>
+        <div id="promptPiecesList"></div>
+      </div>
+    </div>
+
+    <div id="addPromptPieceModal" class="modal">
+      <div id="addPromptPieceModalContent" onclick="event.stopPropagation()">
+        <div class="modal-header">
+          <h3>Add Prompt Piece</h3>
+          <button onclick="closeAddPromptPieceModal()">❌</button>
+        </div>
+        <div id="addPromptPieceForm">
+          <input type="text" id="promptPieceName" placeholder="Piece name" />
+          <textarea id="promptPieceContent" placeholder="Content (separate by semicolon)"></textarea>
+        </div>
+        <div id="addPromptPieceActions">
+          <button onclick="closeAddPromptPieceModal()" id="addPromptPieceCancelBtn">CANCEL</button>
+          <button onclick="savePromptPiece()" id="addPromptPieceSaveBtn">SAVE</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="promptPiecesDeleteConfirmModal" class="modal">
+      <div id="promptPiecesDeleteConfirmContent" onclick="event.stopPropagation()">
+        <div class="modal-header">
+          <h3>Delete Prompt Pieces</h3>
+          <button onclick="closePromptPiecesDeleteConfirmModal()">❌</button>
+        </div>
+        <div id="promptPiecesDeleteConfirmMessage">
+          <p>Are you sure you want to delete <span id="promptPiecesDeleteConfirmCount">0</span> selected piece(s)?</p>
+          <p style="font-size: 12px; color: #f85149;">This action cannot be undone.</p>
+        </div>
+        <div id="promptPiecesDeleteConfirmActions">
+          <button onclick="closePromptPiecesDeleteConfirmModal()" id="promptPiecesDeleteConfirmCancelBtn">Cancel</button>
+          <button onclick="confirmDeletePromptPieces()" id="promptPiecesDeleteConfirmDeleteBtn">Delete</button>
+        </div>
+      </div>
+    </div>
+
     <!-- <div id="loading">Generating images...</div> -->
     <div id="error"></div>
     <div id="mosaic"></div>
@@ -453,6 +505,17 @@ return _originalFetch.apply(this, args);
         generateBtn: document.getElementById("generateBtn"),
         cancelGenBtn: document.getElementById("cancelGenBtn"),
         enterToSend: document.getElementById("enterToSend"),
+        promptPiecesModal: document.getElementById("promptPiecesModal"),
+        promptPiecesModalContent: document.getElementById("promptPiecesModalContent"),
+        promptPiecesList: document.getElementById("promptPiecesList"),
+        promptPiecesBtn: document.getElementById("promptPiecesBtn"),
+        selectAllPromptPieces: document.getElementById("selectAllPromptPieces"),
+        deletePromptPiecesSelectedBtn: document.getElementById("deletePromptPiecesSelectedBtn"),
+        addPromptPieceBtn: document.getElementById("addPromptPieceBtn"),
+        addPromptPieceModal: document.getElementById("addPromptPieceModal"),
+        promptPieceName: document.getElementById("promptPieceName"),
+        promptPieceContent: document.getElementById("promptPieceContent"),
+        promptPiecesDeleteConfirmModal: document.getElementById("promptPiecesDeleteConfirmModal"),
       };
 
       // Track generated images for batch download
@@ -495,6 +558,10 @@ return _originalFetch.apply(this, args);
       let galleryTotalCountFiltered = 0;
       let galleryFavorites = [];
       let galleryFavoritesTotalCount = 0;
+
+      // Prompt pieces state
+      let promptPieces = [];
+      let selectedPromptPiecesIds = new Set();
 
       window.fetch = async function (...args) {
         const url = typeof args[0] === "string" ? args[0] : args[0]?.url;
@@ -1232,6 +1299,11 @@ return _originalFetch.apply(this, args);
           e.preventDefault();
           toggleScratchpad();
         }
+        // Ctrl+Shift+P for prompt pieces
+        if (e.ctrlKey && e.shiftKey && key === "P") {
+          e.preventDefault();
+          togglePromptPieces();
+        }
         // Ctrl+Shift+H for history
         if (e.ctrlKey && e.shiftKey && key === "H") {
           e.preventDefault();
@@ -1716,6 +1788,204 @@ return _originalFetch.apply(this, args);
       el.historyModal.style.display = "none";
       el.manageHistoryModal.style.display = "none";
       el.galleryModal.style.display = "none";
+      el.promptPiecesModal.style.display = "none";
+      el.addPromptPieceModal.style.display = "none";
+      el.promptPiecesDeleteConfirmModal.style.display = "none";
+
+      // Prompt pieces functions
+      window.togglePromptPieces = async function () {
+        if (el.promptPiecesModal.style.display === "none") {
+          selectedPromptPiecesIds.clear();
+          el.selectAllPromptPieces.checked = false;
+          await loadPromptPieces();
+          el.promptPiecesModal.style.display = "flex";
+          el.promptPiecesModal.style.alignItems = "center";
+          el.promptPiecesModal.style.justifyContent = "center";
+          document.body.classList.add("modal-open");
+          updatePromptPiecesButtons();
+        } else {
+          el.promptPiecesModal.style.display = "none";
+          document.body.classList.remove("modal-open");
+        }
+      };
+
+      window.closePromptPiecesModal = function () {
+        el.promptPiecesModal.style.display = "none";
+        document.body.classList.remove("modal-open");
+        document.getElementById("promptPiecesDeleteConfirmModal").style.display = "none";
+        el.selectAllPromptPieces.checked = false;
+        selectedPromptPiecesIds.clear();
+      };
+
+      el.promptPiecesModal.addEventListener("click", (e) => {
+        if (e.target === el.promptPiecesModal) {
+          closePromptPiecesModal();
+        }
+      });
+
+      async function loadPromptPieces() {
+        try {
+          const pieces = await db.settings.where("key").startsWith("promptPiece_").toArray();
+          promptPieces = pieces.sort((a, b) => b.timestamp - a.timestamp);
+          renderPromptPieces();
+        } catch (e) {
+          console.warn("Failed to load prompt pieces:", e);
+          promptPieces = [];
+          renderPromptPieces();
+        }
+      }
+
+      function renderPromptPieces() {
+        el.promptPiecesList.innerHTML = "";
+        if (promptPieces.length === 0) {
+          el.promptPiecesList.innerHTML = '<div class="prompt-pieces-empty">No prompt pieces yet</div>';
+          return;
+        }
+        promptPieces.forEach((piece) => {
+          const div = document.createElement("div");
+          div.className = "prompt-piece-item";
+          div.dataset.id = piece.id;
+          const isChecked = selectedPromptPiecesIds.has(piece.id) ? "checked" : "";
+          const pieceKey = piece.key.replace("promptPiece_", "");
+          const pieceData = piece.value || "";
+          div.innerHTML = `
+            <input type="checkbox" class="prompt-piece-checkbox" data-id="${piece.id}" ${isChecked} />
+            <span class="prompt-piece-name" title="${escapeHtml(pieceKey)}">${escapeHtml(pieceKey)}</span>
+            <span class="prompt-piece-content" title="${escapeHtml(pieceData)}">${escapeHtml(pieceData)}</span>
+            <button class="prompt-piece-delete" onclick="deletePromptPiece(${piece.id})">❌</button>
+          `;
+          const checkbox = div.querySelector(".prompt-piece-checkbox");
+          checkbox.addEventListener("change", (e) => {
+            if (e.target.checked) {
+              selectedPromptPiecesIds.add(piece.id);
+              div.classList.add("selected");
+            } else {
+              selectedPromptPiecesIds.delete(piece.id);
+              div.classList.remove("selected");
+            }
+            updatePromptPiecesButtons();
+          });
+          if (checkbox.checked) {
+            div.classList.add("selected");
+          }
+          el.promptPiecesList.appendChild(div);
+        });
+        updatePromptPiecesButtons();
+      }
+
+      function updatePromptPiecesButtons() {
+        el.deletePromptPiecesSelectedBtn.disabled = selectedPromptPiecesIds.size === 0;
+      }
+
+      el.selectAllPromptPieces.addEventListener("change", (e) => {
+        const checkboxes = el.promptPiecesList.querySelectorAll(".prompt-piece-checkbox");
+        checkboxes.forEach((cb) => {
+          cb.checked = e.target.checked;
+          const id = parseInt(cb.dataset.id, 10);
+          if (e.target.checked) {
+            selectedPromptPiecesIds.add(id);
+            cb.closest(".prompt-piece-item").classList.add("selected");
+          } else {
+            selectedPromptPiecesIds.delete(id);
+            cb.closest(".prompt-piece-item").classList.remove("selected");
+          }
+        });
+        updatePromptPiecesButtons();
+      });
+
+      window.deletePromptPiece = async function (id) {
+        try {
+          const piece = await db.settings.get(id);
+          if (piece) {
+            await db.settings.delete(id);
+            await loadPromptPieces();
+          }
+        } catch (e) {
+          console.warn("Failed to delete prompt piece:", e);
+        }
+      };
+
+      window.openAddPromptPieceModal = function () {
+        el.promptPieceName.value = "";
+        el.promptPieceContent.value = "";
+        el.addPromptPieceModal.style.display = "flex";
+        document.body.classList.add("modal-open");
+        setTimeout(() => el.promptPieceName.focus(), 100);
+      };
+
+      window.closeAddPromptPieceModal = function () {
+        el.addPromptPieceModal.style.display = "none";
+        document.body.classList.remove("modal-open");
+      };
+
+      el.addPromptPieceModal.addEventListener("click", (e) => {
+        if (e.target === el.addPromptPieceModal) {
+          closeAddPromptPieceModal();
+        }
+      });
+
+      window.savePromptPiece = async function () {
+        const name = el.promptPieceName.value.trim();
+        const content = el.promptPieceContent.value.trim();
+        if (!name) {
+          alert("Please enter a name for the piece");
+          return;
+        }
+        if (!content) {
+          alert("Please enter content for the piece");
+          return;
+        }
+        // Check for duplicate name
+        const existingPiece = promptPieces.find((p) => p.key === "promptPiece_" + name);
+        if (existingPiece) {
+          alert("A piece with this name already exists");
+          return;
+        }
+        try {
+          await db.settings.put({
+            key: "promptPiece_" + name,
+            value: content,
+            timestamp: Date.now(),
+          });
+          closeAddPromptPieceModal();
+          await loadPromptPieces();
+        } catch (e) {
+          console.warn("Failed to save prompt piece:", e);
+        }
+      };
+
+      window.showPromptPiecesDeleteConfirmation = function () {
+        if (selectedPromptPiecesIds.size === 0) return;
+        document.getElementById("promptPiecesDeleteConfirmCount").textContent = selectedPromptPiecesIds.size;
+        el.promptPiecesDeleteConfirmModal.style.display = "flex";
+        document.body.classList.add("modal-open");
+      };
+
+      window.closePromptPiecesDeleteConfirmModal = function () {
+        el.promptPiecesDeleteConfirmModal.style.display = "none";
+        document.body.classList.remove("modal-open");
+      };
+
+      el.promptPiecesDeleteConfirmModal.addEventListener("click", (e) => {
+        if (e.target === el.promptPiecesDeleteConfirmModal) {
+          closePromptPiecesDeleteConfirmModal();
+        }
+      });
+
+      window.confirmDeletePromptPieces = async function () {
+        if (selectedPromptPiecesIds.size === 0) return;
+        try {
+          for (const id of selectedPromptPiecesIds) {
+            await db.settings.delete(id);
+          }
+          selectedPromptPiecesIds.clear();
+          el.selectAllPromptPieces.checked = false;
+          closePromptPiecesDeleteConfirmModal();
+          closePromptPiecesModal();
+        } catch (e) {
+          console.warn("Failed to delete prompt pieces:", e);
+        }
+      };
 
       window.usePrompt = async function (id) {
         if (!db) return;
@@ -3692,7 +3962,10 @@ return _originalFetch.apply(this, args);
       #manageHistoryModal,
       #galleryModal,
       #deleteConfirmModal,
-      #historyDeleteConfirmModal {
+      #historyDeleteConfirmModal,
+      #promptPiecesModal,
+      #addPromptPieceModal,
+      #promptPiecesDeleteConfirmModal {
         position: fixed;
         top: 0;
         left: 0;
@@ -4275,7 +4548,8 @@ return _originalFetch.apply(this, args);
 
       #historyList,
       #manageHistoryList,
-      #galleryList {
+      #galleryList,
+      #promptPiecesList {
         flex: 1;
         overflow-y: auto;
         padding: 8px 0;
@@ -4333,6 +4607,262 @@ return _originalFetch.apply(this, args);
         border-color: #30363d;
         color: #484f58;
         cursor: not-allowed;
+      }
+
+      #addPromptPieceBtn {
+        padding: 6px 12px;
+        background: #238636;
+        border: 1px solid #2ea043;
+        border-radius: 6px;
+        color: #fff;
+        cursor: pointer;
+      }
+
+      #addPromptPieceBtn:hover {
+        background: #2ea043;
+      }
+
+      #promptPiecesControlsContainer {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        border-bottom: 1px solid #30363d;
+      }
+
+      #promptPiecesControlsContainer span {
+        font-size: 13px;
+        color: #c9d1d9;
+      }
+
+      #deletePromptPiecesSelectedBtn {
+        padding: 6px 12px;
+        background: #da3633;
+        border: 1px solid #da3633;
+        border-radius: 6px;
+        color: #fff;
+        cursor: pointer;
+        margin-left: auto;
+      }
+
+      #deletePromptPiecesSelectedBtn:hover {
+        background: #f85149;
+      }
+
+      #deletePromptPiecesSelectedBtn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      #addPromptPieceModalContent,
+      #promptPiecesDeleteConfirmContent {
+        background: #161b22;
+        border: 1px solid #30363d;
+        border-radius: 12px;
+        padding: 20px;
+        width: 80%;
+        max-width: 400px;
+        display: flex;
+        flex-direction: column;
+      }
+
+      #promptPiecesModalContent {
+        background: #161b22;
+        border: 1px solid #30363d;
+        border-radius: 12px;
+        width: 80%;
+        max-width: 1300px;
+        max-height: 90vh;
+        display: flex;
+        flex-direction: column;
+      }
+
+      #addPromptPieceForm {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin: 16px 0;
+      }
+
+      #promptPieceName {
+        padding: 8px 12px;
+        background: #0d1117;
+        border: 1px solid #30363d;
+        border-radius: 6px;
+        color: #c9d1d9;
+        font-size: 14px;
+      }
+
+      #promptPieceName:focus {
+        outline: none;
+        border-color: #58a6ff;
+      }
+
+      #promptPieceContent {
+        padding: 8px 12px;
+        background: #0d1117;
+        border: 1px solid #30363d;
+        border-radius: 6px;
+        color: #c9d1d9;
+        font-size: 14px;
+        min-height: 100px;
+        resize: vertical;
+      }
+
+      #promptPieceContent:focus {
+        outline: none;
+        border-color: #58a6ff;
+      }
+
+      #addPromptPieceActions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+        margin-top: 8px;
+      }
+
+      #addPromptPieceCancelBtn {
+        padding: 8px 16px;
+        background: #21262d;
+        border: 1px solid #30363d;
+        border-radius: 6px;
+        color: #c9d1d9;
+        cursor: pointer;
+      }
+
+      #addPromptPieceCancelBtn:hover {
+        background: #30363d;
+      }
+
+      #addPromptPieceSaveBtn {
+        padding: 8px 16px;
+        background: #238636;
+        border: 1px solid #2ea043;
+        border-radius: 6px;
+        color: #fff;
+        cursor: pointer;
+      }
+
+      #addPromptPieceSaveBtn:hover {
+        background: #2ea043;
+      }
+
+      #promptPiecesDeleteConfirmMessage p {
+        margin: 12px 0;
+        color: #c9d1d9;
+        font-size: 14px;
+      }
+
+      #promptPiecesDeleteConfirmActions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+        margin-top: 16px;
+      }
+
+      #promptPiecesDeleteConfirmCancelBtn {
+        padding: 8px 16px;
+        background: #21262d;
+        border: 1px solid #30363d;
+        border-radius: 6px;
+        color: #c9d1d9;
+        cursor: pointer;
+      }
+
+      #promptPiecesDeleteConfirmCancelBtn:hover {
+        background: #30363d;
+      }
+
+      #promptPiecesDeleteConfirmDeleteBtn {
+        padding: 8px 16px;
+        background: #da3633;
+        border: 1px solid #da3633;
+        border-radius: 6px;
+        color: #fff;
+        cursor: pointer;
+      }
+
+      #promptPiecesDeleteConfirmDeleteBtn:hover {
+        background: #f85149;
+      }
+
+      .prompt-piece-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px;
+        background: #0d1117;
+        border: 1px solid #30363d;
+        border-radius: 4px;
+        margin-bottom: 6px;
+        cursor: pointer;
+        transition: background 0.2s ease;
+      }
+
+      .prompt-piece-item:hover {
+        background: #161b22;
+      }
+
+      #promptPiecesList .prompt-piece-item.selected {
+        background: #1f6feb20;
+        border-color: #388bfd;
+      }
+
+      .prompt-piece-name {
+        font-size: 13px;
+        font-weight: 600;
+        color: #58a6ff;
+        min-width: 100px;
+        max-width: 150px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .prompt-piece-content {
+        flex: 1;
+        font-size: 13px;
+        color: #c9d1d9;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .prompt-piece-delete {
+        background: #da3633;
+        border-color: #f85149;
+        padding: 4px 8px;
+        font-size: 12px;
+        min-width: auto;
+        cursor: pointer;
+      }
+
+      .prompt-piece-delete:hover {
+        background: #f85149;
+      }
+
+      .prompt-piece-checkbox {
+        cursor: pointer;
+        width: 16px;
+        height: 16px;
+      }
+
+      .prompt-pieces-empty {
+        text-align: center;
+        opacity: 0.5;
+        padding: 20px;
+        font-size: 13px;
+      }
+
+      #scratchpadBtn,
+      #promptPiecesBtn {
+        background: #6e40c9;
+        border-color: #8957e5;
+      }
+
+      #scratchpadBtn:hover,
+      #promptPiecesBtn:hover {
+        background: #8957e5;
       }
 
       .history-meta {
