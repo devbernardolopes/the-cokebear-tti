@@ -1844,10 +1844,48 @@ return _originalFetch.apply(this, args);
         selectedPromptPiecesIds.clear();
       };
 
+      function updateNameColor(row, hasSelected) {
+        const nameSpan = row.querySelector(".prompt-generator-name");
+        if (hasSelected) {
+          nameSpan.classList.add("has-selection");
+        } else {
+          nameSpan.classList.remove("has-selection");
+        }
+      }
+
+      function savePromptGenSelections() {
+        const rows = el.promptGeneratorList.querySelectorAll(".prompt-generator-row");
+        const selections = {};
+        rows.forEach((row) => {
+          const key = row.dataset.key;
+          const selectedBtns = row.querySelectorAll(".prompt-generator-toggle.selected");
+          const selectedValues = Array.from(selectedBtns).map((btn) => btn.textContent);
+          if (selectedValues.length > 0) {
+            selections[key] = selectedValues;
+          }
+        });
+        localStorage.setItem("promptGenSelections", JSON.stringify(selections));
+      }
+
+      function cleanPromptGenSelections() {
+        const savedSelections = JSON.parse(localStorage.getItem("promptGenSelections") || "{}");
+        const currentKeys = new Set(promptPieces.map((p) => p.key));
+        let changed = false;
+        for (const key of Object.keys(savedSelections)) {
+          if (!currentKeys.has(key)) {
+            delete savedSelections[key];
+            changed = true;
+          }
+        }
+        if (changed) {
+          localStorage.setItem("promptGenSelections", JSON.stringify(savedSelections));
+        }
+      }
+
       window.closePromptGeneratorModal = function () {
+        savePromptGenSelections();
         el.promptGeneratorModal.style.display = "none";
         document.body.classList.remove("modal-open");
-        document.querySelectorAll(".prompt-generator-toggle").forEach((btn) => btn.classList.remove("selected"));
       };
 
       el.promptGeneratorModal.addEventListener("click", (e) => {
@@ -1860,6 +1898,7 @@ return _originalFetch.apply(this, args);
         try {
           const pieces = await db.settings.where("key").startsWith("promptPiece_").toArray();
           promptPieces = pieces.sort((a, b) => b.timestamp - a.timestamp);
+          cleanPromptGenSelections();
           renderPromptGenerator();
         } catch (e) {
           console.warn("Failed to load prompt pieces:", e);
@@ -1952,12 +1991,19 @@ return _originalFetch.apply(this, args);
           valuesContainer.className = "prompt-generator-values";
           valuesContainer.dataset.pieceKey = pieceKey;
 
+          const savedSelections = JSON.parse(localStorage.getItem("promptGenSelections") || "{}");
+          const selectedForKey = savedSelections[piece.key] || [];
+
           values.forEach((value) => {
             const btn = document.createElement("button");
             btn.className = "prompt-generator-toggle";
             btn.textContent = value;
+            if (selectedForKey.includes(value)) {
+              btn.classList.add("selected");
+            }
             btn.addEventListener("click", () => {
               btn.classList.toggle("selected");
+              updateNameColor(row, row.querySelector(".prompt-generator-toggle.selected") !== null);
             });
             valuesContainer.appendChild(btn);
           });
@@ -1965,6 +2011,7 @@ return _originalFetch.apply(this, args);
           row.appendChild(dragHandle);
           row.appendChild(nameSpan);
           row.appendChild(valuesContainer);
+          updateNameColor(row, selectedForKey.length > 0);
           el.promptGeneratorList.appendChild(row);
         });
       }
@@ -2074,6 +2121,7 @@ return _originalFetch.apply(this, args);
         try {
           await db.settings.delete(piece.key);
           await loadPromptPieces();
+          cleanPromptGenSelections();
         } catch (e) {
           console.warn("Failed to delete prompt piece:", e);
         }
@@ -5127,6 +5175,10 @@ return _originalFetch.apply(this, args);
         font-size: 13px;
         padding-top: 4px;
         cursor: pointer;
+      }
+
+      .prompt-generator-name.has-selection {
+        color: #58a6ff;
       }
 
       .prompt-generator-row.collapsed .prompt-generator-values {
