@@ -1914,12 +1914,10 @@ return _originalFetch.apply(this, args);
         try {
           const pieces = await db.settings.where("key").startsWith("promptPiece_").toArray();
           promptPieces = pieces.sort((a, b) => b.timestamp - a.timestamp);
-          cleanPromptGenSelections();
           renderPromptGenerator();
         } catch (e) {
           console.warn("Failed to load prompt pieces:", e);
           promptPieces = [];
-          cleanPromptGenSelections();
           renderPromptGenerator();
         }
         el.promptGeneratorModal.style.display = "flex";
@@ -2014,12 +2012,17 @@ return _originalFetch.apply(this, args);
             }
             btn.addEventListener("click", () => {
               btn.classList.toggle("selected");
-              updateNameColor(row, row.querySelector(".prompt-generator-toggle.selected") !== null);
+              const nameSpan = row.querySelector(".prompt-generator-name");
+              if (row.querySelector(".prompt-generator-toggle.selected")) {
+                nameSpan.classList.add("has-selection");
+              } else {
+                nameSpan.classList.remove("has-selection");
+              }
             });
             valuesContainer.appendChild(btn);
           });
 
-row.appendChild(dragHandle);
+          row.appendChild(dragHandle);
           row.appendChild(nameSpan);
           row.appendChild(valuesContainer);
 
@@ -2032,6 +2035,16 @@ row.appendChild(dragHandle);
           });
 
           el.promptGeneratorList.appendChild(row);
+        });
+
+        el.promptGeneratorList.querySelectorAll(".prompt-generator-row").forEach((row) => {
+          const selectedBtns = row.querySelectorAll(".prompt-generator-toggle.selected");
+          const nameSpan = row.querySelector(".prompt-generator-name");
+          if (selectedBtns.length > 0) {
+            nameSpan.classList.add("has-selection");
+          } else {
+            nameSpan.classList.remove("has-selection");
+          }
         });
       }
 
