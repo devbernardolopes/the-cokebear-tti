@@ -530,6 +530,7 @@ return _originalFetch.apply(this, args);
         addPromptPieceBtn: document.getElementById("addPromptPieceBtn"),
         addPromptPieceModal: document.getElementById("addPromptPieceModal"),
         addPromptPieceModalTitle: document.getElementById("addPromptPieceModalTitle"),
+        addPromptPieceSaveBtn: document.getElementById("addPromptPieceSaveBtn"),
         promptPieceName: document.getElementById("promptPieceName"),
         promptPieceContent: document.getElementById("promptPieceContent"),
         promptPiecesDeleteConfirmModal: document.getElementById("promptPiecesDeleteConfirmModal"),
@@ -1886,6 +1887,10 @@ return _originalFetch.apply(this, args);
           const nameSpan = document.createElement("span");
           nameSpan.className = "prompt-generator-name";
           nameSpan.textContent = pieceKey;
+          nameSpan.insertAdjacentHTML("beforeend", ' <span class="prompt-gen-chevron">▾</span>');
+          nameSpan.addEventListener("click", () => {
+            row.classList.toggle("collapsed");
+          });
 
           const valuesContainer = document.createElement("div");
           valuesContainer.className = "prompt-generator-values";
@@ -5047,6 +5052,22 @@ return _originalFetch.apply(this, args);
         color: #c9d1d9;
         font-size: 13px;
         padding-top: 4px;
+        cursor: pointer;
+      }
+
+      .prompt-generator-row.collapsed .prompt-generator-values {
+        display: none;
+      }
+
+      .prompt-gen-chevron {
+        display: inline-block;
+        transition: transform 0.2s;
+        font-size: 12px;
+        margin-left: 4px;
+      }
+
+      .prompt-generator-row.collapsed .prompt-gen-chevron {
+        transform: rotate(-90deg);
       }
 
       .prompt-generator-values {
