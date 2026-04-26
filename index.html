@@ -1884,12 +1884,20 @@ return _originalFetch.apply(this, args);
           const row = document.createElement("div");
           row.className = "prompt-generator-row";
 
+          const collapsedKeys = JSON.parse(localStorage.getItem("promptGenCollapsed") || "{}");
+          if (collapsedKeys[pieceKey]) {
+            row.classList.add("collapsed");
+          }
+
           const nameSpan = document.createElement("span");
           nameSpan.className = "prompt-generator-name";
           nameSpan.textContent = pieceKey;
           nameSpan.insertAdjacentHTML("beforeend", ' <span class="prompt-gen-chevron">▾</span>');
           nameSpan.addEventListener("click", () => {
             row.classList.toggle("collapsed");
+            const collapsedKeys = JSON.parse(localStorage.getItem("promptGenCollapsed") || "{}");
+            collapsedKeys[pieceKey] = row.classList.contains("collapsed");
+            localStorage.setItem("promptGenCollapsed", JSON.stringify(collapsedKeys));
           });
 
           const valuesContainer = document.createElement("div");
@@ -1918,12 +1926,12 @@ return _originalFetch.apply(this, args);
 
         rows.forEach((row) => {
           const nameSpan = row.querySelector(".prompt-generator-name");
-          const pieceName = nameSpan.textContent;
+          const pieceName = nameSpan.firstChild.textContent;
           const selectedBtns = row.querySelectorAll(".prompt-generator-toggle.selected");
 
           if (selectedBtns.length > 0) {
             const selectedValues = Array.from(selectedBtns).map((btn) => btn.textContent);
-            promptLines.push(`${pieceName}: ${selectedValues.join("; ")}`);
+            promptLines.push(`${pieceName}: ${selectedValues.join("; ")}.`);
           }
         });
 
