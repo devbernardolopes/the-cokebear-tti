@@ -2481,7 +2481,6 @@ return _originalFetch.apply(this, args);
               .split(/[;|]/)
               .map((v) => v.trim())
               .filter((v) => v)
-              .map((v) => v.toLowerCase())
               .filter((v, idx, arr) => arr.indexOf(v) === idx)
               .join("; ");
             if (!cleanedValue) continue;
@@ -2533,7 +2532,6 @@ return _originalFetch.apply(this, args);
           .split(/[;|]/)
           .map((v) => v.trim())
           .filter((v) => v)
-          .map((v) => v.toLowerCase())
           .filter((v, i, arr) => arr.indexOf(v) === i)
           .join("; ");
         if (!name) {
