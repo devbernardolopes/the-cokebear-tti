@@ -778,17 +778,19 @@ return _originalFetch.apply(this, args);
         }
       });
 
+      function updateClearSeedBtn() {
+        el.clearSeedBtn.style.display = el.seed.value ? "block" : "none";
+      }
+
       el.clearSeedBtn.addEventListener("click", () => {
         el.seed.value = "";
-        el.clearSeedBtn.style.display = "none";
+        updateClearSeedBtn();
       });
 
-      el.seed.addEventListener("input", () => {
-        el.clearSeedBtn.style.display = el.seed.value ? "block" : "none";
-      });
+      el.seed.addEventListener("input", updateClearSeedBtn);
 
       // Set initial state
-      el.clearSeedBtn.style.display = el.seed.value ? "block" : "none";
+      updateClearSeedBtn();
 
       el.promptGeneratorBtn.addEventListener("click", () => {
         openPromptGeneratorModal();
@@ -2665,6 +2667,7 @@ return _originalFetch.apply(this, args);
               el.seed.value = "";
               el.seed.title = "";
             }
+            updateClearSeedBtn();
 
             closeHistoryModal();
           }
@@ -3516,6 +3519,7 @@ return _originalFetch.apply(this, args);
             if (item.seed !== undefined && item.seed !== null) {
               el.seed.value = item.seed;
             }
+            updateClearSeedBtn();
             if (item.resolution) {
               el.resolution.value = item.resolution;
             }
