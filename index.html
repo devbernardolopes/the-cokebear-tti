@@ -1504,6 +1504,20 @@ return _originalFetch.apply(this, args);
             settings: "key, value",
             gallery: "++id, timestamp, favorite",
           });
+          db.version(7).stores({
+            prompts: "++id, prompt, timestamp, bookmarked",
+            settings: "key, value",
+            gallery: "++id, timestamp, favorite",
+          }).upgrade(async (tx) => {
+            // Migration: Add createdAt to existing prompt pieces that don't have it
+            const settings = tx.table("settings");
+            const promptPieces = await settings.where("key").startsWith("promptPiece_").toArray();
+            for (const piece of promptPieces) {
+              if (!piece.createdAt) {
+                await settings.update(piece.key, { createdAt: piece.timestamp || Date.now() });
+              }
+            }
+          });
           await db.open();
 
           // Load last prompt text (even if not saved to history)
@@ -2083,7 +2097,8 @@ return _originalFetch.apply(this, args);
       async function openPromptGeneratorModal() {
         try {
           const pieces = await db.settings.where("key").startsWith("promptPiece_").toArray();
-          promptPieces = pieces.sort((a, b) => b.timestamp - a.timestamp);
+          // Sort by createdAt (original creation order), fallback to timestamp for older entries
+          promptPieces = pieces.sort((a, b) => (a.createdAt || a.timestamp) - (b.createdAt || b.timestamp));
           renderPromptGenerator();
         } catch (e) {
           console.warn("Failed to load prompt pieces:", e);
@@ -2092,34 +2107,6 @@ return _originalFetch.apply(this, args);
         }
         el.promptGeneratorModal.style.display = "flex";
         document.body.classList.add("modal-open");
-      }
-
-      window.toggleAllPromptGenEntries = function () {
-        const rows = el.promptGeneratorList.querySelectorAll(".prompt-generator-row");
-        if (rows.length === 0) return;
-        const firstRow = rows[0];
-        const isCollapsed = firstRow.classList.contains("collapsed");
-        const collapsedKeys = JSON.parse(localStorage.getItem("promptGenCollapsed") || "{}");
-        rows.forEach((row) => {
-          if (isCollapsed) {
-            row.classList.remove("collapsed");
-          } else {
-            row.classList.add("collapsed");
-          }
-          const pieceKey = row.querySelector(".prompt-generator-values").dataset.pieceKey;
-          collapsedKeys[pieceKey] = !isCollapsed;
-          const collapsedContentSpan = row.querySelector(".prompt-gen-collapsed-content");
-          if (collapsedContentSpan) {
-            if (!isCollapsed) {
-              const selectedBtns = row.querySelectorAll(".prompt-generator-toggle.selected");
-              const selectedValues = Array.from(selectedBtns).map((btn) => btn.textContent);
-              collapsedContentSpan.textContent = selectedValues.length > 0 ? `[${selectedValues.join(", ")}]` : "";
-            } else {
-              collapsedContentSpan.textContent = "";
-            }
-          }
-        });
-        localStorage.setItem("promptGenCollapsed", JSON.stringify(collapsedKeys));
       };
 
       function renderPromptGenerator() {
@@ -2375,82 +2362,13 @@ return _originalFetch.apply(this, args);
       async function loadPromptPieces() {
         try {
           const pieces = await db.settings.where("key").startsWith("promptPiece_").toArray();
-          promptPieces = pieces.sort((a, b) => b.timestamp - a.timestamp).map((p, i) => ({ ...p, id: i + 1 }));
+          // Sort by createdAt (original creation order), fallback to timestamp for older entries
+          promptPieces = pieces.sort((a, b) => (a.createdAt || a.timestamp) - (b.createdAt || b.timestamp)).map((p, i) => ({ ...p, id: i + 1 }));
           renderPromptPieces();
         } catch (e) {
           console.warn("Failed to load prompt pieces:", e);
           promptPieces = [];
           renderPromptPieces();
-        }
-      }
-
-      function renderPromptPieces() {
-        el.promptPiecesList.innerHTML = "";
-        if (promptPieces.length === 0) {
-          el.promptPiecesList.innerHTML = '<div class="prompt-pieces-empty">No prompt pieces yet</div>';
-          return;
-        }
-        promptPieces.forEach((piece) => {
-          const div = document.createElement("div");
-          div.className = "prompt-piece-item";
-          div.dataset.id = piece.id;
-          const isChecked = selectedPromptPiecesIds.has(piece.id) ? "checked" : "";
-          const pieceKey = piece.key.replace("promptPiece_", "");
-          const pieceData = piece.value || "";
-          div.innerHTML = `
-            <input type="checkbox" class="prompt-piece-checkbox" data-id="${piece.id}" ${isChecked} />
-            <span class="prompt-piece-name" onclick="editPromptPiece(${piece.id})" title="${escapeHtml(pieceKey)}">${escapeHtml(pieceKey)}</span>
-            <span class="prompt-piece-content" onclick="editPromptPiece(${piece.id})" title="${escapeHtml(pieceData)}">${escapeHtml(pieceData)}</span>
-            <button class="prompt-piece-delete" onclick="deletePromptPiece(${piece.id})">❌</button>
-          `;
-          const checkbox = div.querySelector(".prompt-piece-checkbox");
-          checkbox.addEventListener("change", (e) => {
-            if (e.target.checked) {
-              selectedPromptPiecesIds.add(piece.id);
-              div.classList.add("selected");
-            } else {
-              selectedPromptPiecesIds.delete(piece.id);
-              div.classList.remove("selected");
-            }
-            updatePromptPiecesButtons();
-          });
-          if (checkbox.checked) {
-            div.classList.add("selected");
-          }
-          el.promptPiecesList.appendChild(div);
-        });
-        updatePromptPiecesButtons();
-      }
-
-      function updatePromptPiecesButtons() {
-        el.deletePromptPiecesSelectedBtn.disabled = selectedPromptPiecesIds.size === 0;
-      }
-
-      el.selectAllPromptPieces.addEventListener("change", (e) => {
-        const checkboxes = el.promptPiecesList.querySelectorAll(".prompt-piece-checkbox");
-        checkboxes.forEach((cb) => {
-          cb.checked = e.target.checked;
-          const id = parseInt(cb.dataset.id, 10);
-          if (e.target.checked) {
-            selectedPromptPiecesIds.add(id);
-            cb.closest(".prompt-piece-item").classList.add("selected");
-          } else {
-            selectedPromptPiecesIds.delete(id);
-            cb.closest(".prompt-piece-item").classList.remove("selected");
-          }
-        });
-        updatePromptPiecesButtons();
-      });
-
-      window.deletePromptPiece = async function (id) {
-        const piece = promptPieces.find((p) => p.id === id);
-        if (!piece) return;
-        try {
-          await db.settings.delete(piece.key);
-          await loadPromptPieces();
-          cleanPromptGenSelections();
-        } catch (e) {
-          console.warn("Failed to delete prompt piece:", e);
         }
       };
 
@@ -2578,9 +2496,13 @@ return _originalFetch.apply(this, args);
           if (originalKey && originalKey !== newKey) {
             await db.settings.delete(originalKey);
           }
+          // Get existing piece to preserve createdAt timestamp
+          const existingPiece = promptPieces.find((p) => p.key === newKey);
+          const createdAt = existingPiece?.createdAt || Date.now();
           await db.settings.put({
             key: newKey,
             value: content,
+            createdAt: createdAt,
             timestamp: Date.now(),
           });
           editingPromptPieceId = null;
