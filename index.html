@@ -1954,6 +1954,8 @@ return _originalFetch.apply(this, args);
 
       window.closePromptGenSavedSetsModal = function () {
         el.promptGenSavedSetsModal.style.display = "none";
+        el.promptGenSavedSetDeleteConfirmModal.style.display = "none";
+        document.body.classList.remove("modal-open");
       };
 
       el.promptGenSavedSetsModal.addEventListener("click", (e) => {
@@ -1967,13 +1969,13 @@ return _originalFetch.apply(this, args);
       window.deletePromptGenSet = function (timestamp) {
         promptGenSavedSetToDelete = timestamp;
         el.promptGenSavedSetDeleteConfirmModal.style.display = "flex";
-        document.body.classList.add("modal-open");
+        // Don't toggle modal-open since parent modal is still open
       };
 
       window.closePromptGenSavedSetDeleteConfirmModal = function () {
         el.promptGenSavedSetDeleteConfirmModal.style.display = "none";
-        document.body.classList.remove("modal-open");
         promptGenSavedSetToDelete = null;
+        // Parent modal (promptGenSavedSetsModal) keeps modal-open class
       };
 
       el.promptGenSavedSetDeleteConfirmModal.addEventListener("click", (e) => {
@@ -4609,7 +4611,8 @@ return _originalFetch.apply(this, args);
       #addPromptPieceModal,
       #promptPiecesDeleteConfirmModal,
       #promptGeneratorModal,
-      #promptGenSavedSetsModal {
+      #promptGenSavedSetsModal,
+      #promptGenSavedSetDeleteConfirmModal {
         position: fixed;
         top: 0;
         left: 0;
@@ -4623,7 +4626,54 @@ return _originalFetch.apply(this, args);
       }
 
       #promptGenSavedSetDeleteConfirmModal {
-        z-index: 1100;
+        z-index: 1200;
+      }
+
+      #promptGenSavedSetDeleteConfirmContent {
+        background: #161b22;
+        border: 1px solid #30363d;
+        border-radius: 12px;
+        max-width: 400px;
+        padding: 20px;
+      }
+
+      #promptGenSavedSetDeleteConfirmMessage p {
+        margin: 12px 0;
+        color: #c9d1d9;
+        font-size: 14px;
+      }
+
+      #promptGenSavedSetDeleteConfirmActions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+        margin-top: 16px;
+      }
+
+      #promptGenSavedSetDeleteConfirmCancelBtn {
+        padding: 8px 16px;
+        background: #21262d;
+        border: 1px solid #30363d;
+        border-radius: 6px;
+        color: #c9d1d9;
+        cursor: pointer;
+      }
+
+      #promptGenSavedSetDeleteConfirmCancelBtn:hover {
+        background: #30363d;
+      }
+
+      #promptGenSavedSetDeleteConfirmDeleteBtn {
+        padding: 8px 16px;
+        background: #da3633;
+        border: 1px solid #da3633;
+        border-radius: 6px;
+        color: #fff;
+        cursor: pointer;
+      }
+
+      #promptGenSavedSetDeleteConfirmDeleteBtn:hover {
+        background: #f85149;
       }
 
       #historyModalContent,
