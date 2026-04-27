@@ -295,6 +295,9 @@ return _originalFetch.apply(this, args);
           <input type="checkbox" id="selectAllPromptPieces" />
           <span>Select All</span>
           <button onclick="showPromptPiecesDeleteConfirmation()" id="deletePromptPiecesSelectedBtn" disabled>💥</button>
+          <button onclick="exportPromptPieces()" id="exportPromptPiecesBtn">EXPORT</button>
+          <button onclick="importPromptPieces()" id="importPromptPiecesBtn">IMPORT</button>
+          <input type="file" id="promptPiecesImportFile" accept=".json" style="display: none;" />
         </div>
         <div id="promptPiecesList"></div>
       </div>
@@ -2332,6 +2335,72 @@ return _originalFetch.apply(this, args);
           console.warn("Failed to delete prompt piece:", e);
         }
       };
+
+      window.exportPromptPieces = async function () {
+        try {
+          const pieces = await db.settings.where("key").startsWith("promptPiece_").toArray();
+          const exportData = pieces.map((p) => ({
+            name: p.key.replace("promptPiece_", ""),
+            value: p.value,
+          }));
+          const dataStr = JSON.stringify(exportData, null, 2);
+          const blob = new Blob([dataStr], { type: "application/json" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `prompt-pieces-${new Date().toISOString().slice(0, 10)}.json`;
+          a.click();
+          URL.revokeObjectURL(url);
+        } catch (e) {
+          console.warn("Failed to export prompt pieces:", e);
+        }
+      };
+
+      window.importPromptPieces = function () {
+        document.getElementById("promptPiecesImportFile").click();
+      };
+
+      document.getElementById("promptPiecesImportFile").addEventListener("change", async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        try {
+          const text = await file.text();
+          const importData = JSON.parse(text);
+          if (!Array.isArray(importData)) {
+            alert("Invalid file format");
+            return;
+          }
+          const existingPieces = await db.settings.where("key").startsWith("promptPiece_").toArray();
+          const existingKeys = new Set(existingPieces.map((p) => p.key));
+          const timestamp = Date.now();
+          let importedCount = 0;
+          for (let i = 0; i < importData.length; i++) {
+            const item = importData[i];
+            if (!item.name || !item.value) continue;
+            const key = "promptPiece_" + item.name;
+            const cleanedValue = item.value
+              .split(/[;|]/)
+              .map((v) => v.trim())
+              .filter((v) => v)
+              .map((v) => v.toLowerCase())
+              .filter((v, idx, arr) => arr.indexOf(v) === idx)
+              .join("; ");
+            if (!cleanedValue) continue;
+            await db.settings.put({
+              key: key,
+              value: cleanedValue,
+              timestamp: timestamp + i,
+            });
+            importedCount++;
+          }
+          await loadPromptPieces();
+          alert(`Imported ${importedCount} prompt pieces!`);
+        } catch (err) {
+          console.warn("Failed to import prompt pieces:", err);
+          alert("Failed to import. Make sure it's a valid JSON file.");
+        }
+        e.target.value = "";
+      });
 
       window.openAddPromptPieceModal = function () {
         el.promptPieceName.value = "";
