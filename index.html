@@ -2041,9 +2041,9 @@ return _originalFetch.apply(this, args);
         const rows = el.promptGeneratorList.querySelectorAll(".prompt-generator-row");
         rows.forEach((row) => {
           const key = row.dataset.key;
-          const savedValues = selections[key] || [];
+          const savedValues = (selections[key] || []).map((v) => v.toLowerCase());
           row.querySelectorAll(".prompt-generator-toggle").forEach((btn) => {
-            if (savedValues.includes(btn.textContent)) {
+            if (savedValues.includes(btn.textContent.toLowerCase())) {
               btn.classList.add("selected");
             } else {
               btn.classList.remove("selected");
@@ -2051,7 +2051,8 @@ return _originalFetch.apply(this, args);
           });
           const collapsedContentSpan = row.querySelector(".prompt-gen-collapsed-content");
           if (collapsedContentSpan && row.classList.contains("collapsed") && savedValues.length > 0) {
-            collapsedContentSpan.textContent = `[${savedValues.join(", ")}]`;
+            const originalValues = selections[key] || [];
+            collapsedContentSpan.textContent = `[${originalValues.join(", ")}]`;
           }
         });
         el.promptGeneratorList.querySelectorAll(".prompt-generator-row").forEach((row) => {
@@ -2080,8 +2081,8 @@ return _originalFetch.apply(this, args);
             changed = true;
             continue;
           }
-          const currentValues = (piece.value || "").split(/[;|]/).map((v) => v.trim()).filter((v) => v);
-          const validSelections = savedSelections[key].filter((v) => currentValues.includes(v));
+          const currentValues = (piece.value || "").split(/[;|]/).map((v) => v.trim().toLowerCase()).filter((v) => v);
+          const validSelections = savedSelections[key].filter((v) => currentValues.includes(v.toLowerCase()));
           if (validSelections.length > 0) {
             newSelections[key] = validSelections;
             if (validSelections.length !== savedSelections[key].length) {
