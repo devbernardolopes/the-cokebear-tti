@@ -2372,6 +2372,75 @@ return _originalFetch.apply(this, args);
         }
       };
 
+      function renderPromptPieces() {
+        el.promptPiecesList.innerHTML = "";
+        if (promptPieces.length === 0) {
+          el.promptPiecesList.innerHTML = '<div class="prompt-pieces-empty">No prompt pieces yet</div>';
+          updatePromptPiecesButtons();
+          return;
+        }
+        promptPieces.forEach((piece) => {
+          const item = document.createElement("div");
+          item.className = "prompt-piece-item";
+          item.dataset.id = piece.id;
+          if (selectedPromptPiecesIds.has(piece.id)) {
+            item.classList.add("selected");
+          }
+          const checkbox = document.createElement("input");
+          checkbox.type = "checkbox";
+          checkbox.className = "prompt-piece-checkbox";
+          checkbox.checked = selectedPromptPiecesIds.has(piece.id);
+          checkbox.addEventListener("click", (e) => {
+            e.stopPropagation();
+            if (selectedPromptPiecesIds.has(piece.id)) {
+              selectedPromptPiecesIds.delete(piece.id);
+            } else {
+              selectedPromptPiecesIds.add(piece.id);
+            }
+            renderPromptPieces();
+          });
+          const nameSpan = document.createElement("span");
+          nameSpan.className = "prompt-piece-name";
+          nameSpan.textContent = piece.key.replace("promptPiece_", "");
+          nameSpan.addEventListener("click", () => {
+            window.editPromptPiece(piece.id);
+          });
+          const contentSpan = document.createElement("span");
+          contentSpan.className = "prompt-piece-content";
+          contentSpan.textContent = piece.value;
+          contentSpan.addEventListener("click", () => {
+            window.editPromptPiece(piece.id);
+          });
+          const deleteBtn = document.createElement("button");
+          deleteBtn.className = "prompt-piece-delete";
+          deleteBtn.textContent = "🗑";
+          deleteBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            selectedPromptPiecesIds.add(piece.id);
+            window.showPromptPiecesDeleteConfirmation();
+          });
+          item.appendChild(checkbox);
+          item.appendChild(nameSpan);
+          item.appendChild(contentSpan);
+          item.appendChild(deleteBtn);
+          item.addEventListener("click", () => {
+            if (selectedPromptPiecesIds.has(piece.id)) {
+              selectedPromptPiecesIds.delete(piece.id);
+            } else {
+              selectedPromptPiecesIds.add(piece.id);
+            }
+            renderPromptPieces();
+          });
+          el.promptPiecesList.appendChild(item);
+        });
+        updatePromptPiecesButtons();
+      };
+
+      function updatePromptPiecesButtons() {
+        el.deletePromptPiecesSelectedBtn.disabled = selectedPromptPiecesIds.size === 0;
+        el.selectAllPromptPieces.checked = promptPieces.length > 0 && selectedPromptPiecesIds.size === promptPieces.length;
+      };
+
       window.exportPromptPieces = async function () {
         try {
           const pieces = await db.settings.where("key").startsWith("promptPiece_").toArray();
