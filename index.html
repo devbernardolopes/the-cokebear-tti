@@ -338,6 +338,7 @@ return _originalFetch.apply(this, args);
       <div id="promptGeneratorModalContent" onclick="event.stopPropagation()">
         <div class="modal-header">
           <h3>Prompt Generator</h3>
+          <button onclick="toggleAllPromptGenEntries()" id="promptGenToggleAllBtn" title="Collapse/Expand All">⤵</button>
           <button onclick="closePromptGeneratorModal()">❌</button>
         </div>
         <div id="promptGeneratorList"></div>
@@ -1924,6 +1925,24 @@ return _originalFetch.apply(this, args);
         document.body.classList.add("modal-open");
       }
 
+      window.toggleAllPromptGenEntries = function () {
+        const rows = el.promptGeneratorList.querySelectorAll(".prompt-generator-row");
+        if (rows.length === 0) return;
+        const firstRow = rows[0];
+        const isCollapsed = firstRow.classList.contains("collapsed");
+        const collapsedKeys = JSON.parse(localStorage.getItem("promptGenCollapsed") || "{}");
+        rows.forEach((row) => {
+          if (isCollapsed) {
+            row.classList.remove("collapsed");
+          } else {
+            row.classList.add("collapsed");
+          }
+          const pieceKey = row.querySelector(".prompt-generator-values").dataset.pieceKey;
+          collapsedKeys[pieceKey] = !isCollapsed;
+        });
+        localStorage.setItem("promptGenCollapsed", JSON.stringify(collapsedKeys));
+      };
+
       function renderPromptGenerator() {
         el.promptGeneratorList.innerHTML = "";
         if (promptPieces.length === 0) {
@@ -1996,6 +2015,9 @@ return _originalFetch.apply(this, args);
           nameSpan.textContent = pieceKey;
           nameSpan.insertAdjacentHTML("beforeend", ' <span class="prompt-gen-chevron">▾</span>');
 
+          const collapsedContentSpan = document.createElement("span");
+          collapsedContentSpan.className = "prompt-gen-collapsed-content";
+
           const valuesContainer = document.createElement("div");
           valuesContainer.className = "prompt-generator-values";
           valuesContainer.dataset.pieceKey = pieceKey;
@@ -2024,7 +2046,18 @@ return _originalFetch.apply(this, args);
 
           row.appendChild(dragHandle);
           row.appendChild(nameSpan);
+          row.appendChild(collapsedContentSpan);
           row.appendChild(valuesContainer);
+
+          const updateCollapsedContent = () => {
+            if (row.classList.contains("collapsed")) {
+              const selectedBtns = row.querySelectorAll(".prompt-generator-toggle.selected");
+              const selectedValues = Array.from(selectedBtns).map((btn) => btn.textContent);
+              collapsedContentSpan.textContent = selectedValues.length > 0 ? `[${selectedValues.join(", ")}]` : "";
+            } else {
+              collapsedContentSpan.textContent = "";
+            }
+          };
 
           row.addEventListener("click", (e) => {
             if (e.target.closest(".prompt-gen-drag-handle") || e.target.closest(".prompt-generator-toggle")) return;
@@ -2032,7 +2065,10 @@ return _originalFetch.apply(this, args);
             const collapsedKeys = JSON.parse(localStorage.getItem("promptGenCollapsed") || "{}");
             collapsedKeys[pieceKey] = row.classList.contains("collapsed");
             localStorage.setItem("promptGenCollapsed", JSON.stringify(collapsedKeys));
+            updateCollapsedContent();
           });
+
+          updateCollapsedContent();
 
           el.promptGeneratorList.appendChild(row);
         });
@@ -5226,6 +5262,17 @@ return _originalFetch.apply(this, args);
 
       .prompt-generator-row.collapsed .prompt-gen-chevron {
         transform: rotate(-90deg);
+      }
+
+      .prompt-gen-collapsed-content {
+        display: none;
+        color: #8b949e;
+        font-size: 12px;
+        font-style: italic;
+      }
+
+      .prompt-generator-row.collapsed .prompt-gen-collapsed-content {
+        display: inline-block;
       }
 
       .prompt-generator-values {
