@@ -4617,7 +4617,6 @@ return _originalFetch.apply(this, args);
       #promptPiecesModal,
       #addPromptPieceModal,
       #promptPiecesDeleteConfirmModal,
-      #promptGenSavedSetDeleteConfirmModal,
       #promptGeneratorModal,
       #promptGenSavedSetsModal {
         position: fixed;
@@ -4630,6 +4629,10 @@ return _originalFetch.apply(this, args);
         display: none;
         align-items: center;
         justify-content: center;
+      }
+
+      #promptGenSavedSetDeleteConfirmModal {
+        z-index: 1100;
       }
 
       #historyModalContent,
