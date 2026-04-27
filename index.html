@@ -2442,7 +2442,7 @@ return _originalFetch.apply(this, args);
         });
 
         if (promptLines.length > 0) {
-          el.prompt.value = promptLines.join("\n\n");
+          el.prompt.value = promptLines.join("\n");
           autoAdjustPromptHeight();
         }
 
