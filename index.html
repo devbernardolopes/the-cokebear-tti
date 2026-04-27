@@ -2434,7 +2434,7 @@ return _originalFetch.apply(this, args);
         try {
           const pieces = await db.settings.where("key").startsWith("promptPiece_").toArray();
           // Sort by createdAt (original creation order), fallback to timestamp for older entries
-          promptPieces = pieces.sort((a, b) => (a.createdAt || a.timestamp) - (b.createdAt || b.timestamp)).map((p, i) => ({ ...p, id: i + 1 }));
+          promptPieces = pieces.sort((a, b) => (a.createdAt || a.timestamp) - (b.createdAt || b.timestamp)).map((p, i) => ({ ...p, id: p.key }));
           renderPromptPieces();
         } catch (e) {
           console.warn("Failed to load prompt pieces:", e);
@@ -2453,7 +2453,7 @@ return _originalFetch.apply(this, args);
         promptPieces.forEach((piece) => {
           const item = document.createElement("div");
           item.className = "prompt-piece-item";
-          item.dataset.id = piece.id;
+          item.dataset.key = piece.id; // Store database key
           if (selectedPromptPiecesIds.has(piece.id)) {
             item.classList.add("selected");
           }
@@ -2498,6 +2498,18 @@ return _originalFetch.apply(this, args);
         });
         updatePromptPiecesButtons();
       };
+
+      // Select All checkbox event listener
+      el.selectAllPromptPieces.addEventListener("change", () => {
+        if (el.selectAllPromptPieces.checked) {
+          promptPieces.forEach((piece) => {
+            selectedPromptPiecesIds.add(piece.id);
+          });
+        } else {
+          selectedPromptPiecesIds.clear();
+        }
+        renderPromptPieces();
+      });
 
       function updatePromptPiecesButtons() {
         el.deletePromptPiecesSelectedBtn.disabled = selectedPromptPiecesIds.size === 0;
@@ -2659,12 +2671,12 @@ return _originalFetch.apply(this, args);
         if (selectedPromptPiecesIds.size === 0) return;
         document.getElementById("promptPiecesDeleteConfirmCount").textContent = selectedPromptPiecesIds.size;
         el.promptPiecesDeleteConfirmModal.style.display = "flex";
-        document.body.classList.add("modal-open");
+        // Don't toggle modal-open since parent modal is still open
       };
 
       window.closePromptPiecesDeleteConfirmModal = function () {
         el.promptPiecesDeleteConfirmModal.style.display = "none";
-        document.body.classList.remove("modal-open");
+        // Parent modal (promptPiecesModal) keeps modal-open class
       };
 
       el.promptPiecesDeleteConfirmModal.addEventListener("click", (e) => {
@@ -2676,13 +2688,13 @@ return _originalFetch.apply(this, args);
       window.confirmDeletePromptPieces = async function () {
         if (selectedPromptPiecesIds.size === 0) return;
         try {
-          for (const id of selectedPromptPiecesIds) {
-            await db.settings.delete(id);
+          for (const key of selectedPromptPiecesIds) {
+            await db.settings.delete(key); // key is the database key (promptPiece_xxx)
           }
           selectedPromptPiecesIds.clear();
           el.selectAllPromptPieces.checked = false;
           closePromptPiecesDeleteConfirmModal();
-          closePromptPiecesModal();
+          loadPromptPieces(); // Reload the list
         } catch (e) {
           console.warn("Failed to delete prompt pieces:", e);
         }
