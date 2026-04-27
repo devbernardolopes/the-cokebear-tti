@@ -387,6 +387,21 @@ return _originalFetch.apply(this, args);
       </div>
     </div>
 
+    <div id="promptGenNoSetsModal" class="modal">
+      <div id="promptGenNoSetsModalContent" onclick="event.stopPropagation()">
+        <div class="modal-header">
+          <h3>No Saved Selections</h3>
+          <button onclick="closePromptGenNoSetsModal()">❌</button>
+        </div>
+        <div id="promptGenNoSetsMessage">
+          <p>No saved selections found.</p>
+        </div>
+        <div id="promptGenNoSetsActions">
+          <button onclick="closePromptGenNoSetsModal()" id="promptGenNoSetsCloseBtn">OK</button>
+        </div>
+      </div>
+    </div>
+
     <!-- <div id="loading">Generating images...</div> -->
     <div id="error"></div>
     <div id="mosaic"></div>
@@ -1957,13 +1972,23 @@ return _originalFetch.apply(this, args);
       window.loadPromptGenSet = async function () {
         const savedSets = await db.settings.where("key").startsWith("promptGenSavedSet_").toArray();
         if (savedSets.length === 0) {
-          alert("No saved selections found.");
+          el.promptGenNoSetsModal.style.display = "flex";
           return;
         }
         window.promptGenSavedSets = savedSets;
         renderPromptGenSavedSets();
         el.promptGenSavedSetsModal.style.display = "flex";
       };
+
+      window.closePromptGenNoSetsModal = function () {
+        el.promptGenNoSetsModal.style.display = "none";
+      };
+
+      el.promptGenNoSetsModal.addEventListener("click", (e) => {
+        if (e.target === el.promptGenNoSetsModal) {
+          closePromptGenNoSetsModal();
+        }
+      });
 
       window.closePromptGenSavedSetsModal = function () {
         el.promptGenSavedSetsModal.style.display = "none";
@@ -5714,6 +5739,55 @@ return _originalFetch.apply(this, args);
 
       #promptGenSavedSetsList::-webkit-scrollbar {
         display: none;
+      }
+
+      #promptGenNoSetsModal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.7);
+        z-index: 1200;
+        align-items: center;
+        justify-content: center;
+      }
+
+      #promptGenNoSetsModalContent {
+        background: #161b22;
+        border: 1px solid #30363d;
+        border-radius: 12px;
+        max-width: 400px;
+        padding: 20px;
+      }
+
+      #promptGenNoSetsMessage {
+        margin: 12px 0;
+        color: #c9d1d9;
+        font-size: 14px;
+        text-align: center;
+      }
+
+      #promptGenNoSetsActions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+        margin-top: 16px;
+      }
+
+      #promptGenNoSetsCloseBtn {
+        padding: 8px 16px;
+        background: #238636;
+        border: 1px solid #2ea043;
+        border-radius: 6px;
+        color: #fff;
+        cursor: pointer;
+        font-weight: 600;
+      }
+
+      #promptGenNoSetsCloseBtn:hover {
+        background: #2ea043;
       }
 
       .prompt-gen-saved-set-row {
