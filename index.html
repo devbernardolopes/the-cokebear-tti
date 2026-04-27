@@ -360,6 +360,7 @@ return _originalFetch.apply(this, args);
       <div id="promptGeneratorModalContent" onclick="event.stopPropagation()">
         <div class="modal-header">
           <h3>Prompt Generator</h3>
+          <button onclick="clearAllPromptGenSelections()" id="promptGenClearBtn" title="Clear all selections">🗑</button>
           <button onclick="savePromptGenSet()" id="promptGenSaveBtn" title="Save current selections">💾</button>
           <button onclick="loadPromptGenSet()" id="promptGenLoadBtn" title="Load saved selections">📂</button>
           <button onclick="toggleAllPromptGenEntries()" id="promptGenToggleAllBtn" title="Collapse/Expand All">⤵</button>
@@ -2376,6 +2377,28 @@ return _originalFetch.apply(this, args);
           }
         });
         localStorage.setItem("promptGenCollapsed", JSON.stringify(collapsedKeys));
+      };
+
+      window.clearAllPromptGenSelections = function () {
+        const rows = el.promptGeneratorList.querySelectorAll(".prompt-generator-row");
+        rows.forEach((row) => {
+          row.querySelectorAll(".prompt-generator-toggle.selected").forEach((btn) => {
+            btn.classList.remove("selected");
+          });
+          const nameSpan = row.querySelector(".prompt-generator-name");
+          if (nameSpan) {
+            nameSpan.classList.remove("has-selection");
+          }
+          // Update collapsed content if collapsed
+          if (row.classList.contains("collapsed")) {
+            const collapsedContentSpan = row.querySelector(".prompt-gen-collapsed-content");
+            if (collapsedContentSpan) {
+              collapsedContentSpan.textContent = "";
+            }
+          }
+        });
+        // Clear saved selections in localStorage
+        localStorage.setItem("promptGenSelections", JSON.stringify({}));
       };
 
       window.createPromptFromPieces = function () {
@@ -4607,6 +4630,21 @@ return _originalFetch.apply(this, args);
 
       #clearPromptHeaderBtn:hover,
       #promptGeneratorBtn:hover {
+        background: #f85149;
+      }
+
+      #promptGenClearBtn {
+        padding: 4px 8px;
+        font-size: 10px;
+        background: #da3633;
+        border: 1px solid #f85149;
+        border-radius: 4px;
+        color: #fff;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+
+      #promptGenClearBtn:hover {
         background: #f85149;
       }
 
