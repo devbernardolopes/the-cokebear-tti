@@ -2149,7 +2149,6 @@ return _originalFetch.apply(this, args);
 
           const row = document.createElement("div");
           row.className = "prompt-generator-row";
-          row.draggable = true;
           row.dataset.key = piece.key;
 
           const collapsedKeys = JSON.parse(localStorage.getItem("promptGenCollapsed") || "{}");
@@ -2160,34 +2159,113 @@ return _originalFetch.apply(this, args);
           const dragHandle = document.createElement("span");
           dragHandle.className = "prompt-gen-drag-handle";
           dragHandle.textContent = "⋮⋮";
-          dragHandle.addEventListener("mousedown", (e) => {
+
+          // Custom drag implementation for both desktop and mobile
+          let dragStartY = 0;
+          let dragStartX = 0;
+          let isDragging = false;
+          let justDragged = false; // Flag to prevent click after drag
+
+          function getDragAfterElement(y) {
+            const rows = Array.from(el.promptGeneratorList.querySelectorAll(".prompt-generator-row:not(.dragging)"));
+            let closest = null;
+            let closestOffset = Number.NEGATIVE_INFINITY;
+
+            rows.forEach((rowEl) => {
+              const box = rowEl.getBoundingClientRect();
+              const offset = y - box.top - box.height / 2;
+              if (offset < 0 && offset > closestOffset) {
+                closestOffset = offset;
+                closest = rowEl;
+              }
+            });
+            return closest;
+          }
+
+          function onDragStart(e) {
+            // Only initiate drag from handle or row background, not from buttons/toggles
+            const target = e.target;
+            if (target.closest(".prompt-generator-toggle") || target.closest("button:not(.prompt-gen-drag-handle)")) {
+              return;
+            }
+            // Initiate from handle or row background (but not from nameSpan chevron click)
+            const isFromHandle = target.closest(".prompt-gen-drag-handle");
+            const isFromRow = (target === row || target.closest(".prompt-generator-name")) && !target.closest(".prompt-gen-chevron");
+            if (!isFromHandle && !isFromRow) {
+              return;
+            }
+
             e.preventDefault();
-          });
 
-          row.addEventListener("dragstart", (e) => {
-            row.classList.add("dragging");
-            e.dataTransfer.effectAllowed = "move";
-          });
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
 
-          row.addEventListener("dragend", () => {
-            row.classList.remove("dragging");
-            const newOrder = Array.from(el.promptGeneratorList.querySelectorAll(".prompt-generator-row")).map((r) => r.dataset.key);
-            localStorage.setItem("promptGenOrder", JSON.stringify(newOrder));
-          });
+            dragStartY = clientY;
+            dragStartX = clientX;
+            isDragging = false;
 
-          row.addEventListener("dragover", (e) => {
-            e.preventDefault();
-            const dragging = el.promptGeneratorList.querySelector(".dragging");
-            if (dragging && dragging !== row) {
-              const rect = row.getBoundingClientRect();
-              const midY = rect.top + rect.height / 2;
-              if (e.clientY < midY) {
-                row.parentNode.insertBefore(dragging, row);
-              } else {
-                row.parentNode.insertBefore(dragging, row.nextSibling);
+            function onDragMove(e) {
+              const moveY = e.touches ? e.touches[0].clientY : e.clientY;
+              const moveX = e.touches ? e.touches[0].clientX : e.clientX;
+
+              // Only start drag if moved more than 5px (to distinguish from click)
+              if (!isDragging && (Math.abs(moveY - dragStartY) > 5 || Math.abs(moveX - dragStartX) > 5)) {
+                isDragging = true;
+                row.classList.add("dragging");
+              }
+
+              if (isDragging) {
+                e.preventDefault();
+                const dragging = el.promptGeneratorList.querySelector(".dragging");
+                if (dragging) {
+                  const afterElement = getDragAfterElement(moveY);
+                  if (afterElement) {
+                    el.promptGeneratorList.insertBefore(dragging, afterElement);
+                  } else {
+                    el.promptGeneratorList.appendChild(dragging);
+                  }
+                }
               }
             }
+
+            function onDragEnd(e) {
+              document.removeEventListener("mousemove", onDragMove);
+              document.removeEventListener("mouseup", onDragEnd);
+              document.removeEventListener("touchmove", onDragMove);
+              document.removeEventListener("touchend", onDragEnd);
+
+              if (isDragging) {
+                row.classList.remove("dragging");
+                const newOrder = Array.from(el.promptGeneratorList.querySelectorAll(".prompt-generator-row")).map((r) => r.dataset.key);
+                localStorage.setItem("promptGenOrder", JSON.stringify(newOrder));
+                justDragged = true;
+                // Reset the flag after a short delay so click event doesn't trigger collapse
+                setTimeout(() => { justDragged = false; }, 200);
+              }
+              isDragging = false;
+            }
+
+            document.addEventListener("mousemove", onDragMove);
+            document.addEventListener("mouseup", onDragEnd);
+            document.addEventListener("touchmove", onDragMove, { passive: false });
+            document.addEventListener("touchend", onDragEnd);
+          }
+
+          // Allow drag from handle (works on both desktop and mobile)
+          dragHandle.addEventListener("mousedown", onDragStart);
+          dragHandle.addEventListener("touchstart", onDragStart, { passive: false });
+
+          // Allow drag from row background (original desktop behavior)
+          row.addEventListener("mousedown", (e) => {
+            if (e.target === row || (e.target.closest(".prompt-generator-name") && !e.target.closest(".prompt-gen-chevron"))) {
+              onDragStart(e);
+            }
           });
+          row.addEventListener("touchstart", (e) => {
+            if (e.target === row || (e.target.closest(".prompt-generator-name") && !e.target.closest(".prompt-gen-chevron"))) {
+              onDragStart(e);
+            }
+          }, { passive: false });
 
           const nameSpan = document.createElement("span");
           nameSpan.className = "prompt-generator-name";
@@ -2240,6 +2318,8 @@ return _originalFetch.apply(this, args);
 
           row.addEventListener("click", (e) => {
             if (e.target.closest(".prompt-gen-drag-handle") || e.target.closest(".prompt-generator-toggle")) return;
+            // Don't toggle if we just finished a drag
+            if (justDragged) return;
             row.classList.toggle("collapsed");
             const collapsedKeys = JSON.parse(localStorage.getItem("promptGenCollapsed") || "{}");
             collapsedKeys[pieceKey] = row.classList.contains("collapsed");
@@ -5523,6 +5603,7 @@ return _originalFetch.apply(this, args);
         padding: 8px 12px;
         background: #21262d;
         border-radius: 6px;
+        touch-action: none;
       }
 
       .prompt-gen-drag-handle {
@@ -5531,6 +5612,7 @@ return _originalFetch.apply(this, args);
         font-size: 14px;
         user-select: none;
         padding: 2px 4px;
+        touch-action: none;
       }
 
       .prompt-gen-drag-handle:active {
