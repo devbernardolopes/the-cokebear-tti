@@ -2425,14 +2425,6 @@ return _originalFetch.apply(this, args);
           item.appendChild(nameSpan);
           item.appendChild(contentSpan);
           item.appendChild(deleteBtn);
-          item.addEventListener("click", () => {
-            if (selectedPromptPiecesIds.has(piece.id)) {
-              selectedPromptPiecesIds.delete(piece.id);
-            } else {
-              selectedPromptPiecesIds.add(piece.id);
-            }
-            renderPromptPieces();
-          });
           el.promptPiecesList.appendChild(item);
         });
         updatePromptPiecesButtons();
