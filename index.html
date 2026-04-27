@@ -338,6 +338,8 @@ return _originalFetch.apply(this, args);
       <div id="promptGeneratorModalContent" onclick="event.stopPropagation()">
         <div class="modal-header">
           <h3>Prompt Generator</h3>
+          <button onclick="savePromptGenSet()" id="promptGenSaveBtn" title="Save current selections">💾</button>
+          <button onclick="loadPromptGenSet()" id="promptGenLoadBtn" title="Load saved selections">📂</button>
           <button onclick="toggleAllPromptGenEntries()" id="promptGenToggleAllBtn" title="Collapse/Expand All">⤵</button>
           <button onclick="closePromptGeneratorModal()">❌</button>
         </div>
@@ -345,6 +347,19 @@ return _originalFetch.apply(this, args);
         <div id="promptGeneratorActions">
           <button onclick="closePromptGeneratorModal()" id="promptGeneratorCancelBtn">CANCEL</button>
           <button onclick="createPromptFromPieces()" id="promptGeneratorCreateBtn">CREATE</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="promptGenSavedSetsModal" class="modal">
+      <div id="promptGenSavedSetsModalContent" onclick="event.stopPropagation()">
+        <div class="modal-header">
+          <h3>Load Saved Selection</h3>
+          <button onclick="closePromptGenSavedSetsModal()">❌</button>
+        </div>
+        <div id="promptGenSavedSetsList"></div>
+        <div id="promptGenSavedSetsActions">
+          <button onclick="closePromptGenSavedSetsModal()" id="promptGenSavedSetsCloseBtn">CLOSE</button>
         </div>
       </div>
     </div>
@@ -539,6 +554,8 @@ return _originalFetch.apply(this, args);
         promptGeneratorModalContent: document.getElementById("promptGeneratorModalContent"),
         promptGeneratorList: document.getElementById("promptGeneratorList"),
         promptGeneratorCreateBtn: document.getElementById("promptGeneratorCreateBtn"),
+        promptGenSavedSetsModal: document.getElementById("promptGenSavedSetsModal"),
+        promptGenSavedSetsList: document.getElementById("promptGenSavedSetsList"),
       };
 
       // Track generated images for batch download
@@ -1868,6 +1885,117 @@ return _originalFetch.apply(this, args);
         localStorage.setItem("promptGenSelections", JSON.stringify(selections));
       }
 
+      window.savePromptGenSet = async function () {
+        const rows = el.promptGeneratorList.querySelectorAll(".prompt-generator-row");
+        const selections = {};
+        rows.forEach((row) => {
+          const key = row.dataset.key;
+          const selectedBtns = row.querySelectorAll(".prompt-generator-toggle.selected");
+          const selectedValues = Array.from(selectedBtns).map((btn) => btn.textContent);
+          if (selectedValues.length > 0) {
+            selections[key] = selectedValues;
+          }
+        });
+        if (Object.keys(selections).length === 0) {
+          return;
+        }
+        await db.settings.put({
+          key: "promptGenSavedSet_" + Date.now(),
+          value: JSON.stringify(selections),
+          timestamp: Date.now(),
+        });
+      };
+
+      window.loadPromptGenSet = async function () {
+        const savedSets = await db.settings.where("key").startsWith("promptGenSavedSet_").toArray();
+        if (savedSets.length === 0) {
+          alert("No saved selections found.");
+          return;
+        }
+        window.promptGenSavedSets = savedSets;
+        renderPromptGenSavedSets();
+        el.promptGenSavedSetsModal.style.display = "flex";
+      };
+
+      window.closePromptGenSavedSetsModal = function () {
+        el.promptGenSavedSetsModal.style.display = "none";
+      };
+
+      el.promptGenSavedSetsModal.addEventListener("click", (e) => {
+        if (e.target === el.promptGenSavedSetsModal) {
+          closePromptGenSavedSetsModal();
+        }
+      });
+
+      window.deletePromptGenSet = function (timestamp) {
+        if (confirm("Delete this saved selection?")) {
+          db.settings.delete("promptGenSavedSet_" + timestamp);
+          loadPromptGenSet();
+        }
+      };
+
+      function renderPromptGenSavedSets() {
+        const list = document.getElementById("promptGenSavedSetsList");
+        list.innerHTML = "";
+        if (!window.promptGenSavedSets || window.promptGenSavedSets.length === 0) {
+          list.innerHTML = '<div class="prompt-pieces-empty">No saved selections</div>';
+          return;
+        }
+        window.promptGenSavedSets.forEach((set) => {
+          const row = document.createElement("div");
+          row.className = "prompt-gen-saved-set-row";
+          row.dataset.timestamp = set.key.replace("promptGenSavedSet_", "");
+          const selections = JSON.parse(set.value || "{}");
+          const displayParts = [];
+          for (const [key, values] of Object.entries(selections)) {
+            const name = key.replace("promptPiece_", "");
+            displayParts.push(`${name}: [${values.join(", ")}]`);
+          }
+          row.innerHTML = `<span>${displayParts.join(" | ")}</span>`;
+          const deleteBtn = document.createElement("button");
+          deleteBtn.className = "prompt-gen-saved-set-delete";
+          deleteBtn.textContent = "❌";
+          deleteBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            deletePromptGenSet(row.dataset.timestamp);
+          });
+          row.appendChild(deleteBtn);
+          row.addEventListener("click", () => {
+            applyPromptGenSet(selections);
+            closePromptGenSavedSetsModal();
+          });
+          list.appendChild(row);
+        });
+      }
+
+      function applyPromptGenSet(selections) {
+        const rows = el.promptGeneratorList.querySelectorAll(".prompt-generator-row");
+        rows.forEach((row) => {
+          const key = row.dataset.key;
+          const savedValues = selections[key] || [];
+          row.querySelectorAll(".prompt-generator-toggle").forEach((btn) => {
+            if (savedValues.includes(btn.textContent)) {
+              btn.classList.add("selected");
+            } else {
+              btn.classList.remove("selected");
+            }
+          });
+          const collapsedContentSpan = row.querySelector(".prompt-gen-collapsed-content");
+          if (collapsedContentSpan && row.classList.contains("collapsed") && savedValues.length > 0) {
+            collapsedContentSpan.textContent = `[${savedValues.join(", ")}]`;
+          }
+        });
+        el.promptGeneratorList.querySelectorAll(".prompt-generator-row").forEach((row) => {
+          const selectedBtns = row.querySelectorAll(".prompt-generator-toggle.selected");
+          const nameSpan = row.querySelector(".prompt-generator-name");
+          if (selectedBtns.length > 0) {
+            nameSpan.classList.add("has-selection");
+          } else {
+            nameSpan.classList.remove("has-selection");
+          }
+        });
+      }
+
       function cleanPromptGenSelections() {
         const savedSelections = JSON.parse(localStorage.getItem("promptGenSelections") || "{}");
         const currentKeys = new Set(promptPieces.map((p) => p.key));
@@ -1939,6 +2067,16 @@ return _originalFetch.apply(this, args);
           }
           const pieceKey = row.querySelector(".prompt-generator-values").dataset.pieceKey;
           collapsedKeys[pieceKey] = !isCollapsed;
+          const collapsedContentSpan = row.querySelector(".prompt-gen-collapsed-content");
+          if (collapsedContentSpan) {
+            if (!isCollapsed) {
+              const selectedBtns = row.querySelectorAll(".prompt-generator-toggle.selected");
+              const selectedValues = Array.from(selectedBtns).map((btn) => btn.textContent);
+              collapsedContentSpan.textContent = selectedValues.length > 0 ? `[${selectedValues.join(", ")}]` : "";
+            } else {
+              collapsedContentSpan.textContent = "";
+            }
+          }
         });
         localStorage.setItem("promptGenCollapsed", JSON.stringify(collapsedKeys));
       };
@@ -4290,7 +4428,8 @@ return _originalFetch.apply(this, args);
       #promptPiecesModal,
       #addPromptPieceModal,
       #promptPiecesDeleteConfirmModal,
-      #promptGeneratorModal {
+      #promptGeneratorModal,
+      #promptGenSavedSetsModal {
         position: fixed;
         top: 0;
         left: 0;
@@ -5199,6 +5338,63 @@ return _originalFetch.apply(this, args);
         max-height: 90vh;
         display: flex;
         flex-direction: column;
+      }
+
+      #promptGenSavedSetsModalContent {
+        background: #161b22;
+        border: 1px solid #30363d;
+        border-radius: 12px;
+        width: 80%;
+        max-width: 800px;
+        max-height: 80vh;
+        display: flex;
+        flex-direction: column;
+      }
+
+      #promptGenSavedSetsList {
+        flex: 1;
+        overflow-y: auto;
+        margin: 16px 0;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .prompt-gen-saved-set-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 8px 12px;
+        background: #21262d;
+        border-radius: 6px;
+        cursor: pointer;
+      }
+
+      .prompt-gen-saved-set-row:hover {
+        background: #30363d;
+      }
+
+      .prompt-gen-saved-set-row span {
+        color: #c9d1d9;
+        font-size: 13px;
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .prompt-gen-saved-set-delete {
+        background: none;
+        border: none;
+        color: #8b949e;
+        font-size: 14px;
+        cursor: pointer;
+        padding: 4px 8px;
+      }
+
+      .prompt-gen-saved-set-delete:hover {
+        color: #f85149;
       }
 
       #promptGeneratorList {
