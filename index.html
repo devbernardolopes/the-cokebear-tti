@@ -438,79 +438,6 @@ return _originalFetch.apply(this, args);
       let pluginReady = false;
       let db = null;
 
-      const REALISM_ENFORCER = "\n\nPhotorealistic photography, real skin texture, natural imperfections.";
-
-      // const REALISM_ENFORCER =
-      //   "Photorealistic, real-world photography, natural lighting, real skin texture, life-like, natural imperfections. Overall, the image should look like a genuine photograph taken in the real world, not an AI-generated image. Avoid any elements that could make it look artificial or stylized.";
-
-      const CASUAL_PHOTO = "\n\nIt's a casual photo.";
-      
-      const CASUAL_PHOTO_HQ = "\n\nUnedited RAW cellphone photo, wide-angle lens (28mm equivalent), shot on a smartphone camera with high contrast, natural film grain visible everywhere, hyperrealistic real-life photography, straight from the camera, zero post-processing, (photorealistic:2.5), (raw actual photography:2.3), visible skin pores and texture, subtle imperfections, no plastic skin, no waxy sheen, no artificial gloss, no beauty filter, 8k ultra photorealistic unedited image, best quality.";
-
-      const RAW_CASUAL_PHOTO = "\n\nReal-life, low-quality, RAW cellphone camera photo with zero post-processing, subtle imperfections, slightly blurred.";
-
-      const SNAPCHAT_CASUAL_PHOTO = "\n\nIt's a casual Snapchat selfie photo.";
-
-      const PROFESSIONAL_PHOTO = "\n\nSoft focus, depth of field, 4k photo, taken with Canon EOS R5, DSLR, 75mm lens.";
-
-      const PROFESSIONAL_PHOTO_EX = "\n\nSharp focus, depth of field, 8k photo, HDR, taken with Canon EOS R5, DSLR, 75mm lens, with impeccable attention to detail.";
-
-      const CINEMATIC = "\n\nCinematic shot, 75mm, Technicolor, Panavision, cinemascope, sharp focus, fine details, 8k, HDR, realism, realistic, key visual, film still, cinematic color grading, depth of field.";
-
-      const CINEMATIC_EX = "\n\nCinematic shot, 75mm, Technicolor, Panavision, cinemascope, sharp focus, fine details, 8k, HDR, realism, realistic, key visual, film still, cinematic color grading, depth of field.\n\nOverall, it's an absolute world-class cinematic masterpiece. It's an aesthetically pleasing cinematic shot with impeccable attention to detail and impressive composition. The lighting is dramatic and expertly executed, creating a captivating atmosphere. The image is rendered in stunning 8k resolution with HDR, showcasing fine details and textures that contribute to its realism. The color grading is cinematic and visually striking, enhancing the overall mood and impact of the shot. This image stands out as a prime example of top-tier cinematic photography, evoking strong emotions and leaving a lasting impression on viewers.";
-
-      const CCTV = "\n\nOld CCTV footage, high-angle CCTV image.";
-
-      const CURSED = "\n\nCreepy and cursed, absolutely cursed photo, nope nope nope nope, what the actual f, unsettling photo, cursed_thing, cursedimages, no context, cursed image, bad photo, weird photo, very strange, color photo, creepy photo, nightmare fuel.";
-
-      const TWO_THOUSANDS = "\n\nOld early 2000s cellphone photo.";
-
-      const NINETIES = "\n\n90s home video, nostalgic 90s photo, taken with Kodak disposable camera.";
-
-      const EIGHTIES = "\n\nGrainy photograph, 80s photo with film grain, Kodacolor II 80s photo with vignetting, retro, r/OldSchoolCool, 80s photo with wear and tear and minor creasing and scratches, vintage color photo.";
-
-      const SEVENTIES = "\n\nGrainy photograph, 1970s photo with film grain, 70s photo with vignetting, retro, r/OldSchoolCool, 70s photo, vintage photo.";
-
-      const SIXTIES = "\n\nGrainy photograph, 1960s photo with film grain, 60s photo with vignetting, retro, r/OldSchoolCool, 60s photo, vintage photo.";
-
-      const FIFTIES = "\n\nGrainy photograph, 1950s photo with film grain, 1950s photo with vignetting, retro, r/OldSchoolCool, 1950s photo, vintage photo.";
-
-      const PAINTED_ANIME = "\n\nOverall, it's an absolute world-class masterpiece painterly anime artwork. It's an aesthetically pleasing painterly anime artwork with impeccable attention to detail and impressive composition.";
-
-      const PAINTED_ANIME_EX = "\n\nPainted anime style, vibrant colors, detailed character design, dynamic action scenes, 8k resolution, HDR, cinematic lighting.";
-
-      const POLAROID = "\n\nVintage Polaroid instant photo, white borders, slightly faded colors, light leak effects.";
-
-      const INSTANT_FILM = "\n\nInstant film photography, Fujifilm Instax wide format, bright vibrant colors, natural lighting.";
-
-      const MOBILE_PHONE = "\n\nTaken with iPhone 12 Pro Max, smartphone photo quality, HDR enabled, outdoor lighting.";
-
-      const WEB_CAMERA = "\n\nLow resolution webcam capture, compressed JPEG artifacts, pixelated edges, poor lighting compensation.";
-
-      const SECURITY_CAM = "\n\nDigital security camera footage, low resolution, green tint, timestamp overlay, motion blur from compression.";
-
-      const THERMAL = "\n\nThermal imaging camera, heat signature visualization, false color palette, temperature gradient.";
-
-      const XRAY = "\n\nMedical X-ray scan, black and white radiograph, bone density contrast, medical equipment markers.";
-
-      const MICROSCOPIC = "\n\nMicroscope photograph, extreme close-up magnification, cellular structure visible, scientific documentation.";
-
-      const LONG_EXPOSURE = "\n\nLong exposure night photography, star trails, light painting, motion blur of water, tripod mounted.";
-
-      const TILTSHIFT = "\n\nTiltshift photography effect, miniature model look, selective focus plane, shallow depth of field.";
-
-      const IRPHOTOGRAPHY = "\n\nInfrared photography, false color infrared, vegetation appears red/orange, sky appears blue/white.";
-
-      const UVPHOTOGRAPHY = "\n\nUltraviolet photography, modified camera with UV filter, fluorescent details invisible to human eye.";
-
-      const LENSFLEAREFFECTS = "\n\nIntentional lens flare, sunstar effect, chromatic aberration, bokeh background, artistic imperfections.";
-
-      const DOUBLEEXPOSITION = "\n\nDouble exposure technique, ghosted overlapping images, multiple subjects merged, dreamlike aesthetic.";
-
-      const KODACHROME = "\n\nKodachrome slide film, rich saturated colors, vintage transparency, warm tone palette, high contrast.";
-
-      const ILFORDXP = "\n\nCross-processed film, slides processed as negatives, reversed colors, experimental photography techniques."
-
       const el = {
         prompt: document.getElementById("promptText"),
         scratchpad: document.getElementById("scratchpadText"),
@@ -595,7 +522,82 @@ return _originalFetch.apply(this, args);
         promptGeneratorCreateBtn: document.getElementById("promptGeneratorCreateBtn"),
         promptGenSavedSetsModal: document.getElementById("promptGenSavedSetsModal"),
         promptGenSavedSetsList: document.getElementById("promptGenSavedSetsList"),
+        promptGenNoSetsModal: document.getElementById("promptGenNoSetsModal"),
       };
+
+      const REALISM_ENFORCER = "\n\nPhotorealistic photography, real skin texture, natural imperfections.";
+
+      // const REALISM_ENFORCER =
+      //   "Photorealistic, real-world photography, natural lighting, real skin texture, life-like, natural imperfections. Overall, the image should look like a genuine photograph taken in the real world, not an AI-generated image. Avoid any elements that could make it look artificial or stylized.";
+
+      const CASUAL_PHOTO = "\n\nIt's a casual photo.";
+      
+      const CASUAL_PHOTO_HQ = "\n\nUnedited RAW cellphone photo, wide-angle lens (28mm equivalent), shot on a smartphone camera with high contrast, natural film grain visible everywhere, hyperrealistic real-life photography, straight from the camera, zero post-processing, (photorealistic:2.5), (raw actual photography:2.3), visible skin pores and texture, subtle imperfections, no plastic skin, no waxy sheen, no artificial gloss, no beauty filter, 8k ultra photorealistic unedited image, best quality.";
+
+      const RAW_CASUAL_PHOTO = "\n\nReal-life, low-quality, RAW cellphone camera photo with zero post-processing, subtle imperfections, slightly blurred.";
+
+      const SNAPCHAT_CASUAL_PHOTO = "\n\nIt's a casual Snapchat selfie photo.";
+
+      const PROFESSIONAL_PHOTO = "\n\nSoft focus, depth of field, 4k photo, taken with Canon EOS R5, DSLR, 75mm lens.";
+
+      const PROFESSIONAL_PHOTO_EX = "\n\nSharp focus, depth of field, 8k photo, HDR, taken with Canon EOS R5, DSLR, 75mm lens, with impeccable attention to detail.";
+
+      const CINEMATIC = "\n\nCinematic shot, 75mm, Technicolor, Panavision, cinemascope, sharp focus, fine details, 8k, HDR, realism, realistic, key visual, film still, cinematic color grading, depth of field.";
+
+      const CINEMATIC_EX = "\n\nCinematic shot, 75mm, Technicolor, Panavision, cinemascope, sharp focus, fine details, 8k, HDR, realism, realistic, key visual, film still, cinematic color grading, depth of field.\n\nOverall, it's an absolute world-class cinematic masterpiece. It's an aesthetically pleasing cinematic shot with impeccable attention to detail and impressive composition. The lighting is dramatic and expertly executed, creating a captivating atmosphere. The image is rendered in stunning 8k resolution with HDR, showcasing fine details and textures that contribute to its realism. The color grading is cinematic and visually striking, enhancing the overall mood and impact of the shot. This image stands out as a prime example of top-tier cinematic photography, evoking strong emotions and leaving a lasting impression on viewers.";
+
+      const CCTV = "\n\nOld CCTV footage, high-angle CCTV image.";
+
+      const CURSED = "\n\nCreepy and cursed, absolutely cursed photo, nope nope nope nope, what the actual f, unsettling photo, cursed_thing, cursedimages, no context, cursed image, bad photo, weird photo, very strange, color photo, creepy photo, nightmare fuel.";
+
+      const TWO_THOUSANDS = "\n\nOld early 2000s cellphone photo.";
+
+      const NINETIES = "\n\n90s home video, nostalgic 90s photo, taken with Kodak disposable camera.";
+
+      const EIGHTIES = "\n\nGrainy photograph, 80s photo with film grain, Kodacolor II 80s photo with vignetting, retro, r/OldSchoolCool, 80s photo with wear and tear and minor creasing and scratches, vintage color photo.";
+
+      const SEVENTIES = "\n\nGrainy photograph, 1970s photo with film grain, 70s photo with vignetting, retro, r/OldSchoolCool, 70s photo, vintage photo.";
+
+      const SIXTIES = "\n\nGrainy photograph, 1960s photo with film grain, 60s photo with vignetting, retro, r/OldSchoolCool, 60s photo, vintage photo.";
+
+      const FIFTIES = "\n\nGrainy photograph, 1950s photo with film grain, 1950s photo with vignetting, retro, r/OldSchoolCool, 1950s photo, vintage photo.";
+
+      const PAINTED_ANIME = "\n\nOverall, it's an absolute world-class masterpiece painterly anime artwork. It's an aesthetically pleasing painterly anime artwork with impeccable attention to detail and impressive composition.";
+
+      const PAINTED_ANIME_EX = "\n\nPainted anime style, vibrant colors, detailed character design, dynamic action scenes, 8k resolution, HDR, cinematic lighting.";
+
+      const POLAROID = "\n\nVintage Polaroid instant photo, white borders, slightly faded colors, light leak effects.";
+
+      const INSTANT_FILM = "\n\nInstant film photography, Fujifilm Instax wide format, bright vibrant colors, natural lighting.";
+
+      const MOBILE_PHONE = "\n\nTaken with iPhone 12 Pro Max, smartphone photo quality, HDR enabled, outdoor lighting.";
+
+      const WEB_CAMERA = "\n\nLow resolution webcam capture, compressed JPEG artifacts, pixelated edges, poor lighting compensation.";
+
+      const SECURITY_CAM = "\n\nDigital security camera footage, low resolution, green tint, timestamp overlay, motion blur from compression.";
+
+      const THERMAL = "\n\nThermal imaging camera, heat signature visualization, false color palette, temperature gradient.";
+
+      const XRAY = "\n\nMedical X-ray scan, black and white radiograph, bone density contrast, medical equipment markers.";
+
+      const MICROSCOPIC = "\n\nMicroscope photograph, extreme close-up magnification, cellular structure visible, scientific documentation.";
+
+      const LONG_EXPOSURE = "\n\nLong exposure night photography, star trails, light painting, motion blur of water, tripod mounted.";
+
+      const TILTSHIFT = "\n\nTiltshift photography effect, miniature model look, selective focus plane, shallow depth of field.";
+
+      const IRPHOTOGRAPHY = "\n\nInfrared photography, false color infrared, vegetation appears red/orange, sky appears blue/white.";
+
+      const UVPHOTOGRAPHY = "\n\nUltraviolet photography, modified camera with UV filter, fluorescent details invisible to human eye.";
+
+      const LENSFLEAREFFECTS = "\n\nIntentional lens flare, sunstar effect, chromatic aberration, bokeh background, artistic imperfections.";
+
+      const DOUBLEEXPOSITION = "\n\nDouble exposure technique, ghosted overlapping images, multiple subjects merged, dreamlike aesthetic.";
+
+      const KODACHROME = "\n\nKodachrome slide film, rich saturated colors, vintage transparency, warm tone palette, high contrast.";
+
+      const ILFORDXP = "\n\nCross-processed film, slides processed as negatives, reversed colors, experimental photography techniques."
+
 
       // Track generated images for batch download
       let generatedImages = [];
