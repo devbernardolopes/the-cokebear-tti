@@ -5658,6 +5658,11 @@ return _originalFetch.apply(this, args);
         display: flex;
         flex-direction: column;
         gap: 8px;
+        scrollbar-width: none;
+      }
+
+      #promptGenSavedSetsList::-webkit-scrollbar {
+        display: none;
       }
 
       .prompt-gen-saved-set-row {
