@@ -5242,6 +5242,11 @@ return _originalFetch.apply(this, args);
         flex: 1;
         overflow-y: auto;
         padding: 8px 0;
+        scrollbar-width: none;
+      }
+
+      #promptPiecesList::-webkit-scrollbar {
+        display: none;
       }
 
       #loadMoreBtn,
@@ -5628,6 +5633,11 @@ return _originalFetch.apply(this, args);
         display: flex;
         flex-direction: column;
         gap: 8px;
+        scrollbar-width: none;
+      }
+
+      #promptGeneratorList::-webkit-scrollbar {
+        display: none;
       }
 
       .prompt-generator-row {
