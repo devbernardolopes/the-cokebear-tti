@@ -2344,6 +2344,39 @@ return _originalFetch.apply(this, args);
         });
       }
 
+      window.toggleAllPromptGenEntries = function () {
+        const rows = el.promptGeneratorList.querySelectorAll(".prompt-generator-row");
+        if (rows.length === 0) return;
+        const collapsedKeys = JSON.parse(localStorage.getItem("promptGenCollapsed") || "{}");
+        // Check if all rows are collapsed
+        const allCollapsed = Array.from(rows).every((row) => row.classList.contains("collapsed"));
+        rows.forEach((row) => {
+          if (allCollapsed) {
+            // Expand all
+            row.classList.remove("collapsed");
+            const pieceKey = row.dataset.key.replace("promptPiece_", "");
+            collapsedKeys[pieceKey] = false;
+          } else {
+            // Collapse all
+            row.classList.add("collapsed");
+            const pieceKey = row.dataset.key.replace("promptPiece_", "");
+            collapsedKeys[pieceKey] = true;
+          }
+          // Update collapsed content
+          const collapsedContentSpan = row.querySelector(".prompt-gen-collapsed-content");
+          if (collapsedContentSpan) {
+            if (row.classList.contains("collapsed")) {
+              const selectedBtns = row.querySelectorAll(".prompt-generator-toggle.selected");
+              const selectedValues = Array.from(selectedBtns).map((btn) => btn.textContent);
+              collapsedContentSpan.textContent = selectedValues.length > 0 ? `[${selectedValues.join(", ")}]` : "";
+            } else {
+              collapsedContentSpan.textContent = "";
+            }
+          }
+        });
+        localStorage.setItem("promptGenCollapsed", JSON.stringify(collapsedKeys));
+      };
+
       window.createPromptFromPieces = function () {
         const rows = el.promptGeneratorList.querySelectorAll(".prompt-generator-row");
         const promptLines = [];
