@@ -2365,6 +2365,8 @@ return _originalFetch.apply(this, args);
           .split(/[;|]/)
           .map((v) => v.trim())
           .filter((v) => v)
+          .map((v) => v.toLowerCase())
+          .filter((v, i, arr) => arr.indexOf(v) === i)
           .join("; ");
         if (!name) {
           alert("Please enter a name for the piece");
