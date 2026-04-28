@@ -241,8 +241,10 @@ return _originalFetch.apply(this, args);
           <span id="galleryCount"></span>
           <button onclick="closeGalleryModal()">❌</button>
         </div>
-        <div id="galleryFavoritesList"></div>
-        <div id="galleryList"></div>
+        <div id="galleryBody">
+          <div id="galleryFavoritesList"></div>
+          <div id="galleryList"></div>
+        </div>
         <button id="galleryLoadMoreBtn" style="display: none">Load More</button>
       </div>
     </div>
@@ -5129,8 +5131,23 @@ return _originalFetch.apply(this, args);
         font-size: 13px;
       }
 
-      #galleryList,
+      #galleryBody {
+        display: flex;
+        flex: 1;
+        overflow: hidden;
+      }
+
       #galleryFavoritesList {
+        display: grid;
+        grid-template-columns: minmax(128px, 200px);
+        gap: 1px;
+        padding: 10px;
+        overflow-y: auto;
+        border-right: 1px solid #30363d;
+        flex-shrink: 0;
+      }
+
+      #galleryList {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(var(--tile-size, 128px), max-content));
         gap: 1px;
