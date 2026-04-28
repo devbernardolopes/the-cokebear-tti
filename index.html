@@ -374,6 +374,40 @@ return _originalFetch.apply(this, args);
       </div>
     </div>
 
+    <div id="promptGenSaveSetModal" class="modal">
+      <div id="promptGenSaveSetModalContent" onclick="event.stopPropagation()">
+        <div class="modal-header">
+          <h3>Save Selection</h3>
+          <button onclick="closePromptGenSaveSetModal()">❌</button>
+        </div>
+        <div id="promptGenSaveSetMessage">
+          <p>Saved selections can be named for easier identification (optional):</p>
+        </div>
+        <div id="promptGenSaveSetForm">
+          <input type="text" id="promptGenSaveSetName" placeholder="Enter a name (optional)" maxlength="50" />
+        </div>
+        <div id="promptGenSaveSetActions">
+          <button onclick="closePromptGenSaveSetModal()" id="promptGenSaveSetCancelBtn">CANCEL</button>
+          <button onclick="confirmSavePromptGenSet()" id="promptGenSaveSetSaveBtn">SAVE</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="promptGenNothingToSaveModal" class="modal">
+      <div id="promptGenNothingToSaveModalContent" onclick="event.stopPropagation()">
+        <div class="modal-header">
+          <h3>Nothing to Save</h3>
+          <button onclick="closePromptGenNothingToSaveModal()">❌</button>
+        </div>
+        <div id="promptGenNothingToSaveMessage">
+          <p>Nothing is selected. Toggle some options in the Prompt Generator before saving.</p>
+        </div>
+        <div id="promptGenNothingToSaveActions">
+          <button onclick="closePromptGenNothingToSaveModal()" id="promptGenNothingToSaveCloseBtn">OK</button>
+        </div>
+      </div>
+    </div>
+
     <div id="promptGenSavedSetsModal" class="modal">
       <div id="promptGenSavedSetsModalContent" onclick="event.stopPropagation()">
         <div class="modal-header">
@@ -1122,6 +1156,7 @@ return _originalFetch.apply(this, args);
           el.modalImage.src = currentModalImageSrc;
           el.modalCounter.textContent = `${currentGalleryIndex + 1}/${galleryImages.length}`;
           updateModalBadges(currentModalImageSrc);
+          updateFavoriteBtnInModal(galleryCurrentImage?.favorite);
         }
       };
 
@@ -1140,6 +1175,7 @@ return _originalFetch.apply(this, args);
           el.modalImage.src = currentModalImageSrc;
           el.modalCounter.textContent = `${currentGalleryIndex + 1}/${galleryImages.length}`;
           updateModalBadges(currentModalImageSrc);
+          updateFavoriteBtnInModal(galleryCurrentImage?.favorite);
         }
       };
 
@@ -1962,13 +1998,42 @@ return _originalFetch.apply(this, args);
           }
         });
         if (Object.keys(selections).length === 0) {
+          // Nothing selected - show the "nothing to save" modal
+          el.promptGenNothingToSaveModal.style.display = "flex";
+          document.body.classList.add("modal-open");
           return;
         }
+        // Something selected - show the save modal with name input
+        el.promptGenSaveSetModal.style.display = "flex";
+        document.body.classList.add("modal-open");
+        document.getElementById("promptGenSaveSetName").value = "";
+        document.getElementById("promptGenSaveSetName").focus();
+        // Store selections temporarily
+        window._pendingPromptGenSelections = selections;
+      };
+
+      window.closePromptGenSaveSetModal = function () {
+        el.promptGenSaveSetModal.style.display = "none";
+        document.body.classList.remove("modal-open");
+        window._pendingPromptGenSelections = null;
+      };
+
+      window.confirmSavePromptGenSet = async function () {
+        const selections = window._pendingPromptGenSelections;
+        if (!selections) return;
+        const name = document.getElementById("promptGenSaveSetName").value.trim();
+        const data = { name, selections };
         await db.settings.put({
           key: "promptGenSavedSet_" + Date.now(),
-          value: JSON.stringify(selections),
+          value: JSON.stringify(data),
           timestamp: Date.now(),
         });
+        closePromptGenSaveSetModal();
+      };
+
+      window.closePromptGenNothingToSaveModal = function () {
+        el.promptGenNothingToSaveModal.style.display = "none";
+        document.body.classList.remove("modal-open");
       };
 
       window.loadPromptGenSet = async function () {
@@ -2042,13 +2107,16 @@ return _originalFetch.apply(this, args);
           const row = document.createElement("div");
           row.className = "prompt-gen-saved-set-row";
           row.dataset.timestamp = set.key.replace("promptGenSavedSet_", "");
-          const selections = JSON.parse(set.value || "{}");
+          const data = JSON.parse(set.value || "{}");
+          const name = data.name || "";
+          const selections = data.selections || data;
           const displayParts = [];
           for (const [key, values] of Object.entries(selections)) {
-            const name = key.replace("promptPiece_", "");
-            displayParts.push(`${name}: [${values.join(", ")}]`);
+            const pieceName = key.replace("promptPiece_", "");
+            displayParts.push(`${pieceName}: [${values.join(", ")}]`);
           }
-          row.innerHTML = `<span>${displayParts.join(" | ")}</span>`;
+          const nameHtml = name ? `<span class="prompt-gen-saved-set-name">${escapeHtml(name)}</span>: ` : "";
+          row.innerHTML = `<span>${nameHtml}${displayParts.join(" | ")}</span>`;
           const deleteBtn = document.createElement("button");
           deleteBtn.className = "prompt-gen-saved-set-delete";
           deleteBtn.textContent = "❌";
@@ -2065,7 +2133,9 @@ return _originalFetch.apply(this, args);
         });
       }
 
-      function applyPromptGenSet(selections) {
+      function applyPromptGenSet(data) {
+        // Handle both old format (just selections) and new format ({name, selections})
+        const selections = data.selections || data;
         const rows = el.promptGeneratorList.querySelectorAll(".prompt-generator-row");
         rows.forEach((row) => {
           const key = row.dataset.key;
@@ -6575,6 +6645,94 @@ return _originalFetch.apply(this, args);
         #modalImageContainer:active .modal-info-btn {
           opacity: 1;
         }
+      }
+      #promptGenSaveSetModalContent,
+      #promptGenNothingToSaveModalContent {
+        width: 400px;
+        max-width: 90vw;
+        background: #161b22;
+        border: 1px solid #30363d;
+        border-radius: 8px;
+        padding: 0;
+      }
+
+      #promptGenSaveSetMessage,
+      #promptGenNothingToSaveMessage {
+        padding: 12px 16px;
+        font-size: 12px;
+        color: #8b949e;
+      }
+
+      #promptGenSaveSetForm {
+        padding: 0 16px 12px;
+      }
+
+      #promptGenSaveSetForm input[type="text"] {
+        width: 100%;
+        padding: 6px 8px;
+        font-size: 12px;
+        background: #0d1117;
+        color: #c9d1d9;
+        border: 1px solid #30363d;
+        border-radius: 4px;
+        box-sizing: border-box;
+      }
+
+      #promptGenSaveSetForm input[type="text"]:focus {
+        outline: none;
+        border-color: #6e40c9;
+      }
+
+      #promptGenSaveSetActions,
+      #promptGenNothingToSaveActions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+        padding: 12px 16px;
+        border-top: 1px solid #21262d;
+      }
+
+      #promptGenSaveSetCancelBtn,
+      #promptGenSaveSetSaveBtn,
+      #promptGenNothingToSaveCloseBtn {
+        padding: 6px 16px;
+        font-size: 11px;
+        border-radius: 4px;
+        cursor: pointer;
+        border: 1px solid #30363d;
+        color: #c9d1d9;
+      }
+
+      #promptGenSaveSetCancelBtn {
+        background: #30363d;
+      }
+
+      #promptGenSaveSetCancelBtn:hover {
+        background: #484f58;
+      }
+
+      #promptGenSaveSetSaveBtn {
+        background: #6e40c9;
+        border-color: #8957e5;
+      }
+
+      #promptGenSaveSetSaveBtn:hover {
+        background: #7c3aed;
+      }
+
+      #promptGenNothingToSaveCloseBtn {
+        background: #238636;
+        border-color: #2ea043;
+      }
+
+      #promptGenNothingToSaveCloseBtn:hover {
+        background: #2ea043;
+      }
+
+      .prompt-gen-saved-set-name {
+        font-weight: 600;
+        color: #6e40c9;
+        margin-right: 4px;
       }
     </style>
   </body>
