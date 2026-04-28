@@ -234,18 +234,13 @@ return _originalFetch.apply(this, args);
       <div id="galleryModalContent" onclick="event.stopPropagation()">
         <div class="modal-header">
           <h3>Gallery</h3>
-          <button onclick="closeGalleryModal()">❌</button>
-        </div>
-        <div id="galleryControls">
-          <input type="text" id="gallerySearch" placeholder="Search prompts & seeds..." />
+          <input type="text" id="gallerySearch" placeholder="Search..." />
           <button onclick="toggleGallerySort()" id="gallerySortBtn">⬇</button>
-          <button onclick="toggleGallerySelectMode()" id="gallerySelectModeBtn">Select</button>
+          <button onclick="toggleGallerySelectMode()" id="gallerySelectModeBtn">☐</button>
           <button onclick="showDeleteConfirmation()" id="galleryDeleteSelectedBtn" disabled>💥</button>
           <span id="galleryCount"></span>
+          <button onclick="closeGalleryModal()">❌</button>
         </div>
-        <!-- <div id="galleryFavoritesHeader" class="gallery-section-header" style="display: none;">
-          <span>Favorites</span>
-        </div> -->
         <div id="galleryFavoritesList"></div>
         <div id="galleryList"></div>
         <button id="galleryLoadMoreBtn" style="display: none">Load More</button>
@@ -368,7 +363,6 @@ return _originalFetch.apply(this, args);
         </div>
         <div id="promptGeneratorList"></div>
         <div id="promptGeneratorActions">
-          <button onclick="closePromptGeneratorModal()" id="promptGeneratorCancelBtn">CANCEL</button>
           <button onclick="createPromptFromPieces()" id="promptGeneratorCreateBtn">CREATE</button>
         </div>
       </div>
@@ -4962,8 +4956,7 @@ return _originalFetch.apply(this, args);
 
       #historySearchContainer,
       #historyControlsContainer,
-      #manageHistorySearchContainer,
-      #galleryControls {
+      #manageHistorySearchContainer {
         padding: 8px 12px;
         border-bottom: 1px solid #30363d;
       }
@@ -4999,8 +4992,7 @@ return _originalFetch.apply(this, args);
       }
 
       #historySearch,
-      #manageHistorySearch,
-      #galleryControls {
+      #manageHistorySearch {
         /* width: 100%; */
         /* padding: 8px 12px; */
         background: #0d1117;
@@ -5038,34 +5030,6 @@ return _originalFetch.apply(this, args);
       }
 
       #exportHistoryBtn:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-      }
-
-      #galleryControls {
-        display: flex;
-        gap: 8px;
-        align-items: center;
-        background: transparent;
-        border: none;
-        padding: 8px 12px;
-      }
-
-      #galleryControls button {
-        padding: 6px 12px;
-        background: #21262d;
-        border: 1px solid #30363d;
-        border-radius: 6px;
-        color: #c9d1d9;
-        /* font-size: 13px; */
-        cursor: pointer;
-      }
-
-      #galleryControls button:hover {
-        background: #30363d;
-      }
-
-      #galleryControls button:disabled {
         opacity: 0.5;
         cursor: not-allowed;
       }
@@ -6336,6 +6300,30 @@ return _originalFetch.apply(this, args);
 
       .gallery-item .tile-badge {
         background: rgba(48, 54, 61, 0.9);
+      }
+
+      .tile-badge {
+        pointer-events: none;
+      }
+
+      #galleryModal .modal-header {
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      #galleryModal .modal-header h3 {
+        margin-right: auto;
+      }
+
+      #galleryModal #gallerySearch {
+        width: 150px;
+        font-size: 11px;
+        padding: 4px 8px;
+      }
+
+      #galleryModal #galleryCount {
+        font-size: 11px;
+        color: #8b949e;
       }
 
       .modal-badges {

@@ -5,7 +5,7 @@
 This is a **Text-to-Image Generator UI** for [Perchance.org](https://perchance.org). It provides a web interface for generating AI images with features like:
 
 - Variable-based prompt system via scratchpad
-- Concurrency-controlled parallel generation (1-4 parallel requests)
+- Concurrency-controlled parallel generation (1-6 parallel requests)
 - IndexedDB persistence (via Dexie) for settings and prompt history
 - Image modal with navigation and keyboard shortcuts
 - Tab keep-alive mechanism (prevents browser throttling during long generations)
@@ -21,12 +21,15 @@ This is a **Text-to-Image Generator UI** for [Perchance.org](https://perchance.o
 ## Architecture
 
 ### Fetch Interception
+
 The app intercepts `window.fetch` to:
+
 1. Capture generate requests and store resolved prompts for history tracking
 2. Monitor queue position during parallel generation
 3. Handle generation cancellation via `Ctrl+Shift+Q`
 
 ### Database Schema (IndexedDB via Dexie)
+
 ```javascript
 db.version(1).stores({ prompts: "++id, prompt, timestamp" });
 db.version(2).stores({
@@ -34,54 +37,35 @@ db.version(2).stores({
   settings: "key, value",
 });
 ```
+
 - `prompts` table stores generation history with auto-incrementing IDs
 - `settings` table stores user preferences (e.g., concurrency, style suffix)
 
 ### Prompt Variable System
+
 Scratchpad variables are defined as `VARIABLE_NAME = {value1|value2|value3}` (uppercase names) and inserted into prompts as `[VARIABLE_NAME]`. The app resolves variables by replacing placeholders with random values from the defined set before generation.
 
 ### Style Constants
+
 Prompt suffixes for different image styles (cinematic, professional, casual, etc.) are defined as uppercase constants and appended to prompts during generation.
 
 ### Tab Keep-Alive
+
 Uses a silent `AudioContext` + `setInterval` to prevent browser tab throttling during long-running generations.
 
 ## Commands
 
 ### Build
+
 No build step required. This is a single-file application (`index.html`) deployed directly to Perchance. No compilation, bundling, or minification is needed.
 
-### Linting/Typechecking
-No linter or type-checker is currently configured. If adding a linter (e.g., ESLint for JavaScript, Stylelint for CSS):
-- Use 2-space indentation rules
-- Disable framework-specific rules (Vanilla JS only)
-- Use the `eslint:recommended` base config if ESLint is added
-
 ### Testing
-No automated test framework is set up. All testing is manual via browser:
-1. Open `index.html` in a modern browser (Chrome, Firefox, Edge)
-2. Test core functionality: prompt generation, scratchpad variables, history, keyboard shortcuts
-3. Verify IndexedDB persistence by reloading the page and checking history/settings
 
-#### Running a Single Test
-Not applicable, as no test framework exists. If a test framework (e.g., Jest, Vitest) is added later, use the framework's CLI to run a single test:
-- Jest: `npx jest --testPathPattern "test-name"`
-- Vitest: `npx vitest run --testNamePattern "test-name"`
+No automated test framework is set up. All testing is manual via browser by user.
 
 ### Development
+
 Edit `index.html` directly. No hot-reload or dev server is required; refresh the browser to see changes. For quick iteration, use the browser's DevTools to debug JS/CSS directly.
-
-## Keyboard Shortcuts
-
-| Shortcut       | Action                                |
-| -------------- | ------------------------------------- |
-| `Ctrl+Shift+S` | Toggle Scratchpad                     |
-| `Ctrl+Shift+H` | Toggle History                        |
-| `Ctrl+Shift+E` | Auto-adjust prompt height             |
-| `Ctrl+Shift+Q` | Cancel generation                     |
-| `Ctrl+Enter`   | Generate (when not focused in prompt) |
-| `Enter`        | Generate (when "ENTER to send" is on) |
-| `Escape`       | Close modal                           |
 
 ## Important Notes
 
