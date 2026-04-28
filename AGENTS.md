@@ -76,18 +76,13 @@ Edit `index.html` directly. No hot-reload or dev server is required; refresh the
 
 ## Code Style Guidelines
 
-### Imports & Dependencies
 - Only external dependency is Dexie.js 3.2.4, loaded via CDN script tag in `index.html`
 - No local imports or ES modules; all code is contained within `index.html`
 - Do not add additional external dependencies unless critical; Perchance's plugin system provides core generation functionality
-
-### Formatting
-- Indent all code (HTML, CSS, JS) with 2 spaces; no tabs
-- Use single quotes for string literals (consistent with existing Dexie CDN URL)
-- Omit semicolons unless required by syntax (e.g., before immediately invoked function expressions)
-- Keep line lengths under 100 characters where possible for readability
+- Keep the same indentation style as the already available code
 
 ### Naming Conventions
+
 - DOM elements cached in the `el` object with camelCase names (e.g., `el.promptInput`, `el.historyList`)
 - Global functions exposed via `window` use camelCase (e.g., `window.initPlugin`, `window.generateImage`)
 - Scratchpad variables use UPPERCASE names as per project conventions
@@ -95,22 +90,11 @@ Edit `index.html` directly. No hot-reload or dev server is required; refresh the
 - Avoid abbreviations in variable/function names unless widely recognized (e.g., `el` for DOM element cache is acceptable)
 
 ### Error Handling
+
 - Use try/catch blocks for all async operations (Dexie database calls, fetch interception)
-- Log errors to the browser console with descriptive messages; avoid suppressing errors
 - For Perchance plugin initialization, use polling with 500ms intervals until `image()` is available
-- Don't expose user-facing error messages unless critical (e.g., generation failure)
-
-### Types
-- No TypeScript or type annotations; this is a Vanilla JS project
-- Use JSDoc comments for complex functions if adding new functionality (optional, but recommended for clarity)
-
-## External Tool Rules
-No Cursor rules (`.cursorrules`, `.cursor/rules/`) or GitHub Copilot instructions (`.github/copilot-instructions.md`) are present in this repository.
 
 ## Git Rules
+
 - Always commit changes after completing a task that modifies `index.html`
 - Create concise, imperative commit messages (e.g., "Add scratchpad variable validation" not "Added scratchpad variable validation")
-- Never commit secrets, API keys, or sensitive data (verify `index.html` for sensitive content before committing)
-- Do not force-push to the remote repository unless explicitly requested by the user
-- If amending a commit, ensure it has not been pushed to the remote
-- Follow the existing commit style: short, descriptive messages focused on the "why" of the change
