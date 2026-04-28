@@ -2143,9 +2143,13 @@ return _originalFetch.apply(this, args);
             }
           });
           const collapsedContentSpan = row.querySelector(".prompt-gen-collapsed-content");
-          if (collapsedContentSpan && row.classList.contains("collapsed") && savedValues.length > 0) {
-            const originalValues = selections[key] || [];
-            collapsedContentSpan.textContent = `[${originalValues.join(", ")}]`;
+          if (collapsedContentSpan) {
+            if (row.classList.contains("collapsed") && savedValues.length > 0) {
+              const originalValues = selections[key] || [];
+              collapsedContentSpan.textContent = `[${originalValues.join(", ")}]`;
+            } else {
+              collapsedContentSpan.textContent = "";
+            }
           }
         });
         el.promptGeneratorList.querySelectorAll(".prompt-generator-row").forEach((row) => {
