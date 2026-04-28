@@ -3902,14 +3902,13 @@ return _originalFetch.apply(this, args);
             resolution: metadata.resolution,
           };
 
-          // Use requestAnimationFrame to ensure DOM updates aren't throttled
-          requestAnimationFrame(() => {
-            const img = document.createElement("img");
-            img.src = r.dataUrl;
-            img.style.cursor = "pointer";
-            img.onclick = () => openModal(r.dataUrl);
+            // Use requestAnimationFrame to ensure DOM updates aren't throttled
+            requestAnimationFrame(() => {
+              const img = document.createElement("img");
+              img.src = r.dataUrl;
+              img.style.cursor = "pointer";
 
-            // Create info button overlay
+              // Create info button overlay
             const infoBtn = document.createElement("button");
             infoBtn.className = "tile-info-btn";
             infoBtn.innerHTML = "ℹ";
@@ -3957,6 +3956,7 @@ return _originalFetch.apply(this, args);
             tile.appendChild(badgesContainer);
             tile.classList.add("tile-with-image");
             tile.dataset.imageUrl = r.dataUrl;
+            tile.addEventListener("click", () => openModal(r.dataUrl));
             updateGenerationUI();
           });
 
@@ -6320,6 +6320,10 @@ return _originalFetch.apply(this, args);
 
       .gallery-item .tile-badge {
         background: rgba(48, 54, 61, 0.9);
+      }
+
+      .tile-badges {
+        pointer-events: none;
       }
 
       .tile-badge {
