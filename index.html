@@ -3191,15 +3191,20 @@ return _originalFetch.apply(this, args);
           if (!append) {
             galleryFavorites = [];
             if (!searchQuery) {
-              const allItems = await db.gallery.toArray();
-              galleryFavorites = allItems.filter((item) => item.favorite);
-              if (!gallerySortDesc) {
-                galleryFavorites.reverse();
+              // Use database-level pagination for favorites (limit to first 50 for performance)
+              const favCollection = db.gallery.where("favorite").equals(true);
+              galleryFavoritesTotalCount = await favCollection.count();
+              if (galleryFavoritesTotalCount > 0) {
+                if (gallerySortDesc) {
+                  galleryFavorites = await favCollection.orderBy("timestamp").reverse().limit(50).toArray();
+                } else {
+                  galleryFavorites = await favCollection.orderBy("timestamp").limit(50).toArray();
+                }
               }
             } else {
-              const allFavorites = await db.gallery.toArray();
+              // Search within favorites only
+              const allFavorites = await db.gallery.where("favorite").equals(true).toArray();
               galleryFavorites = allFavorites.filter((item) => {
-                if (!item.favorite) return false;
                 const promptMatch = item.prompt && item.prompt.toLowerCase().includes(searchQuery);
                 let seedMatch = false;
                 if (item.seed) {
@@ -3212,23 +3217,21 @@ return _originalFetch.apply(this, args);
               } else {
                 galleryFavorites.sort((a, b) => a.timestamp - b.timestamp);
               }
+              galleryFavoritesTotalCount = galleryFavorites.length;
             }
-            galleryFavoritesTotalCount = galleryFavorites.length;
 
             // Show/hide favorites section
             if (galleryFavorites.length > 0) {
-              // el.galleryFavoritesHeader.style.display = "flex";
               el.galleryFavoritesList.style.display = "grid";
               renderGalleryItems(galleryFavorites, el.galleryFavoritesList, true);
             } else {
-              // el.galleryFavoritesHeader.style.display = "none";
               el.galleryFavoritesList.style.display = "none";
             }
           }
 
           let items;
           if (searchQuery) {
-            // For search, load all and filter
+            // For search, load all and filter (unavoidable without full-text index)
             let allItems = await db.gallery.orderBy("timestamp").toArray();
             if (gallerySortDesc) {
               allItems = allItems.reverse();
@@ -3249,17 +3252,15 @@ return _originalFetch.apply(this, args);
             const end = start + galleryLimit;
             items = filteredItems.slice(start, end);
           } else {
-            // No search - load non-favorites with pagination
-            const allNonFavorites = await db.gallery.filter((item) => !item.favorite).toArray();
+            // No search - use database-level pagination with offset/limit
+            let collection = db.gallery.where("favorite").notEqual(true);
+            galleryTotalCountFiltered = await collection.count();
+
             if (gallerySortDesc) {
-              allNonFavorites.sort((a, b) => b.timestamp - a.timestamp);
+              items = await collection.orderBy("timestamp").reverse().offset(galleryOffset).limit(galleryLimit).toArray();
             } else {
-              allNonFavorites.sort((a, b) => a.timestamp - b.timestamp);
+              items = await collection.orderBy("timestamp").offset(galleryOffset).limit(galleryLimit).toArray();
             }
-            galleryTotalCountFiltered = allNonFavorites.length;
-            const start = galleryOffset;
-            const end = start + galleryLimit;
-            items = allNonFavorites.slice(start, end);
           }
 
           if (!append) {
@@ -3447,7 +3448,7 @@ return _originalFetch.apply(this, args);
           
           // Update count
           galleryTotalCount = await db.gallery.count();
-          galleryFavoritesTotalCount = await db.gallery.filter((item) => item.favorite).count();
+          galleryFavoritesTotalCount = await db.gallery.where("favorite").equals(true).count();
           updateGalleryCount();
         } catch (e) {
           console.warn("Failed to delete gallery image:", e);
