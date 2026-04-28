@@ -1532,12 +1532,12 @@ return _originalFetch.apply(this, args);
           db.version(6).stores({
             prompts: "++id, prompt, timestamp, bookmarked",
             settings: "key, value",
-            gallery: "++id, timestamp, favorite",
+            gallery: "++id, timestamp",
           });
           db.version(7).stores({
             prompts: "++id, prompt, timestamp, bookmarked",
             settings: "key, value",
-            gallery: "++id, timestamp, favorite",
+            gallery: "++id, timestamp",
           }).upgrade(async (tx) => {
             // Migration: Add createdAt to existing prompt pieces that don't have it
             const settings = tx.table("settings");
@@ -3190,35 +3190,16 @@ return _originalFetch.apply(this, args);
           // Load favorites - only when not appending
           if (!append) {
             galleryFavorites = [];
-            if (!searchQuery) {
-              // Use database-level pagination for favorites (limit to first 50 for performance)
-              const favCollection = db.gallery.where("favorite").equals(true);
-              galleryFavoritesTotalCount = await favCollection.count();
-              if (galleryFavoritesTotalCount > 0) {
-                if (gallerySortDesc) {
-                  galleryFavorites = await favCollection.orderBy("timestamp").reverse().limit(50).toArray();
-                } else {
-                  galleryFavorites = await favCollection.orderBy("timestamp").limit(50).toArray();
-                }
-              }
+            // Use toArray and client-side filter (favorite is no longer indexed)
+            const allItems = await db.gallery.toArray();
+            const allFavorites = allItems.filter(item => item.favorite === 1 || item.favorite === true);
+            if (gallerySortDesc) {
+              allFavorites.sort((a, b) => b.timestamp - a.timestamp);
             } else {
-              // Search within favorites only
-              const allFavorites = await db.gallery.where("favorite").equals(true).toArray();
-              galleryFavorites = allFavorites.filter((item) => {
-                const promptMatch = item.prompt && item.prompt.toLowerCase().includes(searchQuery);
-                let seedMatch = false;
-                if (item.seed) {
-                  seedMatch = String(item.seed).includes(searchQuery);
-                }
-                return promptMatch || seedMatch;
-              });
-              if (gallerySortDesc) {
-                galleryFavorites.sort((a, b) => b.timestamp - a.timestamp);
-              } else {
-                galleryFavorites.sort((a, b) => a.timestamp - b.timestamp);
-              }
-              galleryFavoritesTotalCount = galleryFavorites.length;
+              allFavorites.sort((a, b) => a.timestamp - b.timestamp);
             }
+            galleryFavorites = allFavorites.slice(0, 50); // limit to 50 for performance
+            galleryFavoritesTotalCount = allFavorites.length;
 
             // Show/hide favorites section
             if (galleryFavorites.length > 0) {
@@ -3238,7 +3219,7 @@ return _originalFetch.apply(this, args);
             }
             // Client-side filter for search (exclude favorites)
             let filteredItems = allItems.filter((item) => {
-              if (item.favorite) return false; // Already shown in favorites
+               if (item.favorite === 1) return false; // Already shown in favorites
               const promptMatch = item.prompt && item.prompt.toLowerCase().includes(searchQuery);
               let seedMatch = false;
               if (item.seed) {
@@ -3252,15 +3233,13 @@ return _originalFetch.apply(this, args);
             const end = start + galleryLimit;
             items = filteredItems.slice(start, end);
           } else {
-            // No search - use database-level pagination with offset/limit
-            let collection = db.gallery.where("favorite").notEqual(true);
-            galleryTotalCountFiltered = await collection.count();
-
-            if (gallerySortDesc) {
-              items = await collection.orderBy("timestamp").reverse().offset(galleryOffset).limit(galleryLimit).toArray();
-            } else {
-              items = await collection.orderBy("timestamp").offset(galleryOffset).limit(galleryLimit).toArray();
-            }
+            // No search - use filter (no index on favorite) with manual pagination
+            const allNonFav = await db.gallery.toArray();
+            const nonFavSorted = gallerySortDesc
+              ? allNonFav.filter(item => item.favorite !== 1 && item.favorite !== true).sort((a, b) => b.timestamp - a.timestamp)
+              : allNonFav.filter(item => item.favorite !== 1 && item.favorite !== true).sort((a, b) => a.timestamp - b.timestamp);
+            galleryTotalCountFiltered = nonFavSorted.length;
+            items = nonFavSorted.slice(galleryOffset, galleryOffset + galleryLimit);
           }
 
           if (!append) {
@@ -3448,7 +3427,7 @@ return _originalFetch.apply(this, args);
           
           // Update count
           galleryTotalCount = await db.gallery.count();
-          galleryFavoritesTotalCount = await db.gallery.where("favorite").equals(true).count();
+          galleryFavoritesTotalCount = await db.gallery.filter(item => item.favorite === 1 || item.favorite === true).count();
           updateGalleryCount();
         } catch (e) {
           console.warn("Failed to delete gallery image:", e);
@@ -3636,7 +3615,7 @@ return _originalFetch.apply(this, args);
         try {
           const item = await db.gallery.get(id);
           if (!item) return;
-          const newFavorite = !item.favorite;
+          const newFavorite = item.favorite === 1 ? 0 : 1;
           await db.gallery.update(id, { favorite: newFavorite });
           // Update local item reference if it's the current modal image
           if (galleryCurrentImage && galleryCurrentImage.id === id) {
@@ -3686,6 +3665,7 @@ return _originalFetch.apply(this, args);
             style: style,
             resolution: resolution,
             seed: seed,
+            favorite: 0,
             timestamp: Date.now(),
           });
 
