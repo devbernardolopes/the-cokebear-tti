@@ -237,16 +237,16 @@ return _originalFetch.apply(this, args);
           <h3>Gallery</h3>
           <input type="text" id="gallerySearch" placeholder="Search..." />
           <button onclick="toggleGallerySort()" id="gallerySortBtn">⬇</button>
+          <button onclick="toggleGalleryFavoritesOnly()" id="galleryFavoritesOnlyBtn" title="Show favorites only">🤍</button>
           <button onclick="toggleGallerySelectMode()" id="gallerySelectModeBtn">☐</button>
           <button onclick="showDeleteConfirmation()" id="galleryDeleteSelectedBtn" disabled>💥</button>
           <span id="galleryCount"></span>
           <button onclick="closeGalleryModal()">❌</button>
         </div>
-        <div id="galleryBody">
-          <div id="galleryFavoritesList"></div>
-          <div id="galleryList"></div>
-        </div>
-        <button id="galleryLoadMoreBtn" style="display: none">Load More</button>
+          <div id="galleryBody">
+            <div id="galleryFavoritesList"></div>
+            <div id="galleryList"></div>
+          </div>
       </div>
     </div>
 
@@ -357,7 +357,7 @@ return _originalFetch.apply(this, args);
       <div id="promptGeneratorModal" class="modal">
       <div id="promptGeneratorModalContent" onclick="event.stopPropagation()">
         <div class="modal-header">
-          <h3>Prompt Generator</h3>
+          <h3>Prompt Gen</h3>
           <button onclick="clearAllPromptGenSelections()" id="promptGenClearBtn" title="Clear all selections">🗑</button>
           <button onclick="savePromptGenSet()" id="promptGenSaveBtn" title="Save current selections">💾</button>
           <button onclick="loadPromptGenSet()" id="promptGenLoadBtn" title="Load saved selections">📂</button>
@@ -519,7 +519,6 @@ return _originalFetch.apply(this, args);
         galleryList: document.getElementById("galleryList"),
         galleryFavoritesList: document.getElementById("galleryFavoritesList"),
         // galleryFavoritesHeader: document.getElementById("galleryFavoritesHeader"),
-        galleryLoadMoreBtn: document.getElementById("galleryLoadMoreBtn"),
         galleryCount: document.getElementById("galleryCount"),
         gallerySelectModeBtn: document.getElementById("gallerySelectModeBtn"),
         galleryDeleteSelectedBtn: document.getElementById("galleryDeleteSelectedBtn"),
@@ -672,6 +671,12 @@ return _originalFetch.apply(this, args);
       let galleryLoadToken = 0;
       let galleryThumbObserver = null;
       let galleryThumbPendingSrc = new Map();
+      let galleryFavoritesOnly = false;
+      let galleryIsLoadingMore = false;
+      let galleryHasMore = true;
+      let galleryScrollSentinel = null;
+      let galleryScrollObserver = null;
+      let gallerySearchCache = { query: "", sortDesc: true, favoritesOnly: false, items: null };
 
       function getGalleryThumbObserver() {
         if (galleryThumbObserver) return galleryThumbObserver;
@@ -689,9 +694,50 @@ return _originalFetch.apply(this, args);
               galleryThumbObserver.unobserve(img);
             });
           },
-          { root: el.galleryBody || null, rootMargin: "400px 0px" }
+          { root: el.galleryList || null, rootMargin: "400px 0px" }
         );
         return galleryThumbObserver;
+      }
+
+      function ensureGalleryScrollSentinel() {
+        if (!galleryScrollSentinel) {
+          galleryScrollSentinel = document.createElement("div");
+          galleryScrollSentinel.id = "galleryScrollSentinel";
+        }
+        if (!galleryScrollSentinel.parentElement) {
+          el.galleryList.appendChild(galleryScrollSentinel);
+        }
+      }
+
+      function setupGalleryInfiniteScroll(token) {
+        if (!("IntersectionObserver" in window)) return;
+        if (galleryScrollObserver) {
+          galleryScrollObserver.disconnect();
+          galleryScrollObserver = null;
+        }
+        ensureGalleryScrollSentinel();
+        galleryScrollObserver = new IntersectionObserver(
+          (entries) => {
+            if (token !== galleryLoadToken) return;
+            const entry = entries[0];
+            if (!entry || !entry.isIntersecting) return;
+            if (!galleryHasMore || galleryIsLoadingMore) return;
+            galleryOffset += galleryLimit;
+            loadGallery(true, galleryLoadToken);
+          },
+          { root: el.galleryList, rootMargin: "600px 0px" }
+        );
+        galleryScrollObserver.observe(galleryScrollSentinel);
+      }
+
+      function resetGalleryList(token, message) {
+        if (token !== galleryLoadToken) return;
+        galleryOffset = 0;
+        galleryHasMore = true;
+        el.galleryList.innerHTML = message ? `<div class="history-empty">${message}</div>` : "";
+        galleryImages = [];
+        ensureGalleryScrollSentinel();
+        setupGalleryInfiniteScroll(token);
       }
 
       function scheduleIdle(fn) {
@@ -3259,6 +3305,8 @@ return _originalFetch.apply(this, args);
         if (!db) return;
         try {
           if (token !== galleryLoadToken) return;
+          if (galleryIsLoadingMore) return;
+          galleryIsLoadingMore = true;
           // Save scroll position before reload
           let savedScrollPosition = 0;
           if (append) {
@@ -3266,10 +3314,8 @@ return _originalFetch.apply(this, args);
           }
 
           if (!append) {
-            galleryOffset = 0;
-            el.galleryList.innerHTML = "";
-            el.galleryFavoritesList.innerHTML = "";
-            galleryImages = [];
+            resetGalleryList(token, null);
+            el.galleryFavoritesList.style.display = "none";
             galleryFavorites = [];
           }
 
@@ -3279,34 +3325,39 @@ return _originalFetch.apply(this, args);
 
           let items;
           if (searchQuery) {
-            // For search, load all and filter (unavoidable without full-text index)
-            let allItems = await db.gallery.orderBy("timestamp").toArray();
-            if (token !== galleryLoadToken) return;
-            if (gallerySortDesc) {
-              allItems = allItems.reverse();
+            // Search: cache the full filtered list for this query/sort/favoritesOnly to keep infinite scroll cheap
+            const cacheHit =
+              gallerySearchCache.items &&
+              gallerySearchCache.query === searchQuery &&
+              gallerySearchCache.sortDesc === gallerySortDesc &&
+              gallerySearchCache.favoritesOnly === galleryFavoritesOnly;
+
+            let filteredItems;
+            if (cacheHit) {
+              filteredItems = gallerySearchCache.items;
+            } else {
+              let allItems = await db.gallery.orderBy("timestamp").toArray();
+              if (token !== galleryLoadToken) return;
+              if (gallerySortDesc) allItems = allItems.reverse();
+              filteredItems = allItems.filter((item) => {
+                if (galleryFavoritesOnly && !(item.favorite === 1 || item.favorite === true)) return false;
+                const promptMatch = item.prompt && item.prompt.toLowerCase().includes(searchQuery);
+                const seedMatch = item.seed ? String(item.seed).includes(searchQuery) : false;
+                return promptMatch || seedMatch;
+              });
+              gallerySearchCache = { query: searchQuery, sortDesc: gallerySortDesc, favoritesOnly: galleryFavoritesOnly, items: filteredItems };
             }
-            // Client-side filter for search (exclude favorites)
-            let filteredItems = allItems.filter((item) => {
-               if (item.favorite === 1) return false; // Already shown in favorites
-              const promptMatch = item.prompt && item.prompt.toLowerCase().includes(searchQuery);
-              let seedMatch = false;
-              if (item.seed) {
-                seedMatch = String(item.seed).includes(searchQuery);
-              }
-              return promptMatch || seedMatch;
-            });
+
             galleryTotalCountFiltered = filteredItems.length;
-            // Apply pagination after filtering
-            const start = galleryOffset;
-            const end = start + galleryLimit;
-            items = filteredItems.slice(start, end);
+            items = filteredItems.slice(galleryOffset, galleryOffset + galleryLimit);
+            galleryHasMore = galleryOffset + items.length < filteredItems.length;
           } else {
-            // No search - avoid full table scan by paging via indexed timestamp
-            const batchSize = Math.max(galleryLimit, 100);
-            const nonFavItems = [];
+            // No search - page by indexed timestamp; optionally filter to favorites-only without scanning full table
+            const batchSize = Math.max(galleryLimit, 125);
+            const collected = [];
             let scanOffset = galleryOffset;
 
-            while (nonFavItems.length < galleryLimit) {
+            while (collected.length < galleryLimit) {
               if (token !== galleryLoadToken) return;
               let coll = db.gallery.orderBy("timestamp");
               if (gallerySortDesc) coll = coll.reverse();
@@ -3315,32 +3366,33 @@ return _originalFetch.apply(this, args);
               if (batch.length === 0) break;
 
               batch.forEach((item) => {
-                if (item.favorite === 1 || item.favorite === true) return;
-                nonFavItems.push(item);
+                if (galleryFavoritesOnly && !(item.favorite === 1 || item.favorite === true)) return;
+                collected.push(item);
               });
 
               scanOffset += batch.length;
               if (batch.length < batchSize) break;
             }
 
-            items = nonFavItems.slice(0, galleryLimit);
-            // Approximate filtered count to avoid a second full scan
+            items = collected.slice(0, galleryLimit);
             galleryTotalCountFiltered = galleryTotalCount;
+            galleryHasMore = scanOffset < galleryTotalCount;
           }
 
           if (!append) {
             el.galleryList.innerHTML = "";
+            ensureGalleryScrollSentinel();
           }
 
           if (items.length === 0 && !append) {
             el.galleryList.innerHTML = searchQuery ? '<div class="history-empty">No matching images found</div>' : '<div class="history-empty">No images saved to gallery yet</div>';
-            el.galleryLoadMoreBtn.style.display = "none";
+            galleryHasMore = false;
             updateGalleryCount();
             return;
           }
 
           if (items.length === 0 && append) {
-            el.galleryLoadMoreBtn.style.display = "none";
+            galleryHasMore = false;
             updateGalleryCount();
             return;
           }
@@ -3351,45 +3403,17 @@ return _originalFetch.apply(this, args);
 
           renderGalleryItemsProgressive(items, el.galleryList, false, token);
 
-          const hasMore = galleryOffset + items.length < galleryTotalCountFiltered;
-          el.galleryLoadMoreBtn.style.display = hasMore ? "block" : "none";
+          ensureGalleryScrollSentinel();
           updateGalleryCount();
 
           // Restore scroll position after reload
           if (append && savedScrollPosition > 0) {
             el.galleryList.scrollTop = savedScrollPosition;
           }
-
-          // Load favorites after initial paint to keep modal opening snappy
-          if (!append) {
-            scheduleIdle(async () => {
-              if (token !== galleryLoadToken) return;
-              try {
-                const allItems = await db.gallery.orderBy("timestamp").toArray();
-                if (token !== galleryLoadToken) return;
-                const allFavorites = allItems.filter((item) => item.favorite === 1 || item.favorite === true);
-                if (gallerySortDesc) {
-                  allFavorites.sort((a, b) => b.timestamp - a.timestamp);
-                } else {
-                  allFavorites.sort((a, b) => a.timestamp - b.timestamp);
-                }
-                galleryFavorites = allFavorites.slice(0, 50); // limit to 50 for performance
-                galleryFavoritesTotalCount = allFavorites.length;
-
-                if (galleryFavorites.length > 0) {
-                  el.galleryFavoritesList.style.display = "grid";
-                  el.galleryFavoritesList.innerHTML = "";
-                  renderGalleryItemsProgressive(galleryFavorites, el.galleryFavoritesList, true, token);
-                } else {
-                  el.galleryFavoritesList.style.display = "none";
-                }
-              } catch (e) {
-                console.warn("Failed to load gallery favorites:", e);
-              }
-            });
-          }
         } catch (e) {
           console.warn("Failed to load gallery:", e);
+        } finally {
+          galleryIsLoadingMore = false;
         }
       }
 
@@ -3535,17 +3559,20 @@ return _originalFetch.apply(this, args);
 
       window.openGallery = async function () {
         galleryLoadToken++;
-        galleryOffset = 0;
         gallerySelectMode = false;
         selectedGalleryIds.clear();
         gallerySearchQuery = "";
+        gallerySearchCache = { query: "", sortDesc: gallerySortDesc, favoritesOnly: galleryFavoritesOnly, items: null };
         el.gallerySearch.value = "";
         el.galleryList.innerHTML = "";
         el.galleryFavoritesList.innerHTML = "";
         el.gallerySelectModeBtn.textContent = "☐";
+        el.gallerySortBtn.textContent = gallerySortDesc ? "⬇" : "⬆";
         el.galleryModal.style.display = "flex";
         document.body.classList.add("modal-open");
-        el.galleryList.innerHTML = '<div class="history-empty">Loading gallery...</div>';
+        resetGalleryList(galleryLoadToken, "Loading gallery...");
+        el.galleryFavoritesList.style.display = "none";
+        updateGalleryFavoritesOnlyBtn();
         loadGallery(false, galleryLoadToken);
       };
 
@@ -3554,6 +3581,10 @@ return _originalFetch.apply(this, args);
         galleryCurrentImage = null;
         el.galleryModal.style.display = "none";
         document.body.classList.remove("modal-open");
+        if (galleryScrollObserver) {
+          galleryScrollObserver.disconnect();
+          galleryScrollObserver = null;
+        }
       };
 
       el.galleryModal.addEventListener("click", (e) => {
@@ -3586,11 +3617,28 @@ return _originalFetch.apply(this, args);
         }
       };
 
+      function updateGalleryFavoritesOnlyBtn() {
+        const btn = document.getElementById("galleryFavoritesOnlyBtn");
+        if (!btn) return;
+        btn.textContent = galleryFavoritesOnly ? "❤️" : "🤍";
+        btn.classList.toggle("favorite-active", galleryFavoritesOnly);
+      }
+
+      window.toggleGalleryFavoritesOnly = function () {
+        galleryFavoritesOnly = !galleryFavoritesOnly;
+        galleryLoadToken++;
+        gallerySearchCache = { query: "", sortDesc: gallerySortDesc, favoritesOnly: galleryFavoritesOnly, items: null };
+        updateGalleryFavoritesOnlyBtn();
+        resetGalleryList(galleryLoadToken, galleryFavoritesOnly ? "Loading favorites..." : "Loading gallery...");
+        loadGallery(false, galleryLoadToken);
+      };
+
       window.toggleGallerySort = async function () {
         gallerySortDesc = !gallerySortDesc;
         el.gallerySortBtn.textContent = gallerySortDesc ? "⬇" : "⬆";
-        galleryOffset = 0;
-        el.galleryList.innerHTML = '<div class="history-empty">Loading gallery...</div>';
+        galleryLoadToken++;
+        gallerySearchCache = { query: "", sortDesc: gallerySortDesc, favoritesOnly: galleryFavoritesOnly, items: null };
+        resetGalleryList(galleryLoadToken, "Loading gallery...");
         loadGallery(false, galleryLoadToken);
       };
 
@@ -3612,25 +3660,14 @@ return _originalFetch.apply(this, args);
         try {
           await db.gallery.delete(id);
           
-          // Remove from both grids without full reload
-          const divFav = el.galleryFavoritesList.querySelector(`[data-id="${id}"]`);
           const divMain = el.galleryList.querySelector(`[data-id="${id}"]`);
           
-          if (divFav) {
-            divFav.remove();
-            // Check if favorites grid is empty
-            if (el.galleryFavoritesList.children.length === 0) {
-              // el.galleryFavoritesHeader.style.display = "none";
-              el.galleryFavoritesList.style.display = "none";
-            }
-          }
           if (divMain) {
             divMain.remove();
           }
           
           // Update count
           galleryTotalCount = await db.gallery.count();
-          galleryFavoritesTotalCount = await db.gallery.filter(item => item.favorite === 1 || item.favorite === true).count();
           updateGalleryCount();
         } catch (e) {
           console.warn("Failed to delete gallery image:", e);
@@ -3656,10 +3693,18 @@ return _originalFetch.apply(this, args);
         const ids = Array.from(selectedGalleryIds);
         try {
           await db.gallery.bulkDelete(ids);
+          ids.forEach((id) => {
+            const tile = el.galleryList.querySelector(`[data-id="${id}"]`);
+            if (tile) tile.remove();
+          });
           selectedGalleryIds.clear();
           gallerySelectMode = false;
           el.gallerySelectModeBtn.textContent = "☐";
-          await loadGallery(false);
+          galleryTotalCount = await db.gallery.count();
+          updateGalleryCount();
+          if (galleryHasMore) {
+            loadGallery(true, galleryLoadToken);
+          }
         } catch (e) {
           console.warn("Failed to delete selected gallery images:", e);
         }
@@ -3671,18 +3716,16 @@ return _originalFetch.apply(this, args);
         }
       });
 
-      el.galleryLoadMoreBtn.addEventListener("click", () => {
-        galleryOffset += galleryLimit;
-        loadGallery(true, galleryLoadToken);
-      });
+      // Infinite scroll replaces the "Load More" button.
 
       // Gallery search with debounce
       el.gallerySearch.addEventListener("input", (e) => {
         clearTimeout(galleryDebounceTimer);
         galleryDebounceTimer = setTimeout(() => {
           gallerySearchQuery = e.target.value;
-          galleryOffset = 0;
-          el.galleryList.innerHTML = '<div class="history-empty">Searching...</div>';
+          galleryLoadToken++;
+          gallerySearchCache = { query: "", sortDesc: gallerySortDesc, favoritesOnly: galleryFavoritesOnly, items: null };
+          resetGalleryList(galleryLoadToken, "Searching...");
           loadGallery(false, galleryLoadToken);
         }, 300);
       });
@@ -3825,8 +3868,40 @@ return _originalFetch.apply(this, args);
           if (galleryCurrentImage && galleryCurrentImage.id === id) {
             galleryCurrentImage.favorite = newFavorite;
           }
-          // Reload gallery to update both grids
-          await loadGallery(false);
+          // Update tile in-place without resetting the whole gallery
+          const tile = el.galleryList.querySelector(`[data-id="${id}"]`);
+          if (tile) {
+            const favBtn = tile.querySelector(".gallery-item-favorite-btn");
+            const favIndicator = tile.querySelector(".gallery-item-favorite-indicator");
+            if (favBtn) {
+              favBtn.textContent = newFavorite ? "❤️" : "🤍";
+              favBtn.classList.toggle("favorite-active", !!newFavorite);
+            }
+            if (newFavorite) {
+              if (!favIndicator) {
+                const ind = document.createElement("div");
+                ind.className = "gallery-item-favorite-indicator";
+                ind.textContent = "❤️";
+                tile.appendChild(ind);
+              }
+            } else if (favIndicator) {
+              favIndicator.remove();
+            }
+          }
+
+          // If we're in favorites-only mode and unfavorited, remove the tile from view
+          if (galleryFavoritesOnly && !newFavorite) {
+            const tileToRemove = el.galleryList.querySelector(`[data-id="${id}"]`);
+            if (tileToRemove) tileToRemove.remove();
+            if (selectedGalleryIds.has(id)) {
+              selectedGalleryIds.delete(id);
+              updateGalleryCount();
+            }
+            // Backfill if we're near the bottom
+            if (galleryHasMore) {
+              loadGallery(true, galleryLoadToken);
+            }
+          }
           // Update the modal view if open
           updateFavoriteBtnInModal(newFavorite);
         } catch (e) {
@@ -5276,13 +5351,18 @@ return _originalFetch.apply(this, args);
       }
 
       #galleryFavoritesList {
-        display: grid;
+        display: none;
         grid-template-columns: minmax(128px, 200px);
         gap: 1px;
         padding: 10px;
         overflow-y: auto;
         border-right: 1px solid #30363d;
         flex-shrink: 0;
+      }
+
+      #galleryScrollSentinel {
+        width: 100%;
+        height: 1px;
       }
 
       #galleryList {
