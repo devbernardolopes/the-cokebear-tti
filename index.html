@@ -1978,7 +1978,7 @@ return _originalFetch.apply(this, args);
             selections[key] = selectedValues;
           }
         });
-        localStorage.setItem("promptGenSelections", JSON.stringify(selections));
+        sessionStorage.setItem("promptGenSelections", JSON.stringify(selections));
       }
 
       window.savePromptGenSet = async function () {
@@ -2164,7 +2164,7 @@ return _originalFetch.apply(this, args);
       }
 
       function cleanPromptGenSelections() {
-        const savedSelections = JSON.parse(localStorage.getItem("promptGenSelections") || "{}");
+        const savedSelections = JSON.parse(sessionStorage.getItem("promptGenSelections") || "{}");
         const currentKeys = new Set(promptPieces.map((p) => p.key));
         let changed = false;
         const newSelections = {};
@@ -2190,7 +2190,7 @@ return _originalFetch.apply(this, args);
           }
         }
         if (changed) {
-          localStorage.setItem("promptGenSelections", JSON.stringify(newSelections));
+          sessionStorage.setItem("promptGenSelections", JSON.stringify(newSelections));
         }
       }
 
@@ -2228,7 +2228,7 @@ return _originalFetch.apply(this, args);
           return;
         }
 
-        const savedOrder = JSON.parse(localStorage.getItem("promptGenOrder") || "null");
+        const savedOrder = JSON.parse(sessionStorage.getItem("promptGenOrder") || "null");
         let orderedPieces = promptPieces;
         if (savedOrder) {
           orderedPieces = promptPieces.slice().sort((a, b) => {
@@ -2250,7 +2250,7 @@ return _originalFetch.apply(this, args);
           row.className = "prompt-generator-row";
           row.dataset.key = piece.key;
 
-          const collapsedKeys = JSON.parse(localStorage.getItem("promptGenCollapsed") || "{}");
+          const collapsedKeys = JSON.parse(sessionStorage.getItem("promptGenCollapsed") || "{}");
           if (collapsedKeys[pieceKey]) {
             row.classList.add("collapsed");
           }
@@ -2336,7 +2336,7 @@ return _originalFetch.apply(this, args);
               if (isDragging) {
                 row.classList.remove("dragging");
                 const newOrder = Array.from(el.promptGeneratorList.querySelectorAll(".prompt-generator-row")).map((r) => r.dataset.key);
-                localStorage.setItem("promptGenOrder", JSON.stringify(newOrder));
+                sessionStorage.setItem("promptGenOrder", JSON.stringify(newOrder));
                 justDragged = true;
                 // Reset the flag after a short delay so click event doesn't trigger collapse
                 setTimeout(() => { justDragged = false; }, 200);
@@ -2378,7 +2378,7 @@ return _originalFetch.apply(this, args);
           valuesContainer.className = "prompt-generator-values";
           valuesContainer.dataset.pieceKey = pieceKey;
 
-          const savedSelections = JSON.parse(localStorage.getItem("promptGenSelections") || "{}");
+          const savedSelections = JSON.parse(sessionStorage.getItem("promptGenSelections") || "{}");
           const selectedForKey = savedSelections[piece.key] || [];
 
           values.forEach((value) => {
@@ -2420,9 +2420,9 @@ return _originalFetch.apply(this, args);
             // Don't toggle if we just finished a drag
             if (justDragged) return;
             row.classList.toggle("collapsed");
-            const collapsedKeys = JSON.parse(localStorage.getItem("promptGenCollapsed") || "{}");
+            const collapsedKeys = JSON.parse(sessionStorage.getItem("promptGenCollapsed") || "{}");
             collapsedKeys[pieceKey] = row.classList.contains("collapsed");
-            localStorage.setItem("promptGenCollapsed", JSON.stringify(collapsedKeys));
+            sessionStorage.setItem("promptGenCollapsed", JSON.stringify(collapsedKeys));
             updateCollapsedContent();
           });
 
@@ -2445,7 +2445,7 @@ return _originalFetch.apply(this, args);
       window.toggleAllPromptGenEntries = function () {
         const rows = el.promptGeneratorList.querySelectorAll(".prompt-generator-row");
         if (rows.length === 0) return;
-        const collapsedKeys = JSON.parse(localStorage.getItem("promptGenCollapsed") || "{}");
+        const collapsedKeys = JSON.parse(sessionStorage.getItem("promptGenCollapsed") || "{}");
         // Check if all rows are collapsed
         const allCollapsed = Array.from(rows).every((row) => row.classList.contains("collapsed"));
         rows.forEach((row) => {
@@ -2472,7 +2472,7 @@ return _originalFetch.apply(this, args);
             }
           }
         });
-        localStorage.setItem("promptGenCollapsed", JSON.stringify(collapsedKeys));
+        sessionStorage.setItem("promptGenCollapsed", JSON.stringify(collapsedKeys));
       };
 
       window.clearAllPromptGenSelections = function () {
@@ -2493,8 +2493,8 @@ return _originalFetch.apply(this, args);
             }
           }
         });
-        // Clear saved selections in localStorage
-        localStorage.setItem("promptGenSelections", JSON.stringify({}));
+        // Clear saved selections in sessionStorage
+        sessionStorage.setItem("promptGenSelections", JSON.stringify({}));
       };
 
       window.createPromptFromPieces = function () {
