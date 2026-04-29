@@ -669,6 +669,38 @@ return _originalFetch.apply(this, args);
       let galleryTotalCountFiltered = 0;
       let galleryFavorites = [];
       let galleryFavoritesTotalCount = 0;
+      let galleryLoadToken = 0;
+      let galleryThumbObserver = null;
+      let galleryThumbPendingSrc = new Map();
+
+      function getGalleryThumbObserver() {
+        if (galleryThumbObserver) return galleryThumbObserver;
+        if (!("IntersectionObserver" in window)) return null;
+        galleryThumbObserver = new IntersectionObserver(
+          (entries) => {
+            entries.forEach((entry) => {
+              if (!entry.isIntersecting) return;
+              const img = entry.target;
+              const src = galleryThumbPendingSrc.get(img);
+              if (src) {
+                img.src = src;
+                galleryThumbPendingSrc.delete(img);
+              }
+              galleryThumbObserver.unobserve(img);
+            });
+          },
+          { root: el.galleryBody || null, rootMargin: "400px 0px" }
+        );
+        return galleryThumbObserver;
+      }
+
+      function scheduleIdle(fn) {
+        if ("requestIdleCallback" in window) {
+          window.requestIdleCallback(fn, { timeout: 1000 });
+        } else {
+          setTimeout(fn, 0);
+        }
+      }
 
       // Prompt pieces state
       let promptPieces = [];
@@ -3223,9 +3255,10 @@ return _originalFetch.apply(this, args);
       });
 
       // Gallery functions
-      async function loadGallery(append = false) {
+      async function loadGallery(append = false, token = galleryLoadToken) {
         if (!db) return;
         try {
+          if (token !== galleryLoadToken) return;
           // Save scroll position before reload
           let savedScrollPosition = 0;
           if (append) {
@@ -3241,35 +3274,14 @@ return _originalFetch.apply(this, args);
           }
 
           galleryTotalCount = await db.gallery.count();
+          if (token !== galleryLoadToken) return;
           const searchQuery = gallerySearchQuery.toLowerCase();
-
-          // Load favorites - only when not appending
-          if (!append) {
-            galleryFavorites = [];
-            // Use toArray and client-side filter (favorite is no longer indexed)
-            const allItems = await db.gallery.toArray();
-            const allFavorites = allItems.filter(item => item.favorite === 1 || item.favorite === true);
-            if (gallerySortDesc) {
-              allFavorites.sort((a, b) => b.timestamp - a.timestamp);
-            } else {
-              allFavorites.sort((a, b) => a.timestamp - b.timestamp);
-            }
-            galleryFavorites = allFavorites.slice(0, 50); // limit to 50 for performance
-            galleryFavoritesTotalCount = allFavorites.length;
-
-            // Show/hide favorites section
-            if (galleryFavorites.length > 0) {
-              el.galleryFavoritesList.style.display = "grid";
-              renderGalleryItems(galleryFavorites, el.galleryFavoritesList, true);
-            } else {
-              el.galleryFavoritesList.style.display = "none";
-            }
-          }
 
           let items;
           if (searchQuery) {
             // For search, load all and filter (unavoidable without full-text index)
             let allItems = await db.gallery.orderBy("timestamp").toArray();
+            if (token !== galleryLoadToken) return;
             if (gallerySortDesc) {
               allItems = allItems.reverse();
             }
@@ -3289,13 +3301,31 @@ return _originalFetch.apply(this, args);
             const end = start + galleryLimit;
             items = filteredItems.slice(start, end);
           } else {
-            // No search - use filter (no index on favorite) with manual pagination
-            const allNonFav = await db.gallery.toArray();
-            const nonFavSorted = gallerySortDesc
-              ? allNonFav.filter(item => item.favorite !== 1 && item.favorite !== true).sort((a, b) => b.timestamp - a.timestamp)
-              : allNonFav.filter(item => item.favorite !== 1 && item.favorite !== true).sort((a, b) => a.timestamp - b.timestamp);
-            galleryTotalCountFiltered = nonFavSorted.length;
-            items = nonFavSorted.slice(galleryOffset, galleryOffset + galleryLimit);
+            // No search - avoid full table scan by paging via indexed timestamp
+            const batchSize = Math.max(galleryLimit, 100);
+            const nonFavItems = [];
+            let scanOffset = galleryOffset;
+
+            while (nonFavItems.length < galleryLimit) {
+              if (token !== galleryLoadToken) return;
+              let coll = db.gallery.orderBy("timestamp");
+              if (gallerySortDesc) coll = coll.reverse();
+              const batch = await coll.offset(scanOffset).limit(batchSize).toArray();
+              if (token !== galleryLoadToken) return;
+              if (batch.length === 0) break;
+
+              batch.forEach((item) => {
+                if (item.favorite === 1 || item.favorite === true) return;
+                nonFavItems.push(item);
+              });
+
+              scanOffset += batch.length;
+              if (batch.length < batchSize) break;
+            }
+
+            items = nonFavItems.slice(0, galleryLimit);
+            // Approximate filtered count to avoid a second full scan
+            galleryTotalCountFiltered = galleryTotalCount;
           }
 
           if (!append) {
@@ -3319,7 +3349,7 @@ return _originalFetch.apply(this, args);
             galleryImages.push(item);
           });
 
-          renderGalleryItems(items, el.galleryList, false);
+          renderGalleryItemsProgressive(items, el.galleryList, false, token);
 
           const hasMore = galleryOffset + items.length < galleryTotalCountFiltered;
           el.galleryLoadMoreBtn.style.display = hasMore ? "block" : "none";
@@ -3328,6 +3358,35 @@ return _originalFetch.apply(this, args);
           // Restore scroll position after reload
           if (append && savedScrollPosition > 0) {
             el.galleryList.scrollTop = savedScrollPosition;
+          }
+
+          // Load favorites after initial paint to keep modal opening snappy
+          if (!append) {
+            scheduleIdle(async () => {
+              if (token !== galleryLoadToken) return;
+              try {
+                const allItems = await db.gallery.orderBy("timestamp").toArray();
+                if (token !== galleryLoadToken) return;
+                const allFavorites = allItems.filter((item) => item.favorite === 1 || item.favorite === true);
+                if (gallerySortDesc) {
+                  allFavorites.sort((a, b) => b.timestamp - a.timestamp);
+                } else {
+                  allFavorites.sort((a, b) => a.timestamp - b.timestamp);
+                }
+                galleryFavorites = allFavorites.slice(0, 50); // limit to 50 for performance
+                galleryFavoritesTotalCount = allFavorites.length;
+
+                if (galleryFavorites.length > 0) {
+                  el.galleryFavoritesList.style.display = "grid";
+                  el.galleryFavoritesList.innerHTML = "";
+                  renderGalleryItemsProgressive(galleryFavorites, el.galleryFavoritesList, true, token);
+                } else {
+                  el.galleryFavoritesList.style.display = "none";
+                }
+              } catch (e) {
+                console.warn("Failed to load gallery favorites:", e);
+              }
+            });
           }
         } catch (e) {
           console.warn("Failed to load gallery:", e);
@@ -3385,12 +3444,97 @@ return _originalFetch.apply(this, args);
         });
       }
 
+      function renderGalleryItemsProgressive(items, container, isFavorites, token = galleryLoadToken) {
+        const observer = getGalleryThumbObserver();
+        const chunkSize = 15;
+        let idx = 0;
+
+        function buildItem(item) {
+          const div = document.createElement("div");
+          div.className = "gallery-item";
+          div.dataset.id = item.id;
+
+          const checkmarkDisplay = selectedGalleryIds.has(item.id) ? "" : "display: none;";
+          const favoriteClass = item.favorite ? "favorite-active" : "";
+          const favoriteBtnText = item.favorite ? "â¤ï¸" : "ðŸ¤";
+
+          let badgesHtml = "";
+          if (item.style) {
+            const styleLabel = item.style.replace(/_/g, " ");
+            badgesHtml += `<span class="tile-badge">${escapeHtml(styleLabel)}</span>`;
+          }
+          if (item.guidance) {
+            badgesHtml += `<span class="tile-badge guidance-badge">${escapeHtml(item.guidance)}</span>`;
+          }
+
+          div.innerHTML = `
+            <img alt="${escapeHtml(item.prompt || "")}" />
+            <div class="gallery-item-checkmark" style="${checkmarkDisplay}">âœ“</div>
+            ${item.favorite ? '<div class="gallery-item-favorite-indicator">â¤ï¸</div>' : ''}
+            <button class="gallery-item-favorite-btn ${favoriteClass}" onclick="event.stopPropagation(); toggleGalleryImageFavorite(${item.id})">${favoriteBtnText}</button>
+            <button class="gallery-item-copy-btn" onclick="event.stopPropagation(); copyGalleryImageToPrompt(${item.id})">ðŸ“‹</button>
+            <button class="gallery-item-info-btn" onclick="event.stopPropagation(); openGalleryImageInfo(${item.id})">â„¹</button>
+            <button class="gallery-item-download-btn" onclick="event.stopPropagation(); downloadGalleryImage(${item.id})">â¬‡</button>
+            <button class="gallery-item-delete-btn" onclick="event.stopPropagation(); deleteGalleryImage(${item.id})">ðŸ—‘</button>
+            ${badgesHtml ? `<div class="tile-badges">${badgesHtml}</div>` : ""}
+          `;
+
+          const img = div.querySelector("img");
+          if (img) {
+            img.loading = "lazy";
+            img.decoding = "async";
+            if (observer) {
+              galleryThumbPendingSrc.set(img, item.imageData);
+              observer.observe(img);
+            } else {
+              requestAnimationFrame(() => {
+                if (token !== galleryLoadToken) return;
+                img.src = item.imageData;
+              });
+            }
+          }
+
+          if (gallerySelectMode) {
+            div.classList.add("select-mode");
+            if (selectedGalleryIds.has(item.id)) {
+              div.classList.add("selecting");
+            }
+          }
+
+          div.addEventListener("click", () => {
+            if (gallerySelectMode) {
+              toggleGallerySelection(item.id, div);
+            } else {
+              openGalleryImageModal(item.id);
+            }
+          });
+
+          return div;
+        }
+
+        function appendChunk() {
+          if (token !== galleryLoadToken) return;
+          const frag = document.createDocumentFragment();
+          const end = Math.min(items.length, idx + chunkSize);
+          for (; idx < end; idx++) {
+            frag.appendChild(buildItem(items[idx]));
+          }
+          container.appendChild(frag);
+          if (idx < items.length) {
+            requestAnimationFrame(appendChunk);
+          }
+        }
+
+        requestAnimationFrame(appendChunk);
+      }
+
       function updateGalleryCount() {
         el.galleryCount.textContent = `${selectedGalleryIds.size} of ${galleryTotalCount} selected`;
         el.galleryDeleteSelectedBtn.disabled = selectedGalleryIds.size === 0;
       }
 
       window.openGallery = async function () {
+        galleryLoadToken++;
         galleryOffset = 0;
         gallerySelectMode = false;
         selectedGalleryIds.clear();
@@ -3399,12 +3543,14 @@ return _originalFetch.apply(this, args);
         el.galleryList.innerHTML = "";
         el.galleryFavoritesList.innerHTML = "";
         el.gallerySelectModeBtn.textContent = "☐";
-        await loadGallery(false);
         el.galleryModal.style.display = "flex";
         document.body.classList.add("modal-open");
+        el.galleryList.innerHTML = '<div class="history-empty">Loading gallery...</div>';
+        loadGallery(false, galleryLoadToken);
       };
 
       window.closeGalleryModal = function () {
+        galleryLoadToken++;
         galleryCurrentImage = null;
         el.galleryModal.style.display = "none";
         document.body.classList.remove("modal-open");
@@ -3444,7 +3590,8 @@ return _originalFetch.apply(this, args);
         gallerySortDesc = !gallerySortDesc;
         el.gallerySortBtn.textContent = gallerySortDesc ? "⬇" : "⬆";
         galleryOffset = 0;
-        await loadGallery(false);
+        el.galleryList.innerHTML = '<div class="history-empty">Loading gallery...</div>';
+        loadGallery(false, galleryLoadToken);
       };
 
       function toggleGallerySelection(id, div) {
@@ -3526,7 +3673,7 @@ return _originalFetch.apply(this, args);
 
       el.galleryLoadMoreBtn.addEventListener("click", () => {
         galleryOffset += galleryLimit;
-        loadGallery(true);
+        loadGallery(true, galleryLoadToken);
       });
 
       // Gallery search with debounce
@@ -3535,7 +3682,8 @@ return _originalFetch.apply(this, args);
         galleryDebounceTimer = setTimeout(() => {
           gallerySearchQuery = e.target.value;
           galleryOffset = 0;
-          loadGallery(false);
+          el.galleryList.innerHTML = '<div class="history-empty">Searching...</div>';
+          loadGallery(false, galleryLoadToken);
         }, 300);
       });
 
