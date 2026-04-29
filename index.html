@@ -751,6 +751,40 @@ return _originalFetch.apply(this, args);
         }
       }
 
+      function cleanupGalleryResources() {
+        try {
+          if (galleryScrollObserver) {
+            galleryScrollObserver.disconnect();
+            galleryScrollObserver = null;
+          }
+          if (galleryThumbObserver) {
+            galleryThumbObserver.disconnect();
+            galleryThumbObserver = null;
+          }
+          if (galleryThumbPendingSrc) {
+            galleryThumbPendingSrc.clear();
+          }
+
+          const imgs = el.galleryList ? el.galleryList.querySelectorAll("img") : [];
+          imgs.forEach((img) => {
+            try {
+              img.src = "";
+              img.removeAttribute("src");
+              img.removeAttribute("srcset");
+            } catch (e) {}
+          });
+
+          if (el.galleryList) {
+            el.galleryList.innerHTML = "";
+          }
+          galleryScrollSentinel = null;
+          galleryImages = [];
+          if (gallerySearchCache && gallerySearchCache.items) {
+            gallerySearchCache.items = null;
+          }
+        } catch (e) {}
+      }
+
       // Prompt pieces state
       let promptPieces = [];
       let selectedPromptPiecesIds = new Set();
@@ -3589,10 +3623,7 @@ return _originalFetch.apply(this, args);
         galleryCurrentImage = null;
         el.galleryModal.style.display = "none";
         document.body.classList.remove("modal-open");
-        if (galleryScrollObserver) {
-          galleryScrollObserver.disconnect();
-          galleryScrollObserver = null;
-        }
+        cleanupGalleryResources();
       };
 
       el.galleryModal.addEventListener("click", (e) => {
