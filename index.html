@@ -3456,7 +3456,7 @@ return _originalFetch.apply(this, args);
 
           const checkmarkDisplay = selectedGalleryIds.has(item.id) ? "" : "display: none;";
           const favoriteClass = item.favorite ? "favorite-active" : "";
-          const favoriteBtnText = item.favorite ? "â¤ï¸" : "ðŸ¤";
+          const favoriteBtnText = item.favorite ? "❤️" : "🤍";
 
           let badgesHtml = "";
           if (item.style) {
@@ -3469,13 +3469,13 @@ return _originalFetch.apply(this, args);
 
           div.innerHTML = `
             <img alt="${escapeHtml(item.prompt || "")}" />
-            <div class="gallery-item-checkmark" style="${checkmarkDisplay}">âœ“</div>
-            ${item.favorite ? '<div class="gallery-item-favorite-indicator">â¤ï¸</div>' : ''}
+            <div class="gallery-item-checkmark" style="${checkmarkDisplay}">✓</div>
+            ${item.favorite ? '<div class="gallery-item-favorite-indicator">❤️</div>' : ''}
             <button class="gallery-item-favorite-btn ${favoriteClass}" onclick="event.stopPropagation(); toggleGalleryImageFavorite(${item.id})">${favoriteBtnText}</button>
-            <button class="gallery-item-copy-btn" onclick="event.stopPropagation(); copyGalleryImageToPrompt(${item.id})">ðŸ“‹</button>
-            <button class="gallery-item-info-btn" onclick="event.stopPropagation(); openGalleryImageInfo(${item.id})">â„¹</button>
-            <button class="gallery-item-download-btn" onclick="event.stopPropagation(); downloadGalleryImage(${item.id})">â¬‡</button>
-            <button class="gallery-item-delete-btn" onclick="event.stopPropagation(); deleteGalleryImage(${item.id})">ðŸ—‘</button>
+            <button class="gallery-item-copy-btn" onclick="event.stopPropagation(); copyGalleryImageToPrompt(${item.id})">📋</button>
+            <button class="gallery-item-info-btn" onclick="event.stopPropagation(); openGalleryImageInfo(${item.id})">ℹ</button>
+            <button class="gallery-item-download-btn" onclick="event.stopPropagation(); downloadGalleryImage(${item.id})">⬇</button>
+            <button class="gallery-item-delete-btn" onclick="event.stopPropagation(); deleteGalleryImage(${item.id})">🗑</button>
             ${badgesHtml ? `<div class="tile-badges">${badgesHtml}</div>` : ""}
           `;
 
