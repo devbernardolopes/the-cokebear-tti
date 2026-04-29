@@ -2228,7 +2228,7 @@ return _originalFetch.apply(this, args);
           return;
         }
 
-        const savedOrder = JSON.parse(sessionStorage.getItem("promptGenOrder") || "null");
+        const savedOrder = JSON.parse(localStorage.getItem("promptGenOrder") || "null");
         let orderedPieces = promptPieces;
         if (savedOrder) {
           orderedPieces = promptPieces.slice().sort((a, b) => {
@@ -2336,7 +2336,7 @@ return _originalFetch.apply(this, args);
               if (isDragging) {
                 row.classList.remove("dragging");
                 const newOrder = Array.from(el.promptGeneratorList.querySelectorAll(".prompt-generator-row")).map((r) => r.dataset.key);
-                sessionStorage.setItem("promptGenOrder", JSON.stringify(newOrder));
+                localStorage.setItem("promptGenOrder", JSON.stringify(newOrder));
                 justDragged = true;
                 // Reset the flag after a short delay so click event doesn't trigger collapse
                 setTimeout(() => { justDragged = false; }, 200);
