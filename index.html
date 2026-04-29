@@ -2645,8 +2645,12 @@ return _originalFetch.apply(this, args);
       async function loadPromptPieces() {
         try {
           const pieces = await db.settings.where("key").startsWith("promptPiece_").toArray();
-          // Sort by createdAt (original creation order), fallback to timestamp for older entries
-          promptPieces = pieces.sort((a, b) => (a.createdAt || a.timestamp) - (b.createdAt || b.timestamp)).map((p, i) => ({ ...p, id: p.key }));
+          // Sort alphabetically A-Z by piece name (without prefix)
+          promptPieces = pieces.sort((a, b) => {
+            const nameA = a.key.replace("promptPiece_", "").toLowerCase();
+            const nameB = b.key.replace("promptPiece_", "").toLowerCase();
+            return nameA.localeCompare(nameB);
+          }).map((p, i) => ({ ...p, id: p.key }));
           renderPromptPieces();
         } catch (e) {
           console.warn("Failed to load prompt pieces:", e);
