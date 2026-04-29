@@ -486,7 +486,6 @@ return _originalFetch.apply(this, args);
         conc: document.getElementById("concurrency"),
         mosaic: document.getElementById("mosaic"),
         error: document.getElementById("error"),
-        // loading: document.getElementById("loading"),
         historyModal: document.getElementById("historyModal"),
         historyModalContent: document.getElementById("historyModalContent"),
         historyList: document.getElementById("historyList"),
@@ -517,13 +516,12 @@ return _originalFetch.apply(this, args);
         saveToGalleryBtn: document.getElementById("saveToGalleryBtn"),
         galleryModal: document.getElementById("galleryModal"),
         galleryList: document.getElementById("galleryList"),
-        galleryFavoritesList: document.getElementById("galleryFavoritesList"),
-        // galleryFavoritesHeader: document.getElementById("galleryFavoritesHeader"),
         galleryCount: document.getElementById("galleryCount"),
         gallerySelectModeBtn: document.getElementById("gallerySelectModeBtn"),
         galleryDeleteSelectedBtn: document.getElementById("galleryDeleteSelectedBtn"),
         gallerySortBtn: document.getElementById("gallerySortBtn"),
         gallerySearch: document.getElementById("gallerySearch"),
+        galleryFavoritesOnlyBtn: document.getElementById("galleryFavoritesOnlyBtn"),
         modalCounter: document.getElementById("modalCounter"),
         downloadAllBtn: document.getElementById("downloadAllBtn"),
         generateBtn: document.getElementById("generateBtn"),
@@ -666,8 +664,6 @@ return _originalFetch.apply(this, args);
       let gallerySearchQuery = "";
       let galleryDebounceTimer = null;
       let galleryTotalCountFiltered = 0;
-      let galleryFavorites = [];
-      let galleryFavoritesTotalCount = 0;
       let galleryLoadToken = 0;
       let galleryThumbObserver = null;
       let galleryThumbPendingSrc = new Map();
@@ -739,8 +735,15 @@ return _originalFetch.apply(this, args);
         galleryHasMore = true;
         el.galleryList.innerHTML = message ? `<div class="history-empty">${message}</div>` : "";
         galleryImages = [];
+        gallerySearchCache.items = null;
         ensureGalleryScrollSentinel();
         setupGalleryInfiniteScroll(token);
+      }
+
+      function refreshGallery(placeholderText) {
+        galleryLoadToken++;
+        resetGalleryList(galleryLoadToken, placeholderText);
+        loadGallery(false, galleryLoadToken);
       }
 
       function scheduleIdle(fn) {
@@ -3352,8 +3355,7 @@ return _originalFetch.apply(this, args);
 
           if (!append) {
             resetGalleryList(token, null);
-            el.galleryFavoritesList.style.display = "none";
-            galleryFavorites = [];
+            // Favorites are mixed into the main grid now.
           }
 
           galleryTotalCount = await db.gallery.count();
@@ -3607,13 +3609,11 @@ return _originalFetch.apply(this, args);
         gallerySearchCache = { query: "", sortDesc: gallerySortDesc, favoritesOnly: galleryFavoritesOnly, items: null };
         el.gallerySearch.value = "";
         el.galleryList.innerHTML = "";
-        el.galleryFavoritesList.innerHTML = "";
         el.gallerySelectModeBtn.textContent = "☐";
         el.gallerySortBtn.textContent = gallerySortDesc ? "⬇" : "⬆";
         el.galleryModal.style.display = "flex";
         document.body.classList.add("modal-open");
         resetGalleryList(galleryLoadToken, "Loading gallery...");
-        el.galleryFavoritesList.style.display = "none";
         updateGalleryFavoritesOnlyBtn();
         loadGallery(false, galleryLoadToken);
       };
@@ -3657,7 +3657,7 @@ return _originalFetch.apply(this, args);
       };
 
       function updateGalleryFavoritesOnlyBtn() {
-        const btn = document.getElementById("galleryFavoritesOnlyBtn");
+        const btn = el.galleryFavoritesOnlyBtn;
         if (!btn) return;
         btn.textContent = galleryFavoritesOnly ? "❤️" : "🤍";
         btn.classList.toggle("favorite-active", galleryFavoritesOnly);
@@ -3665,20 +3665,14 @@ return _originalFetch.apply(this, args);
 
       window.toggleGalleryFavoritesOnly = function () {
         galleryFavoritesOnly = !galleryFavoritesOnly;
-        galleryLoadToken++;
-        gallerySearchCache = { query: "", sortDesc: gallerySortDesc, favoritesOnly: galleryFavoritesOnly, items: null };
         updateGalleryFavoritesOnlyBtn();
-        resetGalleryList(galleryLoadToken, galleryFavoritesOnly ? "Loading favorites..." : "Loading gallery...");
-        loadGallery(false, galleryLoadToken);
+        refreshGallery(galleryFavoritesOnly ? "Loading favorites..." : "Loading gallery...");
       };
 
       window.toggleGallerySort = async function () {
         gallerySortDesc = !gallerySortDesc;
         el.gallerySortBtn.textContent = gallerySortDesc ? "⬇" : "⬆";
-        galleryLoadToken++;
-        gallerySearchCache = { query: "", sortDesc: gallerySortDesc, favoritesOnly: galleryFavoritesOnly, items: null };
-        resetGalleryList(galleryLoadToken, "Loading gallery...");
-        loadGallery(false, galleryLoadToken);
+        refreshGallery("Loading gallery...");
       };
 
       function toggleGallerySelection(id, div) {
@@ -3762,10 +3756,7 @@ return _originalFetch.apply(this, args);
         clearTimeout(galleryDebounceTimer);
         galleryDebounceTimer = setTimeout(() => {
           gallerySearchQuery = e.target.value;
-          galleryLoadToken++;
-          gallerySearchCache = { query: "", sortDesc: gallerySortDesc, favoritesOnly: galleryFavoritesOnly, items: null };
-          resetGalleryList(galleryLoadToken, "Searching...");
-          loadGallery(false, galleryLoadToken);
+          refreshGallery("Searching...");
         }, 300);
       });
 
