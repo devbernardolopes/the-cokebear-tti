@@ -5877,7 +5877,7 @@ return _originalFetch.apply(this, args);
         padding: 8px 12px;
         background: #21262d;
         border-radius: 6px;
-        touch-action: none;
+        touch-action: pan-y;
       }
 
       .prompt-gen-drag-handle {
@@ -5981,6 +5981,29 @@ return _originalFetch.apply(this, args);
         background: #388bfd;
         border-color: #58a6ff;
         color: #fff;
+      }
+
+      @media (max-width: 520px) {
+        .prompt-generator-row {
+          flex-wrap: wrap;
+          align-items: center;
+        }
+
+        .prompt-generator-name {
+          min-width: 0;
+          flex: 1;
+        }
+
+        .prompt-generator-values {
+          flex: 0 0 100%;
+          width: 100%;
+          overflow-x: visible;
+          padding: 6px 0 2px;
+        }
+
+        .prompt-generator-toggle {
+          padding: 8px 12px;
+        }
       }
 
       #promptGeneratorActions {
