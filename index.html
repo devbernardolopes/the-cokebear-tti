@@ -2294,7 +2294,10 @@ return _originalFetch.apply(this, args);
               return;
             }
 
-            e.preventDefault();
+            // Only preventDefault for mouse events (not touch, to allow click to fire if not dragging)
+            if (!e.touches) {
+              e.preventDefault();
+            }
 
             const clientY = e.touches ? e.touches[0].clientY : e.clientY;
             const clientX = e.touches ? e.touches[0].clientX : e.clientX;
@@ -2310,6 +2313,7 @@ return _originalFetch.apply(this, args);
               // Only start drag if moved more than 5px (to distinguish from click)
               if (!isDragging && (Math.abs(moveY - dragStartY) > 5 || Math.abs(moveX - dragStartX) > 5)) {
                 isDragging = true;
+                e.preventDefault(); // Prevent scroll only when we start dragging
                 row.classList.add("dragging");
               }
 
