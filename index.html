@@ -706,6 +706,9 @@ return _originalFetch.apply(this, args);
         }
         if (!galleryScrollSentinel.parentElement) {
           el.galleryList.appendChild(galleryScrollSentinel);
+        } else if (galleryScrollSentinel.parentElement === el.galleryList && el.galleryList.lastElementChild !== galleryScrollSentinel) {
+          // Keep the sentinel as the last element so it reliably represents "near the end".
+          el.galleryList.appendChild(galleryScrollSentinel);
         }
       }
 
@@ -3543,7 +3546,12 @@ return _originalFetch.apply(this, args);
           for (; idx < end; idx++) {
             frag.appendChild(buildItem(items[idx]));
           }
-          container.appendChild(frag);
+          // Keep the infinite-scroll sentinel at the end of the list.
+          if (container === el.galleryList && galleryScrollSentinel && galleryScrollSentinel.parentElement === container) {
+            container.insertBefore(frag, galleryScrollSentinel);
+          } else {
+            container.appendChild(frag);
+          }
           if (idx < items.length) {
             requestAnimationFrame(appendChunk);
           }
