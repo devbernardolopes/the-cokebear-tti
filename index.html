@@ -85,18 +85,19 @@ return _originalFetch.apply(this, args);
             <option value="6">6x</option>
           </select>
 
-          <div class="guidance-row">
-            <input id="guidance" type="range" min="1" max="30" value="14" />
-            <span id="guidanceValue">14</span>
-          </div>
-
           <div class="seed-input-wrapper">
             <div class="seed-input-container">
               <input id="seed" type="text" placeholder="Seed" inputmode="numeric" pattern="[0-9]*" />
               <button id="clearSeedBtn" type="button" title="Clear seed">❌</button>
             </div>
-            <button id="promptGeneratorBtn" type="button" title="Prompt Generator">🅿</button>
           </div>
+
+          <div class="guidance-row">
+            <input id="guidance" type="range" min="1" max="30" value="14" />
+            <span id="guidanceValue">14</span>
+          </div>
+
+          <button id="promptGeneratorBtn" type="button" title="Prompt Generator">🧬</button>
 
           <input id="negativePrompt" type="text" placeholder="Negative prompt..." />
 
@@ -182,7 +183,7 @@ return _originalFetch.apply(this, args);
 
           <button onclick="downloadAllImages()" id="downloadAllBtn" disabled>Download All</button>
           <button id="cancelGenBtn" onclick="cancelGeneration()">Cancel</button>
-          <button onclick="generateImages()" id="generateBtn">Generate</button>
+          <button onclick="generateImages()" id="generateBtn">▶</button>
         </div>
       </div>
     </div>
@@ -4391,6 +4392,7 @@ return _originalFetch.apply(this, args);
 
       #scratchpadText,
       #galleryList,
+      #galleryFavoritesList,
       #promptText {
         scrollbar-width: none;
         -ms-overflow-style: none;
@@ -4398,6 +4400,7 @@ return _originalFetch.apply(this, args);
 
       #scratchpadText::-webkit-scrollbar,
       #galleryList::-webkit-scrollbar,
+      #galleryFavoritesList::-webkit-scrollbar,
       #promptText::-webkit-scrollbar {
         display: none;
       }
@@ -4691,8 +4694,7 @@ return _originalFetch.apply(this, args);
         background: #f85149;
       }
 
-      #clearPromptHeaderBtn,
-      #promptGeneratorBtn {
+      #clearPromptHeaderBtn {
         padding: 4px 8px;
         font-size: 10px;
         background: #da3633;
@@ -4703,8 +4705,7 @@ return _originalFetch.apply(this, args);
         white-space: nowrap;
       }
 
-      #clearPromptHeaderBtn:hover,
-      #promptGeneratorBtn:hover {
+      #clearPromptHeaderBtn:hover {
         background: #f85149;
       }
 
@@ -4732,21 +4733,20 @@ return _originalFetch.apply(this, args);
       #historyBtn {
         background: #1f6feb;
         border-color: #388bfd;
-        /* min-width: 100px; */
       }
 
       #historyBtn:hover {
         background: #388bfd;
       }
 
-      /* #manageHistoryBtn {
-        background: #6e40c9;
-        border-color: #8957e5;
+      #promptGeneratorBtn {
+        background: #1f6feb;
+        border-color: #388bfd;
       }
 
-      #manageHistoryBtn:hover {
-        background: #8957e5;
-      } */
+      #promptGeneratorBtn:hover {
+        background: #388bfd;
+      }
 
       #downloadAllBtn {
         background: #6e40c9;
