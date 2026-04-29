@@ -2282,17 +2282,9 @@ return _originalFetch.apply(this, args);
           }
 
           function onDragStart(e) {
-            // Only initiate drag from handle or row background, not from buttons/toggles
             const target = e.target;
-            if (target.closest(".prompt-generator-toggle") || target.closest("button:not(.prompt-gen-drag-handle)")) {
-              return;
-            }
-            // Initiate from handle or row background (but not from nameSpan chevron click)
-            const isFromHandle = target.closest(".prompt-gen-drag-handle");
-            const isFromRow = (target === row || target.closest(".prompt-generator-name")) && !target.closest(".prompt-gen-chevron");
-            if (!isFromHandle && !isFromRow) {
-              return;
-            }
+            // Only initiate drag from the handle (desktop + mobile)
+            if (!target.closest(".prompt-gen-drag-handle")) return;
 
             // Only preventDefault for mouse events (not touch, to allow click to fire if not dragging)
             if (!e.touches) {
@@ -2310,10 +2302,10 @@ return _originalFetch.apply(this, args);
               const moveY = e.touches ? e.touches[0].clientY : e.clientY;
               const moveX = e.touches ? e.touches[0].clientX : e.clientX;
 
-              // Only start drag if horizontal movement > 5px AND horizontal > vertical (to allow vertical scroll)
+              // Only start drag if vertical movement > 5px AND vertical > horizontal (avoid accidental drags)
               const deltaX = Math.abs(moveX - dragStartX);
               const deltaY = Math.abs(moveY - dragStartY);
-              if (!isDragging && deltaX > 5 && deltaX > deltaY) {
+              if (!isDragging && deltaY > 5 && deltaY > deltaX) {
                 isDragging = true;
                 e.preventDefault(); // Prevent scroll only when we start dragging
                 row.classList.add("dragging");
@@ -2359,18 +2351,6 @@ return _originalFetch.apply(this, args);
           // Allow drag from handle (works on both desktop and mobile)
           dragHandle.addEventListener("mousedown", onDragStart);
           dragHandle.addEventListener("touchstart", onDragStart, { passive: false });
-
-          // Allow drag from row background (original desktop behavior)
-          row.addEventListener("mousedown", (e) => {
-            if (e.target === row || (e.target.closest(".prompt-generator-name") && !e.target.closest(".prompt-gen-chevron"))) {
-              onDragStart(e);
-            }
-          });
-          row.addEventListener("touchstart", (e) => {
-            if (e.target === row || (e.target.closest(".prompt-generator-name") && !e.target.closest(".prompt-gen-chevron"))) {
-              onDragStart(e);
-            }
-          }, { passive: false });
 
           const nameSpan = document.createElement("span");
           nameSpan.className = "prompt-generator-name";
