@@ -2310,8 +2310,10 @@ return _originalFetch.apply(this, args);
               const moveY = e.touches ? e.touches[0].clientY : e.clientY;
               const moveX = e.touches ? e.touches[0].clientX : e.clientX;
 
-              // Only start drag if moved more than 5px (to distinguish from click)
-              if (!isDragging && (Math.abs(moveY - dragStartY) > 5 || Math.abs(moveX - dragStartX) > 5)) {
+              // Only start drag if horizontal movement > 5px AND horizontal > vertical (to allow vertical scroll)
+              const deltaX = Math.abs(moveX - dragStartX);
+              const deltaY = Math.abs(moveY - dragStartY);
+              if (!isDragging && deltaX > 5 && deltaX > deltaY) {
                 isDragging = true;
                 e.preventDefault(); // Prevent scroll only when we start dragging
                 row.classList.add("dragging");
@@ -3415,7 +3417,7 @@ return _originalFetch.apply(this, args);
         el.gallerySearch.value = "";
         el.galleryList.innerHTML = "";
         el.galleryFavoritesList.innerHTML = "";
-        el.gallerySelectModeBtn.textContent = "Select";
+        el.gallerySelectModeBtn.textContent = "☐";
         await loadGallery(false);
         el.galleryModal.style.display = "flex";
         document.body.classList.add("modal-open");
@@ -3435,7 +3437,7 @@ return _originalFetch.apply(this, args);
 
       window.toggleGallerySelectMode = function () {
         gallerySelectMode = !gallerySelectMode;
-        el.gallerySelectModeBtn.textContent = gallerySelectMode ? "Cancel" : "Select";
+        el.gallerySelectModeBtn.textContent = gallerySelectMode ? "X" : "☐";
 
         // Update all items
         const items = el.galleryList.querySelectorAll(".gallery-item");
@@ -3528,7 +3530,7 @@ return _originalFetch.apply(this, args);
           await db.gallery.bulkDelete(ids);
           selectedGalleryIds.clear();
           gallerySelectMode = false;
-          el.gallerySelectModeBtn.textContent = "Select";
+          el.gallerySelectModeBtn.textContent = "☐";
           await loadGallery(false);
         } catch (e) {
           console.warn("Failed to delete selected gallery images:", e);
