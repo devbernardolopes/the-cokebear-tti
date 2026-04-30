@@ -30,6 +30,7 @@ return _originalFetch.apply(this, args);
 };
 </script>
     <script src="https://unpkg.com/dexie@3.2.4/dist/dexie.min.js"></script>
+    <script src="https://unpkg.com/jszip@3.10.1/dist/jszip.min.js"></script>
   </head>
 
   <body>
@@ -241,8 +242,8 @@ return _originalFetch.apply(this, args);
           <button onclick="toggleGallerySelectMode()" id="gallerySelectModeBtn">☐</button>
           <button onclick="showDeleteConfirmation()" id="galleryDeleteSelectedBtn" disabled>💥</button>
            <span id="galleryCount"></span>
-           <button onclick="exportGallery()" id="galleryExportBtn" title="Export Gallery (Chromium only)">⤴</button>
-           <button onclick="importGallery()" id="galleryImportBtn" title="Import Gallery (Chromium only)">⤵</button>
+            <button onclick="exportGallery()" id="galleryExportBtn" title="Export Gallery">⤴</button>
+            <button onclick="importGallery()" id="galleryImportBtn" title="Import Gallery">⤵</button>
            <button onclick="closeGalleryModal()">❌</button>
         </div>
           <div id="galleryBody">
@@ -281,6 +282,8 @@ return _originalFetch.apply(this, args);
           </div>
         </div>
       </div>
+
+      <input type="file" id="galleryImportZip" accept=".zip" style="display: none;" />
 
      <div id="deleteConfirmModal" class="modal">
       <div id="deleteConfirmContent" onclick="event.stopPropagation()">
@@ -552,6 +555,7 @@ return _originalFetch.apply(this, args);
         galleryImportExportModalTitle: document.getElementById("galleryImportExportModalTitle"),
         galleryImportExportModalMessage: document.getElementById("galleryImportExportModalMessage"),
         galleryImportExportModalOkBtn: document.getElementById("galleryImportExportModalOkBtn"),
+        galleryImportZip: document.getElementById("galleryImportZip"),
         galleryList: document.getElementById("galleryList"),
         galleryCount: document.getElementById("galleryCount"),
         gallerySelectModeBtn: document.getElementById("gallerySelectModeBtn"),
@@ -4107,12 +4111,18 @@ return _originalFetch.apply(this, args);
 
       let pendingImportData = null;
       let pendingImportParentDir = null;
+      let pendingImportZip = null;
+
+      function isFilePickerAvailable() {
+        if (!window.showOpenFilePicker || !window.showDirectoryPicker) return false;
+        try {
+          return window.self === window.top;
+        } catch (e) {
+          return false;
+        }
+      }
 
       window.exportGallery = async function() {
-        if (!window.showDirectoryPicker) {
-          showGalleryImportExportModal("Not Supported", "Export requires Chrome or Edge browser.", true);
-          return;
-        }
         if (!db) return;
         try {
           const items = await db.gallery.orderBy('timestamp').toArray();
@@ -4123,56 +4133,113 @@ return _originalFetch.apply(this, args);
           const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, -5);
           const jsonFile = `tti-gallery-${timestamp}.json`;
           const imgFolder = `tti-gallery-images-${timestamp}`;
-          const dirHandle = await window.showDirectoryPicker();
-          showGalleryImportExportModal("Exporting Gallery", `Exporting... (0/${items.length})`, false);
-          const imgDir = await dirHandle.getDirectoryHandle(imgFolder, { create: true });
-          const entries = [];
-          for (let i = 0; i < items.length; i++) {
-            const item = items[i];
-            const blob = dataURLtoBlob(item.imageData);
-            const imgName = `image-${item.id}.png`;
-            await writeFileToHandle(imgDir, imgName, blob);
-            entries.push({
-              prompt: item.prompt,
-              seed: item.seed,
-              style: item.style,
-              guidance: item.guidance,
-              resolution: item.resolution,
-              favorite: item.favorite ? 1 : 0,
-              timestamp: item.timestamp,
-              imagePath: `${imgFolder}/${imgName}`
-            });
-            document.getElementById('galleryImportExportModalMessage').textContent = `Exporting... (${i+1}/${items.length})`;
+
+          // Try File System Access API first
+          if (isFilePickerAvailable()) {
+            try {
+              const dirHandle = await window.showDirectoryPicker();
+              showGalleryImportExportModal("Exporting Gallery", `Exporting... (0/${items.length})`, false);
+              const imgDir = await dirHandle.getDirectoryHandle(imgFolder, { create: true });
+              const entries = [];
+              for (let i = 0; i < items.length; i++) {
+                const item = items[i];
+                const blob = dataURLtoBlob(item.imageData);
+                const imgName = `image-${item.id}.png`;
+                await writeFileToHandle(imgDir, imgName, blob);
+                entries.push({
+                  prompt: item.prompt,
+                  seed: item.seed,
+                  style: item.style,
+                  guidance: item.guidance,
+                  resolution: item.resolution,
+                  favorite: item.favorite ? 1 : 0,
+                  timestamp: item.timestamp,
+                  imagePath: `${imgFolder}/${imgName}`
+                });
+                document.getElementById('galleryImportExportModalMessage').textContent = `Exporting... (${i+1}/${items.length})`;
+              }
+              const jsonBlob = new Blob([JSON.stringify({ entries }, null, 2)], { type: 'application/json' });
+              await writeFileToHandle(dirHandle, jsonFile, jsonBlob);
+              document.getElementById('galleryImportExportModalMessage').textContent = `Exported ${items.length} images successfully.`;
+              document.getElementById('galleryImportExportModalOkBtn').style.display = 'inline-block';
+              return; // Success - don't run JSZip
+            } catch (e) {
+              if (e.name === 'AbortError') { closeGalleryImportExportModal(); return; }
+              console.warn('FSAPI export failed, falling back to JSZip:', e);
+              // Fall through to JSZip
+            }
           }
-          const jsonBlob = new Blob([JSON.stringify({ entries }, null, 2)], { type: 'application/json' });
-          await writeFileToHandle(dirHandle, jsonFile, jsonBlob);
-          document.getElementById('galleryImportExportModalMessage').textContent = `Exported ${items.length} images successfully.`;
-          document.getElementById('galleryImportExportModalOkBtn').style.display = 'inline-block';
+
+          // Fallback: Use JSZip
+          if (window.JSZip) {
+            showGalleryImportExportModal("Exporting Gallery", `Exporting... (0/${items.length})`, false);
+            const zip = new JSZip();
+            const imgFolderZip = zip.folder(imgFolder);
+            const entries = [];
+            for (let i = 0; i < items.length; i++) {
+              const item = items[i];
+              const blob = dataURLtoBlob(item.imageData);
+              const imgName = `image-${item.id}.png`;
+              imgFolderZip.file(imgName, blob);
+              entries.push({
+                prompt: item.prompt,
+                seed: item.seed,
+                style: item.style,
+                guidance: item.guidance,
+                resolution: item.resolution,
+                favorite: item.favorite ? 1 : 0,
+                timestamp: item.timestamp,
+                imagePath: `${imgFolder}/${imgName}`
+              });
+              document.getElementById('galleryImportExportModalMessage').textContent = `Exporting... (${i+1}/${items.length})`;
+            }
+            zip.file(jsonFile, JSON.stringify({ entries }, null, 2));
+            const zipBlob = await zip.generateAsync({ type: 'blob' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(zipBlob);
+            a.download = `tti-gallery-${timestamp}.zip`;
+            a.click();
+            URL.revokeObjectURL(a.href);
+            document.getElementById('galleryImportExportModalMessage').textContent = `Exported ${items.length} images successfully.`;
+            document.getElementById('galleryImportExportModalOkBtn').style.display = 'inline-block';
+          } else {
+            showGalleryImportExportModal("Not Supported", "JSZip library not loaded.", true);
+          }
         } catch (e) {
-          if (e.name === 'AbortError') { closeGalleryImportExportModal(); return; }
           console.error('Export error:', e);
           showGalleryImportExportModal("Export Failed", `Error: ${e.message}`, true);
         }
       };
 
       window.importGallery = async function() {
-        if (!window.showOpenFilePicker) {
-          showGalleryImportExportModal("Not Supported", "Import requires Chrome or Edge browser.", true);
-          return;
-        }
         if (!db) return;
-        try {
-          const [fileHandle] = await window.showOpenFilePicker({ accept: { 'application/json': ['.json'] } });
-          const data = JSON.parse(await (await fileHandle.getFile()).text());
-          if (!data.entries?.length) throw new Error('Invalid JSON: missing entries array.');
-          data.entries.forEach(e => { if (!e.imagePath || !e.prompt) throw new Error('Invalid entry: missing fields.'); });
-          pendingImportData = data;
-          pendingImportParentDir = await fileHandle.getParentDirectoryHandle();
-          showGalleryImportConfirmModal();
-        } catch (e) {
-          if (e.name === 'AbortError') return;
-          console.error('Import error:', e);
-          showGalleryImportExportModal("Import Failed", `Error: ${e.message}`, true);
+        // Try File System Access API if available and not in cross-origin iframe
+        if (isFilePickerAvailable()) {
+          try {
+            const [fileHandle] = await window.showOpenFilePicker({ accept: { 'application/json': ['.json'] } });
+            const data = JSON.parse(await (await fileHandle.getFile()).text());
+            if (!data.entries?.length) throw new Error('Invalid JSON: missing entries array.');
+            data.entries.forEach(e => { if (!e.imagePath || !e.prompt) throw new Error('Invalid entry: missing fields.'); });
+            pendingImportData = data;
+            pendingImportParentDir = await fileHandle.getParentDirectoryHandle();
+            showGalleryImportConfirmModal();
+          } catch (e) {
+            if (e.name === 'AbortError') return;
+            console.error('Import error:', e);
+            // Fall back to JSZip method on error
+            if (window.JSZip) {
+              el.galleryImportZip.value = '';
+              el.galleryImportZip.click();
+            } else {
+              showGalleryImportExportModal("Import Failed", `Error: ${e.message}`, true);
+            }
+          }
+        // Use hidden file input + JSZip (works in iframes and non-Chromium)
+        } else if (window.JSZip) {
+          el.galleryImportZip.value = '';
+          el.galleryImportZip.click();
+        } else {
+          showGalleryImportExportModal("Not Supported", "JSZip library not loaded.", true);
         }
       };
 
@@ -4181,25 +4248,56 @@ return _originalFetch.apply(this, args);
         if (!pendingImportData) return;
         try {
           const { entries } = pendingImportData;
-          const parentDir = pendingImportParentDir;
-          await db.gallery.clear();
-          showGalleryImportExportModal("Importing Gallery", `Importing... (0/${entries.length})`, false);
-          for (let i = 0; i < entries.length; i++) {
-            const entry = entries[i];
-            const imgHandle = await resolveFilePath(parentDir, entry.imagePath);
-            const imageData = await fileToDataURL(await imgHandle.getFile());
-            await db.gallery.add({
-              imageData,
-              prompt: entry.prompt,
-              seed: entry.seed || null,
-              style: entry.style || '',
-              guidance: entry.guidance || '',
-              resolution: entry.resolution || '',
-              favorite: entry.favorite ? 1 : 0,
-              timestamp: entry.timestamp || Date.now()
-            });
-            document.getElementById('galleryImportExportModalMessage').textContent = `Importing... (${i+1}/${entries.length})`;
+
+          // Chromium: Use File System Access API
+          if (pendingImportParentDir) {
+            const parentDir = pendingImportParentDir;
+            await db.gallery.clear();
+            showGalleryImportExportModal("Importing Gallery", `Importing... (0/${entries.length})`, false);
+            for (let i = 0; i < entries.length; i++) {
+              const entry = entries[i];
+              const imgHandle = await resolveFilePath(parentDir, entry.imagePath);
+              const imageData = await fileToDataURL(await imgHandle.getFile());
+              await db.gallery.add({
+                imageData,
+                prompt: entry.prompt,
+                seed: entry.seed || null,
+                style: entry.style || '',
+                guidance: entry.guidance || '',
+                resolution: entry.resolution || '',
+                favorite: entry.favorite ? 1 : 0,
+                timestamp: entry.timestamp || Date.now()
+              });
+              document.getElementById('galleryImportExportModalMessage').textContent = `Importing... (${i+1}/${entries.length})`;
+            }
+            pendingImportParentDir = null;
+
+          // Non-Chromium: Use JSZip
+          } else if (pendingImportZip) {
+            const zip = pendingImportZip;
+            await db.gallery.clear();
+            showGalleryImportExportModal("Importing Gallery", `Importing... (0/${entries.length})`, false);
+            for (let i = 0; i < entries.length; i++) {
+              const entry = entries[i];
+              const imgFile = zip.file(entry.imagePath);
+              if (!imgFile) continue;
+              const blob = await imgFile.async('blob');
+              const imageData = await fileToDataURL(new File([blob], 'image.png', { type: 'image/png' }));
+              await db.gallery.add({
+                imageData,
+                prompt: entry.prompt,
+                seed: entry.seed || null,
+                style: entry.style || '',
+                guidance: entry.guidance || '',
+                resolution: entry.resolution || '',
+                favorite: entry.favorite ? 1 : 0,
+                timestamp: entry.timestamp || Date.now()
+              });
+              document.getElementById('galleryImportExportModalMessage').textContent = `Importing... (${i+1}/${entries.length})`;
+            }
+            pendingImportZip = null;
           }
+
           galleryLoadToken++;
           loadGallery(false, galleryLoadToken);
           document.getElementById('galleryImportExportModalMessage').textContent = `Imported ${entries.length} images successfully.`;
@@ -4210,8 +4308,38 @@ return _originalFetch.apply(this, args);
         } finally {
           pendingImportData = null;
           pendingImportParentDir = null;
+          pendingImportZip = null;
         }
       };
+
+      // Handle ZIP file selection for non-Chromium import
+      el.galleryImportZip.addEventListener("change", async function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        try {
+          const zip = await JSZip.loadAsync(file);
+          let jsonFile = null;
+          let jsonFilename = '';
+          for (const [path, zipEntry] of Object.entries(zip.files)) {
+            if (!zipEntry.dir && path.match(/tti-gallery-.*\.json$/)) {
+              jsonFile = zipEntry;
+              jsonFilename = path;
+              break;
+            }
+          }
+          if (!jsonFile) throw new Error('No valid JSON file found in zip.');
+          const jsonContent = await jsonFile.async('string');
+          const data = JSON.parse(jsonContent);
+          if (!data.entries?.length) throw new Error('Invalid JSON: missing entries array.');
+          data.entries.forEach(e => { if (!e.imagePath || !e.prompt) throw new Error('Invalid entry: missing fields.'); });
+          pendingImportData = data;
+          pendingImportZip = zip;
+          showGalleryImportConfirmModal();
+        } catch (e) {
+          console.error('Import error:', e);
+          showGalleryImportExportModal("Import Failed", `Error: ${e.message}`, true);
+        }
+      });
 
        function escapeHtml(text) {
         const div = document.createElement("div");
