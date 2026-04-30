@@ -240,17 +240,49 @@ return _originalFetch.apply(this, args);
           <button onclick="toggleGalleryFavoritesOnly()" id="galleryFavoritesOnlyBtn" title="Show favorites only">🤍</button>
           <button onclick="toggleGallerySelectMode()" id="gallerySelectModeBtn">☐</button>
           <button onclick="showDeleteConfirmation()" id="galleryDeleteSelectedBtn" disabled>💥</button>
-          <span id="galleryCount"></span>
-          <button onclick="closeGalleryModal()">❌</button>
+           <span id="galleryCount"></span>
+           <button onclick="exportGallery()" id="galleryExportBtn" title="Export Gallery (Chromium only)">⤴</button>
+           <button onclick="importGallery()" id="galleryImportBtn" title="Import Gallery (Chromium only)">⤵</button>
+           <button onclick="closeGalleryModal()">❌</button>
         </div>
           <div id="galleryBody">
             <div id="galleryFavoritesList"></div>
             <div id="galleryList"></div>
           </div>
-      </div>
-    </div>
+       </div>
+     </div>
 
-    <div id="deleteConfirmModal" class="modal">
+      <div id="galleryImportConfirmModal" class="modal">
+        <div id="galleryImportConfirmContent" onclick="event.stopPropagation()">
+          <div class="modal-header">
+            <h3>Confirm Import</h3>
+            <button onclick="closeGalleryImportConfirmModal()">❌</button>
+          </div>
+          <div id="galleryImportConfirmMessage">
+            <p>Importing will delete all current gallery images. This action cannot be undone.</p>
+            <p style="font-size: 12px; color: #f85149;">Proceed?</p>
+          </div>
+          <div id="galleryImportConfirmActions">
+            <button onclick="closeGalleryImportConfirmModal()" id="galleryImportConfirmCancelBtn">Cancel</button>
+            <button onclick="confirmGalleryImport()" id="galleryImportConfirmProceedBtn">Import</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="galleryImportExportModal" class="modal">
+        <div id="galleryImportExportContent" onclick="event.stopPropagation()">
+          <div class="modal-header">
+            <h3 id="galleryImportExportModalTitle">Export Gallery</h3>
+            <button onclick="closeGalleryImportExportModal()">❌</button>
+          </div>
+          <div id="galleryImportExportModalMessage"></div>
+          <div id="galleryImportExportModalActions">
+            <button onclick="closeGalleryImportExportModal()" id="galleryImportExportModalOkBtn" style="display: none;">OK</button>
+          </div>
+        </div>
+      </div>
+
+     <div id="deleteConfirmModal" class="modal">
       <div id="deleteConfirmContent" onclick="event.stopPropagation()">
         <div class="modal-header">
           <h3>Delete Images</h3>
@@ -515,6 +547,11 @@ return _originalFetch.apply(this, args);
         modalFavoriteBtn: document.getElementById("modalFavoriteBtn"),
         saveToGalleryBtn: document.getElementById("saveToGalleryBtn"),
         galleryModal: document.getElementById("galleryModal"),
+        galleryImportConfirmModal: document.getElementById("galleryImportConfirmModal"),
+        galleryImportExportModal: document.getElementById("galleryImportExportModal"),
+        galleryImportExportModalTitle: document.getElementById("galleryImportExportModalTitle"),
+        galleryImportExportModalMessage: document.getElementById("galleryImportExportModalMessage"),
+        galleryImportExportModalOkBtn: document.getElementById("galleryImportExportModalOkBtn"),
         galleryList: document.getElementById("galleryList"),
         galleryCount: document.getElementById("galleryCount"),
         gallerySelectModeBtn: document.getElementById("gallerySelectModeBtn"),
@@ -4013,9 +4050,170 @@ return _originalFetch.apply(this, args);
             btn.disabled = false;
           }
         }
+       }
+
+      // Gallery Export/Import Helpers
+      function dataURLtoBlob(dataURL) {
+        const parts = dataURL.split(';base64,');
+        const contentType = parts[0].split(':')[1];
+        const raw = window.atob(parts[1]);
+        const arr = new Uint8Array(raw.length);
+        for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+        return new Blob([arr], { type: contentType });
       }
 
-      function escapeHtml(text) {
+      function fileToDataURL(file) {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+      }
+
+      async function writeFileToHandle(dirHandle, filename, blob) {
+        const fileHandle = await dirHandle.getFileHandle(filename, { create: true });
+        const writable = await fileHandle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+      }
+
+      async function resolveFilePath(dirHandle, relativePath) {
+        const parts = relativePath.split('/').filter(p => p);
+        let current = dirHandle;
+        for (let i = 0; i < parts.length - 1; i++) current = await current.getDirectoryHandle(parts[i]);
+        return await current.getFileHandle(parts[parts.length - 1]);
+      }
+
+      function showGalleryImportExportModal(title, message, showOk = false) {
+        const modal = document.getElementById('galleryImportExportModal');
+        document.getElementById('galleryImportExportModalTitle').textContent = title;
+        document.getElementById('galleryImportExportModalMessage').textContent = message;
+        document.getElementById('galleryImportExportModalOkBtn').style.display = showOk ? 'inline-block' : 'none';
+        modal.style.display = 'flex';
+      }
+
+      function closeGalleryImportExportModal() {
+        document.getElementById('galleryImportExportModal').style.display = 'none';
+      }
+
+      function showGalleryImportConfirmModal() {
+        document.getElementById('galleryImportConfirmModal').style.display = 'flex';
+      }
+
+      function closeGalleryImportConfirmModal() {
+        document.getElementById('galleryImportConfirmModal').style.display = 'none';
+      }
+
+      let pendingImportData = null;
+      let pendingImportParentDir = null;
+
+      window.exportGallery = async function() {
+        if (!window.showDirectoryPicker) {
+          showGalleryImportExportModal("Not Supported", "Export requires Chrome or Edge browser.", true);
+          return;
+        }
+        if (!db) return;
+        try {
+          const items = await db.gallery.orderBy('timestamp').toArray();
+          if (!items.length) {
+            showGalleryImportExportModal("Export Failed", "No images to export.", true);
+            return;
+          }
+          const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, -5);
+          const jsonFile = `tti-gallery-${timestamp}.json`;
+          const imgFolder = `tti-gallery-images-${timestamp}`;
+          const dirHandle = await window.showDirectoryPicker();
+          showGalleryImportExportModal("Exporting Gallery", `Exporting... (0/${items.length})`, false);
+          const imgDir = await dirHandle.getDirectoryHandle(imgFolder, { create: true });
+          const entries = [];
+          for (let i = 0; i < items.length; i++) {
+            const item = items[i];
+            const blob = dataURLtoBlob(item.imageData);
+            const imgName = `image-${item.id}.png`;
+            await writeFileToHandle(imgDir, imgName, blob);
+            entries.push({
+              prompt: item.prompt,
+              seed: item.seed,
+              style: item.style,
+              guidance: item.guidance,
+              resolution: item.resolution,
+              favorite: item.favorite ? 1 : 0,
+              timestamp: item.timestamp,
+              imagePath: `${imgFolder}/${imgName}`
+            });
+            document.getElementById('galleryImportExportModalMessage').textContent = `Exporting... (${i+1}/${items.length})`;
+          }
+          const jsonBlob = new Blob([JSON.stringify({ entries }, null, 2)], { type: 'application/json' });
+          await writeFileToHandle(dirHandle, jsonFile, jsonBlob);
+          document.getElementById('galleryImportExportModalMessage').textContent = `Exported ${items.length} images successfully.`;
+          document.getElementById('galleryImportExportModalOkBtn').style.display = 'inline-block';
+        } catch (e) {
+          if (e.name === 'AbortError') { closeGalleryImportExportModal(); return; }
+          console.error('Export error:', e);
+          showGalleryImportExportModal("Export Failed", `Error: ${e.message}`, true);
+        }
+      };
+
+      window.importGallery = async function() {
+        if (!window.showOpenFilePicker) {
+          showGalleryImportExportModal("Not Supported", "Import requires Chrome or Edge browser.", true);
+          return;
+        }
+        if (!db) return;
+        try {
+          const [fileHandle] = await window.showOpenFilePicker({ accept: { 'application/json': ['.json'] } });
+          const data = JSON.parse(await (await fileHandle.getFile()).text());
+          if (!data.entries?.length) throw new Error('Invalid JSON: missing entries array.');
+          data.entries.forEach(e => { if (!e.imagePath || !e.prompt) throw new Error('Invalid entry: missing fields.'); });
+          pendingImportData = data;
+          pendingImportParentDir = await fileHandle.getParentDirectoryHandle();
+          showGalleryImportConfirmModal();
+        } catch (e) {
+          if (e.name === 'AbortError') return;
+          console.error('Import error:', e);
+          showGalleryImportExportModal("Import Failed", `Error: ${e.message}`, true);
+        }
+      };
+
+      window.confirmGalleryImport = async function() {
+        closeGalleryImportConfirmModal();
+        if (!pendingImportData) return;
+        try {
+          const { entries } = pendingImportData;
+          const parentDir = pendingImportParentDir;
+          await db.gallery.clear();
+          showGalleryImportExportModal("Importing Gallery", `Importing... (0/${entries.length})`, false);
+          for (let i = 0; i < entries.length; i++) {
+            const entry = entries[i];
+            const imgHandle = await resolveFilePath(parentDir, entry.imagePath);
+            const imageData = await fileToDataURL(await imgHandle.getFile());
+            await db.gallery.add({
+              imageData,
+              prompt: entry.prompt,
+              seed: entry.seed || null,
+              style: entry.style || '',
+              guidance: entry.guidance || '',
+              resolution: entry.resolution || '',
+              favorite: entry.favorite ? 1 : 0,
+              timestamp: entry.timestamp || Date.now()
+            });
+            document.getElementById('galleryImportExportModalMessage').textContent = `Importing... (${i+1}/${entries.length})`;
+          }
+          galleryLoadToken++;
+          loadGallery(false, galleryLoadToken);
+          document.getElementById('galleryImportExportModalMessage').textContent = `Imported ${entries.length} images successfully.`;
+          document.getElementById('galleryImportExportModalOkBtn').style.display = 'inline-block';
+        } catch (e) {
+          console.error('Import error:', e);
+          showGalleryImportExportModal("Import Failed", `Error: ${e.message}`, true);
+        } finally {
+          pendingImportData = null;
+          pendingImportParentDir = null;
+        }
+      };
+
+       function escapeHtml(text) {
         const div = document.createElement("div");
         div.textContent = text;
         return div.innerHTML;
@@ -5078,6 +5276,96 @@ return _originalFetch.apply(this, args);
 
       #promptGenSavedSetDeleteConfirmModal {
         z-index: 1200;
+      }
+
+      #galleryImportConfirmModal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.7);
+        z-index: 10001;
+        justify-content: center;
+        align-items: center;
+      }
+      #galleryImportConfirmModal[style*="flex"] {
+        display: flex !important;
+      }
+      #galleryImportConfirmContent {
+        background: #161b22;
+        border: 1px solid #30363d;
+        border-radius: 8px;
+        width: 400px;
+        padding: 20px;
+      }
+      #galleryImportConfirmMessage {
+        margin: 15px 0;
+        font-size: 14px;
+        color: #c9d1d9;
+      }
+      #galleryImportConfirmActions {
+        display: flex;
+        gap: 10px;
+        justify-content: flex-end;
+      }
+      #galleryImportConfirmCancelBtn {
+        background: #21262d;
+        color: #c9d1d9;
+        border: 1px solid #30363d;
+        padding: 8px 16px;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      #galleryImportConfirmProceedBtn {
+        background: #f85149;
+        color: #fff;
+        border: 1px solid #f85149;
+        padding: 8px 16px;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+
+      #galleryImportExportModal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.7);
+        z-index: 10002;
+        justify-content: center;
+        align-items: center;
+      }
+      #galleryImportExportModal[style*="flex"] {
+        display: flex !important;
+      }
+      #galleryImportExportContent {
+        background: #161b22;
+        border: 1px solid #30363d;
+        border-radius: 8px;
+        width: 400px;
+        padding: 20px;
+      }
+      #galleryImportExportModalMessage {
+        margin: 15px 0;
+        font-size: 14px;
+        color: #c9d1d9;
+      }
+      #galleryImportExportModalActions {
+        display: flex;
+        gap: 10px;
+        justify-content: flex-end;
+      }
+      #galleryImportExportModalOkBtn {
+        background: #6e40c9;
+        color: #fff;
+        border: 1px solid #8957e5;
+        padding: 8px 16px;
+        border-radius: 4px;
+        cursor: pointer;
       }
 
       #promptGenSavedSetDeleteConfirmContent {
