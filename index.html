@@ -98,6 +98,8 @@ return _originalFetch.apply(this, args);
             <span id="guidanceValue">14</span>
           </div>
 
+          <button id="parsePromptBtn" type="button" title="Parse Prompt to Pieces">❇</button>
+
           <button id="promptGeneratorBtn" type="button" title="Prompt Generator">🧬</button>
 
           <input id="negativePrompt" type="text" placeholder="Negative prompt..." />
@@ -515,6 +517,7 @@ return _originalFetch.apply(this, args);
         seed: document.getElementById("seed"),
         clearSeedBtn: document.getElementById("clearSeedBtn"),
         promptGeneratorBtn: document.getElementById("promptGeneratorBtn"),
+        parsePromptBtn: document.getElementById("parsePromptBtn"),
         clearPromptHeaderBtn: document.getElementById("clearPromptHeaderBtn"),
         style: document.getElementById("style"),
         num: document.getElementById("numImages"),
@@ -1001,6 +1004,10 @@ return _originalFetch.apply(this, args);
 
       el.promptGeneratorBtn.addEventListener("click", () => {
         openPromptGeneratorModal();
+      });
+
+      el.parsePromptBtn.addEventListener("click", () => {
+        parsePromptToPieces();
       });
 
       el.clearPromptHeaderBtn.addEventListener("click", () => {
@@ -2675,6 +2682,32 @@ return _originalFetch.apply(this, args);
         }
 
         closePromptGeneratorModal();
+      };
+
+      window.parsePromptToPieces = async function () {
+        const promptText = el.prompt.value.trim();
+        if (!promptText) return;
+
+        const lines = promptText.split("\n").filter((l) => l.trim());
+        const selections = {};
+
+        lines.forEach((line) => {
+          const match = line.match(/^([^:]+):\s*(.+)\.$/);
+          if (match) {
+            const pieceName = match[1].trim();
+            const valuesStr = match[2].trim();
+            const values = valuesStr.split(",").map((v) => v.trim()).filter((v) => v);
+            if (values.length > 0) {
+              selections["promptPiece_" + pieceName] = values;
+            }
+          }
+        });
+
+        if (Object.keys(selections).length > 0) {
+          sessionStorage.setItem("promptGenSelections", JSON.stringify(selections));
+        }
+
+        openPromptGeneratorModal();
       };
 
       el.promptPiecesModal.addEventListener("click", (e) => {
@@ -5342,6 +5375,15 @@ return _originalFetch.apply(this, args);
 
       #promptGeneratorBtn:hover {
         background: #388bfd;
+      }
+
+      #parsePromptBtn {
+        background: #2ea043;
+        border-color: #3fb950;
+      }
+
+      #parsePromptBtn:hover {
+        background: #3fb950;
       }
 
       #downloadAllBtn {
