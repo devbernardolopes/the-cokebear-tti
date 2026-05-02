@@ -349,6 +349,7 @@ return _originalFetch.apply(this, args);
         <div id="addPromptPieceForm">
           <input type="text" id="promptPieceName" placeholder="Piece name" />
           <textarea id="promptPieceContent" placeholder="Content (separate by semicolon or pipe)"></textarea>
+          <input type="text" id="promptPieceSeparator" placeholder="Separator (default: ', ')" maxlength="10" />
         </div>
         <div id="addPromptPieceActions">
           <button onclick="closeAddPromptPieceModal()" id="addPromptPieceCancelBtn">CANCEL</button>
@@ -583,6 +584,7 @@ return _originalFetch.apply(this, args);
         addPromptPieceSaveBtn: document.getElementById("addPromptPieceSaveBtn"),
         promptPieceName: document.getElementById("promptPieceName"),
         promptPieceContent: document.getElementById("promptPieceContent"),
+        promptPieceSeparator: document.getElementById("promptPieceSeparator"),
         promptPiecesDeleteConfirmModal: document.getElementById("promptPiecesDeleteConfirmModal"),
         promptGenSavedSetDeleteConfirmModal: document.getElementById("promptGenSavedSetDeleteConfirmModal"),
         promptGenNothingToSaveModal: document.getElementById("promptGenNothingToSaveModal"),
@@ -2422,10 +2424,17 @@ return _originalFetch.apply(this, args);
           const pieceKey = piece.key.replace("promptPiece_", "");
           const pieceData = piece.value || "";
           const values = pieceData.split(/[;|]/).map((v) => v.trim()).filter((v) => v);
+          const separator = piece.separator || ", ";
+          // Build valueOrder: use stored order, validate against current values
+          const storedOrder = piece.valueOrder || values;
+          const validOrder = storedOrder.filter((v) => values.includes(v));
+          const missing = values.filter((v) => !validOrder.includes(v));
+          const finalOrder = [...validOrder, ...missing];
 
           const row = document.createElement("div");
           row.className = "prompt-generator-row";
           row.dataset.key = piece.key;
+          row.dataset.separator = separator;
 
           const collapsedKeys = JSON.parse(sessionStorage.getItem("promptGenCollapsed") || "{}");
           if (collapsedKeys[pieceKey]) {
@@ -2436,11 +2445,11 @@ return _originalFetch.apply(this, args);
           dragHandle.className = "prompt-gen-drag-handle";
           dragHandle.textContent = "⋮⋮";
 
-          // Custom drag implementation for both desktop and mobile
+          // Custom drag implementation for row reorder (both desktop and mobile)
           let dragStartY = 0;
           let dragStartX = 0;
           let isDragging = false;
-          let justDragged = false; // Flag to prevent click after drag
+          let justDragged = false;
 
           function getDragAfterElement(y) {
             const rows = Array.from(el.promptGeneratorList.querySelectorAll(".prompt-generator-row:not(.dragging)"));
@@ -2458,15 +2467,10 @@ return _originalFetch.apply(this, args);
             return closest;
           }
 
-          function onDragStart(e) {
+          function onRowDragStart(e) {
             const target = e.target;
-            // Only initiate drag from the handle (desktop + mobile)
             if (!target.closest(".prompt-gen-drag-handle")) return;
-
-            // Only preventDefault for mouse events (not touch, to allow click to fire if not dragging)
-            if (!e.touches) {
-              e.preventDefault();
-            }
+            if (!e.touches) { e.preventDefault(); }
 
             const clientY = e.touches ? e.touches[0].clientY : e.clientY;
             const clientX = e.touches ? e.touches[0].clientX : e.clientX;
@@ -2478,16 +2482,13 @@ return _originalFetch.apply(this, args);
             function onDragMove(e) {
               const moveY = e.touches ? e.touches[0].clientY : e.clientY;
               const moveX = e.touches ? e.touches[0].clientX : e.clientX;
-
-              // Only start drag if vertical movement > 5px AND vertical > horizontal (avoid accidental drags)
               const deltaX = Math.abs(moveX - dragStartX);
               const deltaY = Math.abs(moveY - dragStartY);
               if (!isDragging && deltaY > 5 && deltaY > deltaX) {
                 isDragging = true;
-                e.preventDefault(); // Prevent scroll only when we start dragging
+                e.preventDefault();
                 row.classList.add("dragging");
               }
-
               if (isDragging) {
                 e.preventDefault();
                 const dragging = el.promptGeneratorList.querySelector(".dragging");
@@ -2507,13 +2508,11 @@ return _originalFetch.apply(this, args);
               document.removeEventListener("mouseup", onDragEnd);
               document.removeEventListener("touchmove", onDragMove);
               document.removeEventListener("touchend", onDragEnd);
-
               if (isDragging) {
                 row.classList.remove("dragging");
                 const newOrder = Array.from(el.promptGeneratorList.querySelectorAll(".prompt-generator-row")).map((r) => r.dataset.key);
                 localStorage.setItem("promptGenOrder", JSON.stringify(newOrder));
                 justDragged = true;
-                // Reset the flag after a short delay so click event doesn't trigger collapse
                 setTimeout(() => { justDragged = false; }, 200);
               }
               isDragging = false;
@@ -2525,9 +2524,8 @@ return _originalFetch.apply(this, args);
             document.addEventListener("touchend", onDragEnd);
           }
 
-          // Allow drag from handle (works on both desktop and mobile)
-          dragHandle.addEventListener("mousedown", onDragStart);
-          dragHandle.addEventListener("touchstart", onDragStart, { passive: false });
+          dragHandle.addEventListener("mousedown", onRowDragStart);
+          dragHandle.addEventListener("touchstart", onRowDragStart, { passive: false });
 
           const nameSpan = document.createElement("span");
           nameSpan.className = "prompt-generator-name";
@@ -2544,14 +2542,22 @@ return _originalFetch.apply(this, args);
           const savedSelections = JSON.parse(sessionStorage.getItem("promptGenSelections") || "{}");
           const selectedForKey = savedSelections[piece.key] || [];
 
-          values.forEach((value) => {
+          // Create toggle buttons in finalOrder
+          finalOrder.forEach((value) => {
             const btn = document.createElement("button");
             btn.className = "prompt-generator-toggle";
-            btn.textContent = value;
+            btn.dataset.value = value;
+            btn.innerHTML = `<span class="toggle-drag-handle">⋮</span><span class="toggle-text">${value}</span>`;
             if (selectedForKey.includes(value)) {
               btn.classList.add("selected");
             }
-            btn.addEventListener("click", () => {
+            // Toggle selection on click (but not if we just dragged)
+            let toggleJustDragged = false;
+            btn.addEventListener("click", (e) => {
+              if (toggleJustDragged) {
+                toggleJustDragged = false;
+                return;
+              }
               btn.classList.toggle("selected");
               const nameSpan = row.querySelector(".prompt-generator-name");
               if (row.querySelector(".prompt-generator-toggle.selected")) {
@@ -2560,6 +2566,84 @@ return _originalFetch.apply(this, args);
                 nameSpan.classList.remove("has-selection");
               }
             });
+
+            // In-row drag for toggle reorder (only from toggle-drag-handle)
+            let toggleDragStartY = 0;
+            let toggleDragStartX = 0;
+            let toggleIsDragging = false;
+
+            function onToggleDragStart(e) {
+              if (!e.target.closest(".toggle-drag-handle")) return;
+              if (!e.touches) { e.preventDefault(); }
+              const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+              const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+              toggleDragStartY = clientY;
+              toggleDragStartX = clientX;
+              toggleIsDragging = false;
+
+              function onToggleDragMove(e) {
+                const moveY = e.touches ? e.touches[0].clientY : e.clientY;
+                const moveX = e.touches ? e.touches[0].clientX : e.clientX;
+                const deltaX = Math.abs(moveX - toggleDragStartX);
+                const deltaY = Math.abs(moveY - toggleDragStartY);
+                if (!toggleIsDragging && deltaX > 3 && deltaX > deltaY) {
+                  toggleIsDragging = true;
+                  e.preventDefault();
+                  btn.classList.add("dragging");
+                }
+                if (toggleIsDragging) {
+                  e.preventDefault();
+                  const dragging = valuesContainer.querySelector(".prompt-generator-toggle.dragging");
+                  if (dragging) {
+                    const btns = Array.from(valuesContainer.querySelectorAll(".prompt-generator-toggle:not(.dragging)"));
+                    let closest = null;
+                    let closestOffset = Number.NEGATIVE_INFINITY;
+                    btns.forEach((b) => {
+                      const box = b.getBoundingClientRect();
+                      const offset = moveX - box.left - box.width / 2;
+                      if (offset < 0 && offset > closestOffset) {
+                        closestOffset = offset;
+                        closest = b;
+                      }
+                    });
+                    if (closest) {
+                      valuesContainer.insertBefore(dragging, closest);
+                    } else {
+                      valuesContainer.appendChild(dragging);
+                    }
+                  }
+                }
+              }
+
+              function onToggleDragEnd(e) {
+                document.removeEventListener("mousemove", onToggleDragMove);
+                document.removeEventListener("mouseup", onToggleDragEnd);
+                document.removeEventListener("touchmove", onToggleDragMove);
+                document.removeEventListener("touchend", onToggleDragEnd);
+                if (toggleIsDragging) {
+                  btn.classList.remove("dragging");
+                  toggleJustDragged = true;
+                  setTimeout(() => { toggleJustDragged = false; }, 200);
+                  // Save new order to DB
+                  const newOrder = Array.from(valuesContainer.querySelectorAll(".prompt-generator-toggle")).map((b) => b.dataset.value);
+                  const pieceObj = promptPieces.find((p) => p.key === piece.key);
+                  if (pieceObj) {
+                    pieceObj.valueOrder = newOrder;
+                    db.settings.put({ ...pieceObj, valueOrder: newOrder });
+                  }
+                }
+                toggleIsDragging = false;
+              }
+
+              document.addEventListener("mousemove", onToggleDragMove);
+              document.addEventListener("mouseup", onToggleDragEnd);
+              document.addEventListener("touchmove", onToggleDragMove, { passive: false });
+              document.addEventListener("touchend", onToggleDragEnd);
+            }
+
+            btn.addEventListener("mousedown", onToggleDragStart);
+            btn.addEventListener("touchstart", onToggleDragStart, { passive: false });
+
             valuesContainer.appendChild(btn);
           });
 
@@ -2571,7 +2655,7 @@ return _originalFetch.apply(this, args);
           const updateCollapsedContent = () => {
             if (row.classList.contains("collapsed")) {
               const selectedBtns = row.querySelectorAll(".prompt-generator-toggle.selected");
-              const selectedValues = Array.from(selectedBtns).map((btn) => btn.textContent);
+              const selectedValues = Array.from(selectedBtns).map((btn) => btn.dataset.value);
               collapsedContentSpan.textContent = selectedValues.length > 0 ? `[${selectedValues.join(", ")}]` : "";
             } else {
               collapsedContentSpan.textContent = "";
@@ -2580,7 +2664,6 @@ return _originalFetch.apply(this, args);
 
           row.addEventListener("click", (e) => {
             if (e.target.closest(".prompt-gen-drag-handle") || e.target.closest(".prompt-generator-toggle")) return;
-            // Don't toggle if we just finished a drag
             if (justDragged) return;
             row.classList.toggle("collapsed");
             const collapsedKeys = JSON.parse(sessionStorage.getItem("promptGenCollapsed") || "{}");
@@ -2668,10 +2751,11 @@ return _originalFetch.apply(this, args);
           const nameSpan = row.querySelector(".prompt-generator-name");
           const pieceName = nameSpan.firstChild.textContent;
           const selectedBtns = row.querySelectorAll(".prompt-generator-toggle.selected");
+          const separator = row.dataset.separator || ", ";
 
           if (selectedBtns.length > 0) {
-            const selectedValues = Array.from(selectedBtns).map((btn) => btn.textContent);
-            promptLines.push(`${pieceName}: ${selectedValues.join(", ")}.`);
+            const selectedValues = Array.from(selectedBtns).map((btn) => btn.dataset.value);
+            promptLines.push(`${pieceName}: ${selectedValues.join(separator)}.`);
           }
         });
 
@@ -2691,17 +2775,63 @@ return _originalFetch.apply(this, args);
         const lines = promptText.split("\n").filter((l) => l.trim());
         const selections = {};
 
-        lines.forEach((line) => {
+        for (const line of lines) {
           const match = line.match(/^([^:]+):\s*(.+)\.$/);
-          if (match) {
-            const pieceName = match[1].trim();
-            const valuesStr = match[2].trim();
-            const values = valuesStr.split(",").map((v) => v.trim()).filter((v) => v);
-            if (values.length > 0) {
-              selections["promptPiece_" + pieceName] = values;
+          if (!match) continue;
+
+          const pieceName = match[1].trim();
+          const valuesStr = match[2].trim();
+
+          const pieceKey = `promptPiece_${pieceName}`;
+          const existingPiece = await db.settings.get(pieceKey);
+
+          let values = [];
+
+          if (existingPiece) {
+            const separator = existingPiece.separator || ", ";
+            const existingValues = (existingPiece.value || "").split(/[;|]/).map((v) => v.trim()).filter((v) => v);
+
+            // First, check if valuesStr exactly matches an existing value (handles combined values)
+            if (existingValues.includes(valuesStr)) {
+              values = [valuesStr];
+            } else {
+              // Use a simple split approach for the separator
+              let parsedValues;
+              if (separator === ", ") {
+                parsedValues = valuesStr.split(",").map((v) => v.trim()).filter((v) => v);
+              } else {
+                // For custom separators, split by the separator
+                parsedValues = valuesStr.split(separator).map((v) => v.trim()).filter((v) => v);
+              }
+
+              // Check if all parsed values match existing values
+              const allMatch = parsedValues.every((v) => existingValues.includes(v));
+
+              if (allMatch) {
+                values = parsedValues;
+              } else {
+                // Some don't match - treat as new values
+                values = parsedValues;
+                const missingValues = parsedValues.filter((v) => !existingValues.includes(v));
+                if (missingValues.length > 0) {
+                  const updatedValues = existingValues.concat(missingValues);
+                  await db.settings.update(pieceKey, { value: updatedValues.join("|") });
+                }
+              }
             }
+          } else {
+            // No existing piece, create one with default separator
+            const parsedValues = valuesStr.split(",").map((v) => v.trim()).filter((v) => v);
+            values = parsedValues;
+            await db.settings.add({
+              key: pieceKey,
+              value: values.join("|"),
+              createdAt: Date.now()
+            });
           }
-        });
+
+          selections[pieceKey] = values;
+        }
 
         if (Object.keys(selections).length > 0) {
           sessionStorage.setItem("promptGenSelections", JSON.stringify(selections));
@@ -2809,10 +2939,15 @@ return _originalFetch.apply(this, args);
       window.exportPromptPieces = async function () {
         try {
           const pieces = await db.settings.where("key").startsWith("promptPiece_").toArray();
-          const exportData = pieces.map((p) => ({
-            name: p.key.replace("promptPiece_", ""),
-            value: p.value,
-          }));
+          const exportData = pieces.map((p) => {
+            const item = {
+              name: p.key.replace("promptPiece_", ""),
+              value: p.value,
+            };
+            if (p.separator) item.separator = p.separator;
+            if (p.valueOrder) item.valueOrder = p.valueOrder;
+            return item;
+          });
           const dataStr = JSON.stringify(exportData, null, 2);
           const blob = new Blob([dataStr], { type: "application/json" });
           const url = URL.createObjectURL(blob);
@@ -2855,11 +2990,14 @@ return _originalFetch.apply(this, args);
               .filter((v, idx, arr) => arr.indexOf(v) === idx)
               .join("; ");
             if (!cleanedValue) continue;
-            await db.settings.put({
+            const data = {
               key: key,
               value: cleanedValue,
               timestamp: timestamp + i,
-            });
+            };
+            if (item.separator) data.separator = item.separator;
+            if (item.valueOrder) data.valueOrder = item.valueOrder;
+            await db.settings.put(data);
             importedCount++;
           }
           await loadPromptPieces();
@@ -2884,6 +3022,7 @@ return _originalFetch.apply(this, args);
         document.body.classList.remove("modal-open");
         el.promptPieceName.value = "";
         el.promptPieceContent.value = "";
+        el.promptPieceSeparator.value = "";
         el.addPromptPieceModalTitle.textContent = "Add Prompt Piece";
         el.addPromptPieceSaveBtn.textContent = "SAVE";
         editingPromptPieceId = null;
@@ -2905,6 +3044,7 @@ return _originalFetch.apply(this, args);
           .filter((v) => v)
           .filter((v, i, arr) => arr.indexOf(v) === i)
           .join("; ");
+        const separator = el.promptPieceSeparator.value.trim();
         if (!name) {
           alert("Please enter a name for the piece");
           return;
@@ -2915,7 +3055,7 @@ return _originalFetch.apply(this, args);
         }
         try {
           const newKey = "promptPiece_" + name;
-          let originalKey = editingPromptPieceId;
+          const originalKey = editingPromptPieceId;
           // If name changed and not editing, check for duplicate
           if (!originalKey) {
             const existingPiece = promptPieces.find((p) => p.key === newKey);
@@ -2924,19 +3064,26 @@ return _originalFetch.apply(this, args);
               return;
             }
           }
+          // Get existing piece data (from old key if renaming)
+          const sourceKey = originalKey || newKey;
+          const sourcePiece = promptPieces.find((p) => p.key === sourceKey);
+          const createdAt = sourcePiece?.createdAt || Date.now();
+          // Preserve existing separator and valueOrder
+          const finalSeparator = separator || sourcePiece?.separator || undefined;
+          const finalValueOrder = sourcePiece?.valueOrder || content.split(/[;|]/).map((v) => v.trim()).filter((v) => v);
           // Delete old key if name changed during edit
           if (originalKey && originalKey !== newKey) {
             await db.settings.delete(originalKey);
           }
-          // Get existing piece to preserve createdAt timestamp
-          const existingPiece = promptPieces.find((p) => p.key === newKey);
-          const createdAt = existingPiece?.createdAt || Date.now();
-          await db.settings.put({
+          const data = {
             key: newKey,
             value: content,
             createdAt: createdAt,
             timestamp: Date.now(),
-          });
+          };
+          if (finalSeparator) data.separator = finalSeparator;
+          data.valueOrder = finalValueOrder;
+          await db.settings.put(data);
           editingPromptPieceId = null;
           closeAddPromptPieceModal();
         } catch (e) {
@@ -2951,6 +3098,7 @@ return _originalFetch.apply(this, args);
         editingPromptPieceId = piece.key;
         document.getElementById("promptPieceName").value = pieceKey;
         document.getElementById("promptPieceContent").value = piece.value;
+        document.getElementById("promptPieceSeparator").value = piece.separator || "";
         document.getElementById("addPromptPieceModalTitle").textContent = "Edit Prompt Piece";
         document.getElementById("addPromptPieceSaveBtn").textContent = "UPDATE";
         document.getElementById("addPromptPieceModal").style.display = "flex";
@@ -6718,6 +6866,31 @@ return _originalFetch.apply(this, args);
         color: #fff;
       }
 
+      .toggle-drag-handle {
+        cursor: grab;
+        margin-right: 4px;
+        font-size: 10px;
+        color: #8b949e;
+        user-select: none;
+        touch-action: none;
+        -webkit-user-select: none;
+      }
+
+      .toggle-drag-handle:active {
+        cursor: grabbing;
+      }
+
+      .prompt-generator-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 2px;
+      }
+
+      .prompt-generator-toggle.dragging {
+        opacity: 0.5;
+        background: #30363d;
+      }
+
       @media (max-width: 520px) {
         .prompt-generator-row {
           flex-wrap: wrap;
@@ -6738,6 +6911,10 @@ return _originalFetch.apply(this, args);
 
         .prompt-generator-toggle {
           padding: 8px 12px;
+        }
+
+        .toggle-drag-handle {
+          padding: 4px 6px;
         }
       }
 
