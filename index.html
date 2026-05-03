@@ -2568,63 +2568,91 @@ return _originalFetch.apply(this, args);
             });
 
             // In-row drag for toggle reorder (only from toggle-drag-handle)
-            let toggleDragStartY = 0;
-            let toggleDragStartX = 0;
             let toggleIsDragging = false;
+            let placeholder = null;
+            let rafId = null;
 
             function onToggleDragStart(e) {
               if (!e.target.closest(".toggle-drag-handle")) return;
               if (!e.touches) { e.preventDefault(); }
-              const clientY = e.touches ? e.touches[0].clientY : e.clientY;
               const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-              toggleDragStartY = clientY;
-              toggleDragStartX = clientX;
+              const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+              let startX = clientX;
+              let startY = clientY;
               toggleIsDragging = false;
 
+              function getInsertionIndex(x) {
+                const btns = Array.from(valuesContainer.querySelectorAll(".prompt-generator-toggle:not(.dragging):not(.toggle-placeholder)"));
+                if (btns.length === 0) return 0;
+                let idx = btns.length;
+                for (let i = 0; i < btns.length; i++) {
+                  const box = btns[i].getBoundingClientRect();
+                  if (x < box.left + box.width / 2) {
+                    idx = i;
+                    break;
+                  }
+                }
+                return idx;
+              }
+
               function onToggleDragMove(e) {
-                const moveY = e.touches ? e.touches[0].clientY : e.clientY;
                 const moveX = e.touches ? e.touches[0].clientX : e.clientX;
-                const deltaX = Math.abs(moveX - toggleDragStartX);
-                const deltaY = Math.abs(moveY - toggleDragStartY);
-                if (!toggleIsDragging && deltaX > 3 && deltaX > deltaY) {
+                const moveY = e.touches ? e.touches[0].clientY : e.clientY;
+                const deltaX = Math.abs(moveX - startX);
+                const deltaY = Math.abs(moveY - startY);
+                if (!toggleIsDragging && (deltaX > 3 || deltaY > 3)) {
                   toggleIsDragging = true;
                   e.preventDefault();
                   btn.classList.add("dragging");
+                  btn.style.visibility = "hidden";
+                  btn.style.pointerEvents = "none";
+                  placeholder = document.createElement("div");
+                  placeholder.className = "toggle-placeholder";
+                  placeholder.style.width = btn.offsetWidth + "px";
+                  placeholder.style.height = btn.offsetHeight + "px";
+                  placeholder.style.border = "2px dashed #58a6ff";
+                  placeholder.style.borderRadius = "4px";
+                  placeholder.style.margin = "0 3px";
+                  placeholder.style.display = "inline-block";
+                  placeholder.style.verticalAlign = "top";
+                  placeholder.style.boxSizing = "border-box";
+                  valuesContainer.insertBefore(placeholder, btn);
                 }
                 if (toggleIsDragging) {
                   e.preventDefault();
-                  const dragging = valuesContainer.querySelector(".prompt-generator-toggle.dragging");
-                  if (dragging) {
-                    const btns = Array.from(valuesContainer.querySelectorAll(".prompt-generator-toggle:not(.dragging)"));
-                    let closest = null;
-                    let closestOffset = Number.NEGATIVE_INFINITY;
-                    btns.forEach((b) => {
-                      const box = b.getBoundingClientRect();
-                      const offset = moveX - box.left - box.width / 2;
-                      if (offset < 0 && offset > closestOffset) {
-                        closestOffset = offset;
-                        closest = b;
+                  if (placeholder) {
+                    if (rafId) cancelAnimationFrame(rafId);
+                    const cx = moveX;
+                    rafId = requestAnimationFrame(function() {
+                      const idx = getInsertionIndex(cx);
+                      const btns = Array.from(valuesContainer.querySelectorAll(".prompt-generator-toggle:not(.dragging):not(.toggle-placeholder)"));
+                      if (idx >= btns.length) {
+                        valuesContainer.appendChild(placeholder);
+                      } else {
+                        valuesContainer.insertBefore(placeholder, btns[idx]);
                       }
                     });
-                    if (closest) {
-                      valuesContainer.insertBefore(dragging, closest);
-                    } else {
-                      valuesContainer.appendChild(dragging);
-                    }
                   }
                 }
               }
 
               function onToggleDragEnd(e) {
+                if (rafId) cancelAnimationFrame(rafId);
                 document.removeEventListener("mousemove", onToggleDragMove);
                 document.removeEventListener("mouseup", onToggleDragEnd);
                 document.removeEventListener("touchmove", onToggleDragMove);
                 document.removeEventListener("touchend", onToggleDragEnd);
                 if (toggleIsDragging) {
+                  if (placeholder && placeholder.parentNode) {
+                    valuesContainer.insertBefore(btn, placeholder);
+                    placeholder.remove();
+                    placeholder = null;
+                  }
                   btn.classList.remove("dragging");
+                  btn.style.visibility = "";
+                  btn.style.pointerEvents = "";
                   toggleJustDragged = true;
                   setTimeout(() => { toggleJustDragged = false; }, 200);
-                  // Save new order to DB
                   const newOrder = Array.from(valuesContainer.querySelectorAll(".prompt-generator-toggle")).map((b) => b.dataset.value);
                   const pieceObj = promptPieces.find((p) => p.key === piece.key);
                   if (pieceObj) {
