@@ -2567,32 +2567,54 @@ return _originalFetch.apply(this, args);
               }
             });
 
-            // In-row drag for toggle reorder (only from toggle-drag-handle)
-            let toggleIsDragging = false;
-            let placeholder = null;
-            let rafId = null;
+              // In-row drag for toggle reorder (only from toggle-drag-handle)
+              let toggleIsDragging = false;
+              let dragGhost = null;
+              let rafId = null;
+              let lastDragX = 0;
+              let lastDragY = 0;
+              let startX = 0;
+              let startY = 0;
 
-            function onToggleDragStart(e) {
-              if (!e.target.closest(".toggle-drag-handle")) return;
-              if (!e.touches) { e.preventDefault(); }
-              const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-              const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-              let startX = clientX;
-              let startY = clientY;
-              toggleIsDragging = false;
-
-              function getInsertionIndex(x) {
-                const btns = Array.from(valuesContainer.querySelectorAll(".prompt-generator-toggle:not(.dragging):not(.toggle-placeholder)"));
+              function getInsertionIndex(x, y) {
+                const btns = Array.from(valuesContainer.querySelectorAll(".prompt-generator-toggle:not(.dragging)"));
                 if (btns.length === 0) return 0;
-                let idx = btns.length;
-                for (let i = 0; i < btns.length; i++) {
-                  const box = btns[i].getBoundingClientRect();
-                  if (x < box.left + box.width / 2) {
-                    idx = i;
-                    break;
+
+                let closestDist = Infinity;
+                let closestIdx = 0;
+
+                for (var i = 0; i < btns.length; i++) {
+                  var btn = btns[i];
+                  const box = btn.getBoundingClientRect();
+                  const centerX = box.left + box.width / 2;
+                  const centerY = box.top + box.height / 2;
+                  const dx = x - centerX;
+                  const dy = y - centerY;
+                  const dist = Math.sqrt(dx * dx + dy * dy);
+                  if (dist < closestDist) {
+                    closestDist = dist;
+                    closestIdx = i;
                   }
                 }
-                return idx;
+
+                const targetBtn = btns[closestIdx];
+                if (!targetBtn) return btns.length;
+
+                const box = targetBtn.getBoundingClientRect();
+                return x < box.left + box.width / 2 ? closestIdx : closestIdx + 1;
+              }
+
+              function onToggleDragStart(e) {
+                const handle = e.target.closest(".toggle-drag-handle");
+                if (!handle) return;
+
+                startX = e.touches ? e.touches[0].clientX : e.clientX;
+                startY = e.touches ? e.touches[0].clientY : e.clientY;
+
+                document.addEventListener("mousemove", onToggleDragMove);
+                document.addEventListener("mouseup", onToggleDragEnd);
+                document.addEventListener("touchmove", onToggleDragMove, { passive: false });
+                document.addEventListener("touchend", onToggleDragEnd);
               }
 
               function onToggleDragMove(e) {
@@ -2600,38 +2622,33 @@ return _originalFetch.apply(this, args);
                 const moveY = e.touches ? e.touches[0].clientY : e.clientY;
                 const deltaX = Math.abs(moveX - startX);
                 const deltaY = Math.abs(moveY - startY);
+
                 if (!toggleIsDragging && (deltaX > 3 || deltaY > 3)) {
                   toggleIsDragging = true;
                   e.preventDefault();
                   btn.classList.add("dragging");
-                  btn.style.visibility = "hidden";
-                  btn.style.pointerEvents = "none";
-                  placeholder = document.createElement("div");
-                  placeholder.className = "toggle-placeholder";
-                  placeholder.style.width = btn.offsetWidth + "px";
-                  placeholder.style.height = btn.offsetHeight + "px";
-                  placeholder.style.border = "2px dashed #58a6ff";
-                  placeholder.style.borderRadius = "4px";
-                  placeholder.style.margin = "0 3px";
-                  placeholder.style.display = "inline-block";
-                  placeholder.style.verticalAlign = "top";
-                  placeholder.style.boxSizing = "border-box";
-                  valuesContainer.insertBefore(placeholder, btn);
+                  btn.style.display = "none";
+
+                  // Create drag ghost that follows cursor
+                  dragGhost = btn.cloneNode(true);
+                  dragGhost.className = "drag-ghost";
+                  dragGhost.style.position = "fixed";
+                  dragGhost.style.zIndex = "10000";
+                  dragGhost.style.pointerEvents = "none";
+                  dragGhost.style.opacity = "0.8";
+                  dragGhost.style.width = btn.offsetWidth + "px";
+                  document.body.appendChild(dragGhost);
                 }
+
                 if (toggleIsDragging) {
                   e.preventDefault();
-                  if (placeholder) {
-                    if (rafId) cancelAnimationFrame(rafId);
-                    const cx = moveX;
-                    rafId = requestAnimationFrame(function() {
-                      const idx = getInsertionIndex(cx);
-                      const btns = Array.from(valuesContainer.querySelectorAll(".prompt-generator-toggle:not(.dragging):not(.toggle-placeholder)"));
-                      if (idx >= btns.length) {
-                        valuesContainer.appendChild(placeholder);
-                      } else {
-                        valuesContainer.insertBefore(placeholder, btns[idx]);
-                      }
-                    });
+                  lastDragX = moveX;
+                  lastDragY = moveY;
+
+                  // Update ghost position
+                  if (dragGhost) {
+                    dragGhost.style.left = (moveX - dragGhost.offsetWidth / 2) + "px";
+                    dragGhost.style.top = (moveY - dragGhost.offsetHeight / 2) + "px";
                   }
                 }
               }
@@ -2642,17 +2659,31 @@ return _originalFetch.apply(this, args);
                 document.removeEventListener("mouseup", onToggleDragEnd);
                 document.removeEventListener("touchmove", onToggleDragMove);
                 document.removeEventListener("touchend", onToggleDragEnd);
+
                 if (toggleIsDragging) {
-                  if (placeholder && placeholder.parentNode) {
-                    valuesContainer.insertBefore(btn, placeholder);
-                    placeholder.remove();
-                    placeholder = null;
+                  // Calculate final insertion index from last known position
+                  const finalIdx = getInsertionIndex(lastDragX, lastDragY);
+
+                  // Remove ghost
+                  if (dragGhost) {
+                    dragGhost.remove();
+                    dragGhost = null;
                   }
+
                   btn.classList.remove("dragging");
-                  btn.style.visibility = "";
-                  btn.style.pointerEvents = "";
+                  btn.style.display = "";
+
+                  // Move button to final position in one operation
+                  const btns = Array.from(valuesContainer.querySelectorAll(".prompt-generator-toggle:not(.dragging)"));
+                  if (finalIdx >= btns.length) {
+                    valuesContainer.appendChild(btn);
+                  } else {
+                    valuesContainer.insertBefore(btn, btns[finalIdx]);
+                  }
+
                   toggleJustDragged = true;
                   setTimeout(() => { toggleJustDragged = false; }, 200);
+
                   const newOrder = Array.from(valuesContainer.querySelectorAll(".prompt-generator-toggle")).map((b) => b.dataset.value);
                   const pieceObj = promptPieces.find((p) => p.key === piece.key);
                   if (pieceObj) {
@@ -2660,20 +2691,18 @@ return _originalFetch.apply(this, args);
                     db.settings.put({ ...pieceObj, valueOrder: newOrder });
                   }
                 }
+
+                // Reset state
                 toggleIsDragging = false;
+                lastDragX = 0;
+                lastDragY = 0;
               }
 
-              document.addEventListener("mousemove", onToggleDragMove);
-              document.addEventListener("mouseup", onToggleDragEnd);
-              document.addEventListener("touchmove", onToggleDragMove, { passive: false });
-              document.addEventListener("touchend", onToggleDragEnd);
-            }
+              btn.addEventListener("mousedown", onToggleDragStart);
+              btn.addEventListener("touchstart", onToggleDragStart, { passive: false });
 
-            btn.addEventListener("mousedown", onToggleDragStart);
-            btn.addEventListener("touchstart", onToggleDragStart, { passive: false });
-
-            valuesContainer.appendChild(btn);
-          });
+              valuesContainer.appendChild(btn);
+            });
 
           row.appendChild(dragHandle);
           row.appendChild(nameSpan);
@@ -6906,6 +6935,27 @@ return _originalFetch.apply(this, args);
 
       .toggle-drag-handle:active {
         cursor: grabbing;
+      }
+
+      .drag-ghost {
+        opacity: 0.8;
+        pointer-events: none;
+        z-index: 10000;
+        position: fixed;
+      }
+
+      .insert-indicator {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background: #58a6ff;
+        pointer-events: none;
+        z-index: 9999;
+      }
+
+      .prompt-generator-values {
+        position: relative;
       }
 
       .prompt-generator-toggle {
