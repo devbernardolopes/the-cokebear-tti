@@ -2851,6 +2851,9 @@ return _originalFetch.apply(this, args);
             // First, check if valuesStr exactly matches an existing value (handles combined values)
             if (existingValues.includes(valuesStr)) {
               values = [valuesStr];
+              // Reorder to put this combined value first
+              const newOrder = [valuesStr, ...existingValues.filter((v) => v !== valuesStr)];
+              await db.settings.update(pieceKey, { valueOrder: newOrder });
             } else {
               // Use a simple split approach for the separator
               let parsedValues;
@@ -2866,6 +2869,10 @@ return _originalFetch.apply(this, args);
 
               if (allMatch) {
                 values = parsedValues;
+                // Reorder existingValues to match the order in parsedValues, then append remaining
+                const remaining = existingValues.filter((v) => !parsedValues.includes(v));
+                const newOrder = [...parsedValues, ...remaining];
+                await db.settings.update(pieceKey, { valueOrder: newOrder });
               } else {
                 // Some don't match - treat as new values
                 values = parsedValues;
@@ -2874,6 +2881,10 @@ return _originalFetch.apply(this, args);
                   const updatedValues = existingValues.concat(missingValues);
                   await db.settings.update(pieceKey, { value: updatedValues.join("|") });
                 }
+                // Reorder: put parsedValues first (preserving their order), then remaining existing values
+                const remaining = existingValues.filter((v) => !parsedValues.includes(v));
+                const newOrder = [...parsedValues, ...remaining];
+                await db.settings.update(pieceKey, { valueOrder: newOrder });
               }
             }
           } else {
@@ -2883,6 +2894,7 @@ return _originalFetch.apply(this, args);
             await db.settings.add({
               key: pieceKey,
               value: values.join("|"),
+              valueOrder: parsedValues,
               createdAt: Date.now()
             });
           }
