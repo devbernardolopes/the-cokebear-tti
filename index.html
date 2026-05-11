@@ -375,6 +375,23 @@ return _originalFetch.apply(this, args);
         </div>
       </div>
 
+      <div id="promptGenDeleteConfirmModal" class="modal" style="display: none;">
+        <div id="promptGenDeleteConfirmContent" onclick="event.stopPropagation()">
+          <div class="modal-header">
+            <h3>Delete Prompt Piece</h3>
+            <button onclick="closePromptGenDeleteConfirmModal()">❌</button>
+          </div>
+          <div id="promptGenDeleteConfirmMessage">
+            <p>Delete value &ldquo;<span id="promptGenDeleteConfirmValueName"></span>&rdquo; from &ldquo;<span id="promptGenDeleteConfirmPieceName"></span>&rdquo;?</p>
+            <p style="font-size: 12px; color: #f85149;">This action cannot be undone.</p>
+          </div>
+          <div id="promptGenDeleteConfirmActions">
+            <button onclick="closePromptGenDeleteConfirmModal()" id="promptGenDeleteConfirmCancelBtn">Cancel</button>
+            <button onclick="confirmPromptGenDeletePiece()" id="promptGenDeleteConfirmDeleteBtn">Delete</button>
+          </div>
+        </div>
+      </div>
+
       <div id="promptGenSavedSetDeleteConfirmModal" class="modal">
         <div id="promptGenSavedSetDeleteConfirmContent" onclick="event.stopPropagation()">
           <div class="modal-header">
@@ -2389,7 +2406,14 @@ return _originalFetch.apply(this, args);
         try {
           const pieces = await db.settings.where("key").startsWith("promptPiece_").toArray();
           // Sort by createdAt (original creation order), fallback to timestamp for older entries
-          promptPieces = pieces.sort((a, b) => (a.createdAt || a.timestamp) - (b.createdAt || b.timestamp));
+          // For pieces with the same createdAt, sort alphabetically to avoid textarea line order leaking into prompt gen order
+          promptPieces = pieces.sort((a, b) => {
+            const diff = (a.createdAt || a.timestamp) - (b.createdAt || b.timestamp);
+            if (diff !== 0) return diff;
+            const nameA = a.key.replace("promptPiece_", "").toLowerCase();
+            const nameB = b.key.replace("promptPiece_", "").toLowerCase();
+            return nameA.localeCompare(nameB);
+          });
           renderPromptGenerator();
         } catch (e) {
           console.warn("Failed to load prompt pieces:", e);
@@ -2547,7 +2571,7 @@ return _originalFetch.apply(this, args);
             const btn = document.createElement("button");
             btn.className = "prompt-generator-toggle";
             btn.dataset.value = value;
-            btn.innerHTML = `<span class="toggle-drag-handle">⋮</span><span class="toggle-text">${value}</span>`;
+            btn.innerHTML = `<span class="toggle-drag-handle">⋮</span><span class="toggle-text">${value}</span><span class="toggle-delete">🗑</span>`;
             if (selectedForKey.includes(value)) {
               btn.classList.add("selected");
             }
@@ -2565,6 +2589,12 @@ return _originalFetch.apply(this, args);
               } else {
                 nameSpan.classList.remove("has-selection");
               }
+            });
+
+            const deleteEl = btn.querySelector(".toggle-delete");
+            deleteEl.addEventListener("click", (e) => {
+              e.stopPropagation();
+              showPromptGenDeleteConfirm(piece.key, value, pieceKey);
             });
 
               // In-row drag for toggle reorder (only from toggle-drag-handle)
@@ -3192,6 +3222,62 @@ return _originalFetch.apply(this, args);
           loadPromptPieces(); // Reload the list
         } catch (e) {
           console.warn("Failed to delete prompt pieces:", e);
+        }
+      };
+
+      let promptGenPendingDeleteKey = null;
+      let promptGenPendingDeleteValue = null;
+
+      window.showPromptGenDeleteConfirm = function (key, value, pieceName) {
+        promptGenPendingDeleteKey = key;
+        promptGenPendingDeleteValue = value;
+        document.getElementById("promptGenDeleteConfirmValueName").textContent = value;
+        document.getElementById("promptGenDeleteConfirmPieceName").textContent = pieceName;
+        document.getElementById("promptGenDeleteConfirmModal").style.display = "flex";
+      };
+
+      window.closePromptGenDeleteConfirmModal = function () {
+        document.getElementById("promptGenDeleteConfirmModal").style.display = "none";
+        promptGenPendingDeleteKey = null;
+        promptGenPendingDeleteValue = null;
+      };
+
+      document.getElementById("promptGenDeleteConfirmModal").addEventListener("click", (e) => {
+        if (e.target === document.getElementById("promptGenDeleteConfirmModal")) {
+          closePromptGenDeleteConfirmModal();
+        }
+      });
+
+      window.confirmPromptGenDeletePiece = async function () {
+        if (!promptGenPendingDeleteKey) return;
+        try {
+          const pieceObj = promptPieces.find((p) => p.key === promptGenPendingDeleteKey);
+          if (pieceObj) {
+            const allValues = (pieceObj.value || "").split(/[;|]/).map((v) => v.trim()).filter((v) => v);
+            const remaining = allValues.filter((v) => v !== promptGenPendingDeleteValue);
+            if (remaining.length === 0) {
+              await db.settings.delete(promptGenPendingDeleteKey);
+              promptPieces = promptPieces.filter((p) => p.key !== promptGenPendingDeleteKey);
+            } else {
+              const newValueStr = remaining.join("|");
+              const updateData = { value: newValueStr };
+              if (pieceObj.valueOrder) {
+                updateData.valueOrder = pieceObj.valueOrder.filter((v) => v !== promptGenPendingDeleteValue);
+              }
+              await db.settings.put({ ...pieceObj, ...updateData });
+              const idx = promptPieces.findIndex((p) => p.key === promptGenPendingDeleteKey);
+              if (idx !== -1) {
+                promptPieces[idx] = { ...promptPieces[idx], ...updateData };
+              }
+            }
+          }
+          promptGenPendingDeleteKey = null;
+          promptGenPendingDeleteValue = null;
+          closePromptGenDeleteConfirmModal();
+          cleanPromptGenSelections();
+          renderPromptGenerator();
+        } catch (e) {
+          console.warn("Failed to delete value:", e);
         }
       };
 
@@ -5628,6 +5714,7 @@ return _originalFetch.apply(this, args);
       #promptPiecesModal,
       #addPromptPieceModal,
       #promptPiecesDeleteConfirmModal,
+      #promptGenDeleteConfirmModal,
       #promptGeneratorModal,
       #promptGenSaveSetModal,
       #promptGenNothingToSaveModal,
@@ -5651,6 +5738,10 @@ return _originalFetch.apply(this, args);
 
       #promptGenSavedSetDeleteConfirmModal {
         z-index: 1200;
+      }
+
+      #promptGenDeleteConfirmModal {
+        z-index: 1300;
       }
 
       #galleryImportConfirmModal {
@@ -6935,6 +7026,19 @@ return _originalFetch.apply(this, args);
 
       .toggle-drag-handle:active {
         cursor: grabbing;
+      }
+
+      .toggle-delete {
+        margin-left: 4px;
+        cursor: pointer;
+        font-size: 10px;
+        opacity: 0.5;
+        user-select: none;
+        line-height: 1;
+      }
+
+      .toggle-delete:hover {
+        opacity: 1;
       }
 
       .drag-ghost {
