@@ -2169,7 +2169,7 @@ return _originalFetch.apply(this, args);
         rows.forEach((row) => {
           const key = row.dataset.key;
           const selectedBtns = row.querySelectorAll(".prompt-generator-toggle.selected");
-          const selectedValues = Array.from(selectedBtns).map((btn) => btn.textContent);
+          const selectedValues = Array.from(selectedBtns).map((btn) => btn.dataset.value);
           if (selectedValues.length > 0) {
             selections[key] = selectedValues;
           }
@@ -2183,7 +2183,7 @@ return _originalFetch.apply(this, args);
         rows.forEach((row) => {
           const key = row.dataset.key;
           const selectedBtns = row.querySelectorAll(".prompt-generator-toggle.selected");
-          const selectedValues = Array.from(selectedBtns).map((btn) => btn.textContent);
+          const selectedValues = Array.from(selectedBtns).map((btn) => btn.dataset.value);
           if (selectedValues.length > 0) {
             selections[key] = selectedValues;
           }
@@ -2332,7 +2332,7 @@ return _originalFetch.apply(this, args);
           const key = row.dataset.key;
           const savedValues = (selections[key] || []).map((v) => v.toLowerCase());
           row.querySelectorAll(".prompt-generator-toggle").forEach((btn) => {
-            if (savedValues.includes(btn.textContent.toLowerCase())) {
+            if (savedValues.includes(btn.dataset.value.toLowerCase())) {
               btn.classList.add("selected");
             } else {
               btn.classList.remove("selected");
@@ -2798,7 +2798,7 @@ return _originalFetch.apply(this, args);
           if (collapsedContentSpan) {
             if (row.classList.contains("collapsed")) {
               const selectedBtns = row.querySelectorAll(".prompt-generator-toggle.selected");
-              const selectedValues = Array.from(selectedBtns).map((btn) => btn.textContent);
+          const selectedValues = Array.from(selectedBtns).map((btn) => btn.dataset.value);
               collapsedContentSpan.textContent = selectedValues.length > 0 ? `[${selectedValues.join(", ")}]` : "";
             } else {
               collapsedContentSpan.textContent = "";
@@ -3274,6 +3274,7 @@ return _originalFetch.apply(this, args);
           promptGenPendingDeleteKey = null;
           promptGenPendingDeleteValue = null;
           closePromptGenDeleteConfirmModal();
+          savePromptGenSelections();
           cleanPromptGenSelections();
           renderPromptGenerator();
         } catch (e) {
