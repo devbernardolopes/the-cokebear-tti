@@ -1575,8 +1575,8 @@ return _originalFetch.apply(this, args);
       // Update UI state for generate and cancel buttons
       function updateGenerationUI() {
         const hasWaiting = hasWaitingTiles() && isGenerating;
-        el.cancelGenBtn.style.display = hasWaiting ? "block" : "none";
-        el.generateBtn.disabled = isGenerating;
+        if (el.cancelGenBtn) el.cancelGenBtn.style.display = hasWaiting ? "block" : "none";
+        if (el.generateBtn) el.generateBtn.disabled = isGenerating;
       }
 
       // Cancel generation
