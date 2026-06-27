@@ -800,7 +800,6 @@ return _originalFetch.apply(this, args);
         galleryImages = [];
         gallerySearchCache.items = null;
         ensureGalleryScrollSentinel();
-        setupGalleryInfiniteScroll(token);
       }
 
       function refreshGallery(placeholderText) {
@@ -3800,11 +3799,6 @@ return _originalFetch.apply(this, args);
             galleryHasMore = scanOffset < galleryTotalCount;
           }
 
-          if (!append) {
-            el.galleryList.innerHTML = "";
-            ensureGalleryScrollSentinel();
-          }
-
           if (items.length === 0 && !append) {
             el.galleryList.innerHTML = searchQuery ? '<div class="history-empty">No matching images found</div>' : '<div class="history-empty">No images saved to gallery yet</div>';
             galleryHasMore = false;
@@ -3825,6 +3819,9 @@ return _originalFetch.apply(this, args);
           renderGalleryItemsProgressive(items, el.galleryList, false, token);
 
           ensureGalleryScrollSentinel();
+          if (!append) {
+            setupGalleryInfiniteScroll(token);
+          }
           updateGalleryCount();
 
           // Restore scroll position after reload
