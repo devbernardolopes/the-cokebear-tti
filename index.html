@@ -1226,9 +1226,11 @@ return _originalFetch.apply(this, args);
         copySeedBtn.style.whiteSpace = "nowrap";
         copySeedBtn.style.flexShrink = "0";
         copySeedBtn.onclick = () => {
+          // Access the seed input element directly
           const seedInputElement = document.getElementById("seed");
           if (seedInputElement) {
             seedInputElement.value = metadata.seed || "";
+            updateClearSeedBtn();
           }
           copySeedBtn.textContent = "✓";
           setTimeout(() => {
@@ -1244,9 +1246,7 @@ return _originalFetch.apply(this, args);
         backBtn.style.width = "100%";
         backBtn.style.padding = "6px";
         backBtn.style.fontSize = "11px";
-        backBtn.style.background = "#30363d";
-        backBtn.style.border = "1px solid #484f58";
-        backBtn.style.borderRadius = "4px";
+        backBtn.style.background = "#0d1117";
         backBtn.style.color = "#c9d1d9";
         backBtn.style.cursor = "pointer";
         backBtn.onclick = () => {
