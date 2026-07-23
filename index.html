@@ -4323,7 +4323,11 @@ return _originalFetch.apply(this, args);
         const btn = document.getElementById("modalFavoriteBtn");
         if (btn) {
           btn.textContent = isFavorite ? "❤️" : "🤍";
-          btn.classList.toggle("favorite-active", isFavorite);
+          if (isFavorite) {
+            btn.classList.add("favorite-active");
+          } else {
+            btn.classList.remove("favorite-active");
+          }
         }
       }
 
