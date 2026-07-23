@@ -98,9 +98,9 @@ return _originalFetch.apply(this, args);
             <span id="guidanceValue">14</span>
           </div>
 
-          <button id="parsePromptBtn" type="button" title="Parse Prompt to Pieces">❇</button>
+          <button id="parsePromptBtn" type="button">❇</button>
 
-          <button id="promptGeneratorBtn" type="button" title="Prompt Generator">🧬</button>
+          <button id="promptGeneratorBtn" type="button">🧬</button>
 
           <input id="negativePrompt" type="text" placeholder="Negative prompt..." />
 
@@ -4896,6 +4896,7 @@ return _originalFetch.apply(this, args);
 
         const infoPanel = document.createElement("div");
         infoPanel.className = "tile-info-panel";
+        infoPanel.addEventListener("click", (e) => e.stopPropagation());
 
         const promptArea = document.createElement("textarea");
         // promptArea.value = metadata.prompt;
