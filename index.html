@@ -185,6 +185,8 @@ return _originalFetch.apply(this, args);
           </select>
 
           <button onclick="downloadAllImages()" id="downloadAllBtn" disabled>Download All</button>
+          <button onclick="openPngMetadataFile()" id="pngMetadataBtn" title="Load prompt/seed metadata from a PNG file">⬆</button>
+          <input type="file" id="pngMetadataFile" accept="image/png" style="display: none;" />
           <button id="cancelGenBtn" onclick="cancelGeneration()">Cancel</button>
           <button onclick="generateImages()" id="generateBtn">▶</button>
         </div>
@@ -588,6 +590,7 @@ return _originalFetch.apply(this, args);
         downloadAllBtn: document.getElementById("downloadAllBtn"),
         generateBtn: document.getElementById("generateBtn"),
         cancelGenBtn: document.getElementById("cancelGenBtn"),
+        pngMetadataFile: document.getElementById("pngMetadataFile"),
         enterToSend: document.getElementById("enterToSend"),
         promptPiecesModal: document.getElementById("promptPiecesModal"),
         promptPiecesModalContent: document.getElementById("promptPiecesModalContent"),
@@ -4181,6 +4184,7 @@ return _originalFetch.apply(this, args);
           const style = el.style.value;
           const resolution = el.resolution.value;
           const seed = metadata?.seed || null;
+          const negativePrompt = metadata?.negativePrompt || el.negativePrompt.value;
 
           await db.gallery.add({
             imageData: currentModalImageSrc,
@@ -4189,6 +4193,7 @@ return _originalFetch.apply(this, args);
             style: style,
             resolution: resolution,
             seed: seed,
+            negativePrompt: negativePrompt,
             timestamp: Date.now(),
           });
 
@@ -4258,10 +4263,7 @@ return _originalFetch.apply(this, args);
         try {
           const item = await db.gallery.get(id);
           if (item) {
-            const link = document.createElement("a");
-            link.href = item.imageData;
-            link.download = `gallery-${id}.png`;
-            link.click();
+            await triggerDownload(item.imageData, `gallery-${id}.png`, item);
           }
         } catch (e) {
           console.warn("Failed to download gallery image:", e);
@@ -4384,6 +4386,7 @@ return _originalFetch.apply(this, args);
           const style = metadata?.style ?? el.style.value;
           const resolution = metadata?.resolution ?? el.resolution.value;
           const seed = metadata?.seed ?? null;
+          const negativePrompt = metadata?.negativePrompt ?? el.negativePrompt.value;
 
           await db.gallery.add({
             imageData: imageUrl,
@@ -4392,6 +4395,7 @@ return _originalFetch.apply(this, args);
             style: style,
             resolution: resolution,
             seed: seed,
+            negativePrompt: negativePrompt,
             favorite: 0,
             timestamp: Date.now(),
           });
@@ -4512,6 +4516,7 @@ return _originalFetch.apply(this, args);
                   style: item.style,
                   guidance: item.guidance,
                   resolution: item.resolution,
+                  negativePrompt: item.negativePrompt || '',
                   favorite: item.favorite ? 1 : 0,
                   timestamp: item.timestamp,
                   imagePath: `${imgFolder}/${imgName}`
@@ -4547,6 +4552,7 @@ return _originalFetch.apply(this, args);
                 style: item.style,
                 guidance: item.guidance,
                 resolution: item.resolution,
+                negativePrompt: item.negativePrompt || '',
                 favorite: item.favorite ? 1 : 0,
                 timestamp: item.timestamp,
                 imagePath: `${imgFolder}/${imgName}`
@@ -4625,6 +4631,7 @@ return _originalFetch.apply(this, args);
                 style: entry.style || '',
                 guidance: entry.guidance || '',
                 resolution: entry.resolution || '',
+                negativePrompt: entry.negativePrompt || '',
                 favorite: entry.favorite ? 1 : 0,
                 timestamp: entry.timestamp || Date.now()
               });
@@ -4650,6 +4657,7 @@ return _originalFetch.apply(this, args);
                 style: entry.style || '',
                 guidance: entry.guidance || '',
                 resolution: entry.resolution || '',
+                negativePrompt: entry.negativePrompt || '',
                 favorite: entry.favorite ? 1 : 0,
                 timestamp: entry.timestamp || Date.now()
               });
@@ -4847,6 +4855,7 @@ return _originalFetch.apply(this, args);
             guidance: metadata.guidance,
             style: metadata.style,
             resolution: metadata.resolution,
+            negativePrompt: metadata.negativePrompt || "",
           };
 
             // Use requestAnimationFrame to ensure DOM updates aren't throttled
@@ -4914,19 +4923,334 @@ return _originalFetch.apply(this, args);
         }
       }
 
+      const PNG_METADATA_KEY = "cokebear-tti";
+      const PNG_METADATA_SPEC = "cokebear_tti_v1";
+
+      function base64EncodeUnicode(str) {
+        const bytes = new TextEncoder().encode(str);
+        let bin = "";
+        for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+        return btoa(bin);
+      }
+
+      function base64DecodeUnicode(b64) {
+        const bin = atob(b64);
+        const bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        return new TextDecoder().decode(bytes);
+      }
+
+      function bytesToLatin1String(bytes) {
+        let str = "";
+        for (let i = 0; i < bytes.length; i++) str += String.fromCharCode(bytes[i]);
+        return str;
+      }
+
+      function crc32(bytes) {
+        let table = crc32.table;
+        if (!table) {
+          table = crc32.table = new Uint32Array(256);
+          for (let n = 0; n < 256; n++) {
+            let c = n;
+            for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+            table[n] = c >>> 0;
+          }
+        }
+        let crc = 0xffffffff;
+        for (let i = 0; i < bytes.length; i++) crc = table[(crc ^ bytes[i]) & 0xff] ^ (crc >>> 8);
+        return (crc ^ 0xffffffff) >>> 0;
+      }
+
+      function readUint32BE(bytes, off) {
+        return ((bytes[off] << 24) | (bytes[off + 1] << 16) | (bytes[off + 2] << 8) | bytes[off + 3]) >>> 0;
+      }
+
+      function parsePngChunks(bytes) {
+        const chunks = [];
+        if (!bytes || bytes.length < 8) return chunks;
+        let off = 8;
+        while (off + 8 <= bytes.length) {
+          const length = readUint32BE(bytes, off);
+          if (off + 12 + length > bytes.length) break;
+          const type =
+            String.fromCharCode(bytes[off + 4]) +
+            String.fromCharCode(bytes[off + 5]) +
+            String.fromCharCode(bytes[off + 6]) +
+            String.fromCharCode(bytes[off + 7]);
+          chunks.push({ type, data: bytes.subarray(off + 8, off + 8 + length), offset: off });
+          off += 12 + length;
+          if (type === "IEND") break;
+        }
+        return chunks;
+      }
+
+      function dataUrlToBytes(dataUrl) {
+        if (typeof dataUrl !== "string") return null;
+        const comma = dataUrl.indexOf(",");
+        if (comma === -1) return null;
+        const header = dataUrl.slice(0, comma);
+        const body = dataUrl.slice(comma + 1);
+        let bin;
+        if (header.includes(";base64")) {
+          try {
+            bin = atob(body);
+          } catch (e) {
+            return null;
+          }
+        } else {
+          try {
+            bin = decodeURIComponent(body);
+          } catch (e) {
+            return null;
+          }
+        }
+        const bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        return bytes;
+      }
+
+      function isPngBytes(bytes) {
+        if (!bytes || bytes.length < 8) return false;
+        const sig = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+        for (let i = 0; i < 8; i++) if (bytes[i] !== sig[i]) return false;
+        return true;
+      }
+
+      function makeTextChunk(key, value) {
+        const data = new Uint8Array(key.length + 1 + value.length);
+        for (let i = 0; i < key.length; i++) data[i] = key.charCodeAt(i) & 0xff;
+        data[key.length] = 0;
+        for (let i = 0; i < value.length; i++) data[key.length + 1 + i] = value.charCodeAt(i) & 0xff;
+        const chunk = new Uint8Array(12 + data.length);
+        new DataView(chunk.buffer).setUint32(0, data.length);
+        const typeStr = "tEXt";
+        for (let i = 0; i < 4; i++) chunk[4 + i] = typeStr.charCodeAt(i);
+        chunk.set(data, 8);
+        const crcInput = new Uint8Array(4 + data.length);
+        crcInput.set(chunk.subarray(4, 8), 0);
+        crcInput.set(data, 4);
+        new DataView(chunk.buffer, 8 + data.length).setUint32(0, crc32(crcInput));
+        return chunk;
+      }
+
+      function chunkKey(c) {
+        if (c.type !== "tEXt" && c.type !== "iTXt") return null;
+        let idx = 0;
+        while (idx < c.data.length && c.data[idx] !== 0) idx++;
+        return bytesToLatin1String(c.data.subarray(0, idx));
+      }
+
+      function buildPngWithMetadata(bytes, key, value) {
+        const chunks = parsePngChunks(bytes);
+        if (chunks.length === 0) return null;
+        const keep = chunks.filter((c) => chunkKey(c) !== key);
+        const newChunk = makeTextChunk(key, value);
+        let total = 8;
+        for (const c of keep) total += 12 + c.data.length;
+        total += newChunk.length;
+        const out = new Uint8Array(total);
+        out.set(bytes.subarray(0, 8), 0);
+        let off = 8;
+        let inserted = false;
+        for (const c of keep) {
+          if (!inserted && c.type === "IEND") {
+            out.set(newChunk, off);
+            off += newChunk.length;
+            inserted = true;
+          }
+          const range = bytes.subarray(c.offset, c.offset + 12 + c.data.length);
+          out.set(range, off);
+          off += range.length;
+        }
+        if (!inserted) {
+          out.set(newChunk, off);
+          off += newChunk.length;
+        }
+        return out;
+      }
+
+      async function pngWithEmbeddedMetadata(dataUrl, meta) {
+        const bytes = dataUrlToBytes(dataUrl);
+        if (!bytes || !isPngBytes(bytes)) return null;
+        const value = base64EncodeUnicode(JSON.stringify(meta));
+        const rebuilt = buildPngWithMetadata(bytes, PNG_METADATA_KEY, value);
+        if (!rebuilt) return null;
+        const blob = new Blob([rebuilt], { type: "image/png" });
+        return URL.createObjectURL(blob);
+      }
+
+      function extractPngMetadata(dataUrl) {
+        const bytes = dataUrlToBytes(dataUrl);
+        if (!bytes || !isPngBytes(bytes)) return null;
+        const chunks = parsePngChunks(bytes);
+        for (const c of chunks) {
+          const key = chunkKey(c);
+          if (key !== PNG_METADATA_KEY) continue;
+          let idx = 0;
+          while (idx < c.data.length && c.data[idx] !== 0) idx++;
+          const rawValue = c.data.subarray(idx + 1);
+          let value = null;
+          if (c.type === "iTXt") {
+            value = new TextDecoder().decode(rawValue);
+          } else {
+            try {
+              value = base64DecodeUnicode(bytesToLatin1String(rawValue));
+            } catch (e) {
+              value = null;
+            }
+          }
+          if (value) {
+            try {
+              return JSON.parse(value);
+            } catch (e) {
+              return null;
+            }
+          }
+        }
+        return null;
+      }
+
+      function buildEmbeddableMetadata(info) {
+        if (!info) return null;
+        return {
+          spec: PNG_METADATA_SPEC,
+          prompt: info.prompt ?? "",
+          seed: info.seed ?? null,
+          guidance: info.guidance ?? "",
+          style: info.style ?? "",
+          resolution: info.resolution ?? "",
+          negativePrompt: info.negativePrompt ?? "",
+          timestamp: info.timestamp ?? Date.now(),
+          app: "Cokebear TTI",
+          generator: "Perchance",
+        };
+      }
+
       function downloadImage(dataUrl) {
         const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, -5);
-        const metadata = window.imageMetadata?.[dataUrl];
+        let metadata = window.imageMetadata?.[dataUrl];
+        if (!metadata && galleryCurrentImage && galleryCurrentImage.imageData === dataUrl) {
+          metadata = galleryCurrentImage;
+        }
         const seed = metadata?.seed ?? "";
         const filename = seed ? `tti-${timestamp}-${seed}.png` : `tti-${timestamp}.png`;
+        triggerDownload(dataUrl, filename, metadata);
+      }
 
+      async function triggerDownload(dataUrl, filename, metadata) {
+        let href = dataUrl;
+        let objectUrl = null;
+        if (metadata) {
+          try {
+            const embeddable = buildEmbeddableMetadata(metadata);
+            if (embeddable) {
+              const url = await pngWithEmbeddedMetadata(dataUrl, embeddable);
+              if (url) {
+                href = url;
+                objectUrl = url;
+              }
+            }
+          } catch (e) {
+            console.warn("Failed to embed metadata into PNG:", e);
+          }
+        }
         const link = document.createElement("a");
-        link.href = dataUrl;
+        link.href = href;
         link.download = filename;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+        if (objectUrl) {
+          setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+        }
       }
+
+      let appMessageTimer = null;
+
+      function showAppMessage(text, isError) {
+        el.error.textContent = text;
+        el.error.style.color = isError ? "" : "#3fb950";
+        clearTimeout(appMessageTimer);
+        appMessageTimer = setTimeout(() => {
+          el.error.textContent = "";
+          el.error.style.color = "";
+        }, 4000);
+      }
+
+      function applyPngMetadata(meta) {
+        if (!meta) return;
+        if (meta.prompt != null) {
+          el.prompt.value = meta.prompt;
+        }
+        el.prompt.dispatchEvent(new Event("input", { bubbles: true }));
+        if (meta.guidance != null) {
+          el.guidance.value = meta.guidance;
+          el.guidance.dispatchEvent(new Event("input"));
+        }
+        if (meta.seed != null) {
+          el.seed.value = meta.seed;
+          el.seed.dispatchEvent(new Event("input"));
+        }
+        updateClearSeedBtn();
+        if (meta.resolution) {
+          el.resolution.value = meta.resolution;
+        }
+        if (meta.style) {
+          el.style.value = meta.style;
+        }
+        if (meta.negativePrompt != null) {
+          el.negativePrompt.value = meta.negativePrompt;
+          el.negativePrompt.dispatchEvent(new Event("input"));
+        }
+        autoAdjustPromptHeight();
+      }
+
+      async function applyPngMetadataFromFile(file) {
+        if (!file) return;
+        const dataUrl = await fileToDataURL(file);
+        const meta = extractPngMetadata(dataUrl);
+        if (!meta) {
+          showAppMessage("No Cokebear TTI metadata found in that PNG.", true);
+          return;
+        }
+        applyPngMetadata(meta);
+        showAppMessage("Image metadata applied to controls.");
+      }
+
+      window.openPngMetadataFile = function () {
+        if (!el.pngMetadataFile) return;
+        el.pngMetadataFile.value = "";
+        el.pngMetadataFile.click();
+      };
+
+      el.pngMetadataFile.addEventListener("change", async function (e) {
+        const file = e.target.files && e.target.files[0];
+        el.pngMetadataFile.value = "";
+        if (!file) return;
+        try {
+          await applyPngMetadataFromFile(file);
+        } catch (err) {
+          console.warn("Failed to read PNG metadata:", err);
+          showAppMessage("Failed to read PNG metadata.", true);
+        }
+      });
+
+      // Drag-and-drop a PNG anywhere to apply its embedded metadata
+      window.addEventListener("dragover", (e) => {
+        if (e.dataTransfer && Array.from(e.dataTransfer.types || []).includes("Files")) {
+          e.preventDefault();
+        }
+      });
+      window.addEventListener("drop", (e) => {
+        if (!e.dataTransfer || !Array.from(e.dataTransfer.types || []).includes("Files")) return;
+        e.preventDefault();
+        const file = e.dataTransfer.files && e.dataTransfer.files[0];
+        if (!file || file.type !== "image/png") return;
+        applyPngMetadataFromFile(file).catch((err) => {
+          console.warn("Failed to read PNG metadata:", err);
+          showAppMessage("Failed to read PNG metadata.", true);
+        });
+      });
 
       function flipTileToInfo(tile, imageUrl) {
         const metadata = window.imageMetadata?.[imageUrl];
@@ -5103,7 +5427,7 @@ return _originalFetch.apply(this, args);
         }
       });
 
-      window.downloadAllImages = function () {
+      window.downloadAllImages = async function () {
         if (generatedImages.length === 0) return;
 
         const baseTimestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, -5);
@@ -5114,13 +5438,7 @@ return _originalFetch.apply(this, args);
           const seed = metadata?.seed ?? "";
           const seedSuffix = seed ? `-${seed}` : "";
           const filename = `tti-${baseTimestamp}-${String(index + 1).padStart(2, "0")}${seedSuffix}.png`;
-
-          const link = document.createElement("a");
-          link.href = dataUrl;
-          link.download = filename;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
+          await triggerDownload(dataUrl, filename, metadata);
         }
       };
 
@@ -5268,6 +5586,7 @@ return _originalFetch.apply(this, args);
               guidance: el.guidance.value,
               style: style,
               resolution: res,
+              negativePrompt: negPrompt,
             };
 
             const result = await generateOne(imagePrompt, tile, thisGenerationId, metadata);
