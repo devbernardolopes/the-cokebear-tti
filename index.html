@@ -735,6 +735,8 @@ return _originalFetch.apply(this, args);
       let galleryHasMore = true;
       let galleryScrollSentinel = null;
       let galleryScrollObserver = null;
+      let galleryScrollListenerAttached = false;
+      let galleryScrollCheckPending = false;
       let gallerySearchCache = { query: "", sortDesc: true, favoritesOnly: false, items: null };
 
       function getGalleryThumbObserver() {
@@ -790,6 +792,33 @@ return _originalFetch.apply(this, args);
           { root: el.galleryList, rootMargin: "600px 0px" }
         );
         galleryScrollObserver.observe(galleryScrollSentinel);
+      }
+
+      function checkGalleryLoadMore() {
+        if (!galleryHasMore || galleryIsLoadingMore) return;
+        const list = el.galleryList;
+        if (!list || list.scrollHeight === 0) return;
+        if (list.scrollTop + list.clientHeight >= list.scrollHeight - 600) {
+          galleryOffset += galleryLimit;
+          loadGallery(true, galleryLoadToken);
+        }
+      }
+
+      function ensureGalleryScrollListener() {
+        if (galleryScrollListenerAttached) return;
+        galleryScrollListenerAttached = true;
+        el.galleryList.addEventListener(
+          "scroll",
+          () => {
+            if (galleryScrollCheckPending) return;
+            galleryScrollCheckPending = true;
+            requestAnimationFrame(() => {
+              galleryScrollCheckPending = false;
+              checkGalleryLoadMore();
+            });
+          },
+          { passive: true }
+        );
       }
 
       function resetGalleryList(token, message) {
@@ -3817,9 +3846,10 @@ return _originalFetch.apply(this, args);
             galleryImages.push(item);
           });
 
-          renderGalleryItemsProgressive(items, el.galleryList, false, token);
+          renderGalleryItemsProgressive(items, el.galleryList, false, token, checkGalleryLoadMore);
 
           ensureGalleryScrollSentinel();
+          ensureGalleryScrollListener();
           if (!append) {
             setupGalleryInfiniteScroll(token);
           }
@@ -3887,7 +3917,7 @@ return _originalFetch.apply(this, args);
         });
       }
 
-      function renderGalleryItemsProgressive(items, container, isFavorites, token = galleryLoadToken) {
+      function renderGalleryItemsProgressive(items, container, isFavorites, token = galleryLoadToken, onComplete = null) {
         const observer = getGalleryThumbObserver();
         const chunkSize = 15;
         let idx = 0;
@@ -3970,6 +4000,8 @@ return _originalFetch.apply(this, args);
           }
           if (idx < items.length) {
             requestAnimationFrame(appendChunk);
+          } else if (onComplete) {
+            requestAnimationFrame(onComplete);
           }
         }
 
