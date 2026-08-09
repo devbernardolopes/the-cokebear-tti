@@ -5020,7 +5020,10 @@ return _originalFetch.apply(this, args);
         const data = new Uint8Array(key.length + 1 + value.length);
         for (let i = 0; i < key.length; i++) data[i] = key.charCodeAt(i) & 0xff;
         data[key.length] = 0;
-        for (let i = 0; i < value.length; i++) data[key.length + 1 + i] = value.charCodeAt(i) & 0xff;
+        for (let i = 0; i < value.length; i++) {
+          const code = value.charCodeAt(i);
+          data[key.length + 1 + i] = code <= 0xff ? code : 0x3f;
+        }
         const chunk = new Uint8Array(12 + data.length);
         new DataView(chunk.buffer).setUint32(0, data.length);
         const typeStr = "tEXt";
@@ -5040,22 +5043,25 @@ return _originalFetch.apply(this, args);
         return bytesToLatin1String(c.data.subarray(0, idx));
       }
 
-      function buildPngWithMetadata(bytes, key, value) {
+      function buildPngWithChunks(bytes, entries) {
         const chunks = parsePngChunks(bytes);
         if (chunks.length === 0) return null;
-        const keep = chunks.filter((c) => chunkKey(c) !== key);
-        const newChunk = makeTextChunk(key, value);
+        const keys = new Set(entries.map((e) => e.key));
+        const keep = chunks.filter((c) => !keys.has(chunkKey(c)));
+        const newChunks = entries.map((e) => makeTextChunk(e.key, e.value));
         let total = 8;
         for (const c of keep) total += 12 + c.data.length;
-        total += newChunk.length;
+        for (const nc of newChunks) total += nc.length;
         const out = new Uint8Array(total);
         out.set(bytes.subarray(0, 8), 0);
         let off = 8;
         let inserted = false;
         for (const c of keep) {
           if (!inserted && c.type === "IEND") {
-            out.set(newChunk, off);
-            off += newChunk.length;
+            for (const nc of newChunks) {
+              out.set(nc, off);
+              off += nc.length;
+            }
             inserted = true;
           }
           const range = bytes.subarray(c.offset, c.offset + 12 + c.data.length);
@@ -5063,17 +5069,68 @@ return _originalFetch.apply(this, args);
           off += range.length;
         }
         if (!inserted) {
-          out.set(newChunk, off);
-          off += newChunk.length;
+          for (const nc of newChunks) {
+            out.set(nc, off);
+            off += nc.length;
+          }
         }
         return out;
       }
 
+      async function imageDataUrlToPng(dataUrl) {
+        let img;
+        try {
+          img = new Image();
+          img.src = dataUrl;
+          if (typeof img.decode === "function") {
+            await img.decode();
+          } else {
+            await new Promise((resolve, reject) => {
+              img.onload = resolve;
+              img.onerror = () => reject(new Error("decode failed"));
+            });
+          }
+          if (!img.naturalWidth || !img.naturalHeight) return null;
+          const canvas = document.createElement("canvas");
+          canvas.width = img.naturalWidth;
+          canvas.height = img.naturalHeight;
+          canvas.getContext("2d").drawImage(img, 0, 0);
+          return canvas.toDataURL("image/png");
+        } catch (e) {
+          console.warn("Failed to convert image to PNG:", e);
+          return null;
+        }
+      }
+
+      function buildParametersText(meta) {
+        if (!meta) return "";
+        const lines = [];
+        if (meta.prompt) lines.push(meta.prompt);
+        if (meta.negativePrompt) lines.push(`Negative prompt: ${meta.negativePrompt}`);
+        const settings = [];
+        if (meta.guidance) settings.push(`CFG scale: ${meta.guidance}`);
+        if (meta.seed !== undefined && meta.seed !== null && meta.seed !== "") {
+          settings.push(`Seed: ${meta.seed}`);
+        }
+        if (meta.resolution) settings.push(`Size: ${meta.resolution}`);
+        if (settings.length) lines.push(settings.join(", "));
+        return lines.join("\n");
+      }
+
       async function pngWithEmbeddedMetadata(dataUrl, meta) {
-        const bytes = dataUrlToBytes(dataUrl);
-        if (!bytes || !isPngBytes(bytes)) return null;
-        const value = base64EncodeUnicode(JSON.stringify(meta));
-        const rebuilt = buildPngWithMetadata(bytes, PNG_METADATA_KEY, value);
+        let bytes = dataUrlToBytes(dataUrl);
+        if (!bytes) return null;
+        if (!isPngBytes(bytes)) {
+          const pngDataUrl = await imageDataUrlToPng(dataUrl);
+          if (!pngDataUrl) return null;
+          bytes = dataUrlToBytes(pngDataUrl);
+          if (!bytes || !isPngBytes(bytes)) return null;
+        }
+        const entries = [];
+        entries.push({ key: PNG_METADATA_KEY, value: base64EncodeUnicode(JSON.stringify(meta)) });
+        const paramsText = buildParametersText(meta);
+        if (paramsText) entries.push({ key: "parameters", value: paramsText });
+        const rebuilt = buildPngWithChunks(bytes, entries);
         if (!rebuilt) return null;
         const blob = new Blob([rebuilt], { type: "image/png" });
         return URL.createObjectURL(blob);
