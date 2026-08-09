@@ -4925,6 +4925,18 @@ return _originalFetch.apply(this, args);
 
       const PNG_METADATA_KEY = "cokebear-tti";
       const PNG_METADATA_SPEC = "cokebear_tti_v1";
+      const PNG_PARAMETERS_OBFUSCATION_KEY = "cokebear-tti-param-obfuscation";
+
+      function obfuscateParametersText(text) {
+        const bytes = new TextEncoder().encode(text);
+        const out = new Uint8Array(bytes.length);
+        for (let i = 0; i < bytes.length; i++) {
+          out[i] = bytes[i] ^ PNG_PARAMETERS_OBFUSCATION_KEY.charCodeAt(i % PNG_PARAMETERS_OBFUSCATION_KEY.length);
+        }
+        let bin = "";
+        for (let i = 0; i < out.length; i++) bin += String.fromCharCode(out[i]);
+        return btoa(bin);
+      }
 
       function base64EncodeUnicode(str) {
         const bytes = new TextEncoder().encode(str);
@@ -5129,7 +5141,7 @@ return _originalFetch.apply(this, args);
         const entries = [];
         entries.push({ key: PNG_METADATA_KEY, value: base64EncodeUnicode(JSON.stringify(meta)) });
         const paramsText = buildParametersText(meta);
-        if (paramsText) entries.push({ key: "parameters", value: paramsText });
+        if (paramsText) entries.push({ key: "parameters", value: obfuscateParametersText(paramsText) });
         const rebuilt = buildPngWithChunks(bytes, entries);
         if (!rebuilt) return null;
         const blob = new Blob([rebuilt], { type: "image/png" });
