@@ -2240,7 +2240,7 @@ return _originalFetch.apply(this, args);
         }
         const clearBtn = row.querySelector(".prompt-gen-clear-btn");
         if (clearBtn) {
-          clearBtn.style.display = hasSelected ? "" : "none";
+          clearBtn.disabled = !hasSelected;
         }
       }
 
@@ -7579,6 +7579,17 @@ return _originalFetch.apply(this, args);
       .prompt-gen-clear-btn:hover {
         opacity: 1;
         color: #f85149;
+      }
+
+      .prompt-gen-clear-btn:disabled {
+        cursor: not-allowed;
+        opacity: 0.25;
+        color: #8b949e;
+      }
+
+      .prompt-gen-clear-btn:disabled:hover {
+        opacity: 0.25;
+        color: #8b949e;
       }
 
       .prompt-generator-row.collapsed .prompt-generator-values {
