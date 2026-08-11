@@ -51,7 +51,7 @@ return _originalFetch.apply(this, args);
             • <b>Ctrl+Enter</b>: Generate (when not focused in prompt, or if 'ENTER to send' is off)<br />
             • <b>Enter</b>: Generate (when 'ENTER to send' is on and focused in prompt)<br />
           </p>
-          <p><b>Cancel Button:</b> Only enabled when there are images in the queue that can still be cancelled ("Waiting...").</p>
+          <p><b>Cancel Button:</b> Stops all pending and in-flight generations. Images already finished are kept.</p>
         </div>
       </div>
       <div id="buttonRow">
@@ -709,6 +709,12 @@ return _originalFetch.apply(this, args);
       // Track tiles that have been cancelled
       let cancelledTiles = new Set();
 
+      // AbortControllers for in-flight /api/generate fetch requests
+      const activeGenerateControllers = new Set();
+
+      // Guard flag so any plugin-internal retry fetch after a cancel is aborted too
+      let cancelRequested = false;
+
       // History pagination state
       let historyOffset = 0;
       const historyLimit = 50;
@@ -889,6 +895,33 @@ return _originalFetch.apply(this, args);
 
       window.fetch = async function (...args) {
         const url = typeof args[0] === "string" ? args[0] : args[0]?.url;
+
+        if (url && url.includes("/api/generate") && !url.includes("getUserQueuePosition")) {
+          const controller = new AbortController();
+          activeGenerateControllers.add(controller);
+
+          if (cancelRequested) controller.abort();
+
+          const init = args[1] && typeof args[1] === "object" ? { ...args[1] } : {};
+          const pluginSignal = init.signal;
+          let onPluginAbort = null;
+          if (pluginSignal) {
+            if (pluginSignal.aborted) {
+              controller.abort(pluginSignal.reason);
+            } else {
+              onPluginAbort = () => controller.abort();
+              pluginSignal.addEventListener("abort", onPluginAbort, { once: true });
+            }
+          }
+          init.signal = controller.signal;
+
+          try {
+            return await _originalFetch.apply(this, [args[0], init]);
+          } finally {
+            activeGenerateControllers.delete(controller);
+            if (onPluginAbort && pluginSignal) pluginSignal.removeEventListener("abort", onPluginAbort);
+          }
+        }
 
         const response = await _originalFetch.apply(this, args);
 
@@ -1593,53 +1626,40 @@ return _originalFetch.apply(this, args);
       el.scratchpad.addEventListener("mouseup", showParameterInsertOption);
       el.scratchpad.addEventListener("keyup", showParameterInsertOption);
 
-      // Helper function to check if there are any waiting tiles
-      function hasWaitingTiles() {
-        const placeholders = document.querySelectorAll(".placeholder");
-        for (const p of placeholders) {
-          if (p.textContent === "Waiting...") {
-            return true;
-          }
-        }
-        return false;
-      }
-
       // Update UI state for generate and cancel buttons
       function updateGenerationUI() {
-        const hasWaiting = hasWaitingTiles() && isGenerating;
-        if (el.cancelGenBtn) el.cancelGenBtn.style.display = hasWaiting ? "block" : "none";
+        if (el.cancelGenBtn) el.cancelGenBtn.style.display = isGenerating ? "block" : "none";
         if (el.generateBtn) el.generateBtn.disabled = isGenerating;
       }
 
       // Cancel generation
       window.cancelGeneration = function () {
-        // Mark all waiting tiles as cancelled and add to set
+        cancelRequested = true;
+
+        // Mark all pending tiles as cancelled and add to set
         const placeholders = document.querySelectorAll(".placeholder");
         for (const p of placeholders) {
-          if (p.textContent === "Waiting...") {
+          const text = p.textContent;
+          if (text === "Waiting..." || text === "Starting..." || text === "Generating..." || text.startsWith("Queued") || text === "Processing...") {
             const tile = p.parentElement;
             cancelledTiles.add(tile);
+            waitingTiles.delete(tile);
             p.textContent = "Cancelled";
           }
         }
 
-        // Check if any tiles are still being generated
-        let hasGenerating = false;
-        for (const p of placeholders) {
-          const text = p.textContent;
-          if (text === "Starting..." || text === "Generating..." || text.startsWith("Queued") || text === "Processing...") {
-            hasGenerating = true;
-            break;
+        // Abort all in-flight generate requests
+        for (const controller of activeGenerateControllers) {
+          try {
+            controller.abort();
+          } catch (e) {
+            // Ignore
           }
         }
+        activeGenerateControllers.clear();
 
-        // Only stop generation if no tiles are being generated
-        if (!hasGenerating) {
-          isGenerating = false;
-          stopKeepAlive();
-          // el.loading.style.display = "none";
-        }
-
+        isGenerating = false;
+        stopKeepAlive();
         updateGenerationUI();
       };
 
@@ -4839,7 +4859,7 @@ return _originalFetch.apply(this, args);
           }
 
           // Check again after generation completes
-          if (currentGenerationId !== generationId) {
+          if (currentGenerationId !== generationId || cancelledTiles.has(tile)) {
             throw new Error("Cancelled");
           }
 
@@ -5625,6 +5645,7 @@ return _originalFetch.apply(this, args);
         generatedImages = []; // Reset for new generation
         const generatedSeeds = []; // Track seeds for this generation
         isGenerating = true;
+        cancelRequested = false;
         startKeepAlive();
 
         const shape = res.includes("512x768") ? "portrait" : res.includes("768x512") ? "landscape" : "square";
@@ -5734,7 +5755,7 @@ return _originalFetch.apply(this, args);
               generatedSeeds.push(result.seed);
             }
           } catch (err) {
-            if (currentGenerationId !== thisGenerationId || err.message === "Cancelled") {
+            if (currentGenerationId !== thisGenerationId || err.message === "Cancelled" || cancelledTiles.has(tile)) {
               tile.innerHTML = `<div class="placeholder">Cancelled</div>`;
             } else {
               tile.innerHTML = `<div class="placeholder" style="color: #ff7b72;">Error</div>`;
