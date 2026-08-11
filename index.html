@@ -394,6 +394,23 @@ return _originalFetch.apply(this, args);
         </div>
       </div>
 
+      <div id="promptGenClearSelectionConfirmModal" class="modal" style="display: none;">
+        <div id="promptGenClearSelectionConfirmContent" onclick="event.stopPropagation()">
+          <div class="modal-header">
+            <h3>Clear Selections</h3>
+            <button onclick="closePromptGenClearSelectionConfirm()">❌</button>
+          </div>
+          <div id="promptGenClearSelectionConfirmMessage">
+            <p>Clear all selected options from &ldquo;<span id="promptGenClearConfirmPieceName"></span>&rdquo;?</p>
+            <p style="font-size: 12px; color: #f85149;">This action cannot be undone.</p>
+          </div>
+          <div id="promptGenClearSelectionConfirmActions">
+            <button onclick="closePromptGenClearSelectionConfirm()" id="promptGenClearConfirmCancelBtn">Cancel</button>
+            <button onclick="confirmClearPromptGenSelections()" id="promptGenClearConfirmClearBtn">Clear</button>
+          </div>
+        </div>
+      </div>
+
       <div id="promptGenSavedSetDeleteConfirmModal" class="modal">
         <div id="promptGenSavedSetDeleteConfirmContent" onclick="event.stopPropagation()">
           <div class="modal-header">
@@ -2215,6 +2232,18 @@ return _originalFetch.apply(this, args);
         }
       }
 
+      function updateRowSelectionState(row) {
+        const hasSelected = row.querySelector(".prompt-generator-toggle.selected") !== null;
+        const nameSpan = row.querySelector(".prompt-generator-name");
+        if (nameSpan) {
+          nameSpan.classList.toggle("has-selection", hasSelected);
+        }
+        const clearBtn = row.querySelector(".prompt-gen-clear-btn");
+        if (clearBtn) {
+          clearBtn.style.display = hasSelected ? "" : "none";
+        }
+      }
+
       function savePromptGenSelections() {
         const rows = el.promptGeneratorList.querySelectorAll(".prompt-generator-row");
         const selections = {};
@@ -2401,13 +2430,7 @@ return _originalFetch.apply(this, args);
           }
         });
         el.promptGeneratorList.querySelectorAll(".prompt-generator-row").forEach((row) => {
-          const selectedBtns = row.querySelectorAll(".prompt-generator-toggle.selected");
-          const nameSpan = row.querySelector(".prompt-generator-name");
-          if (selectedBtns.length > 0) {
-            nameSpan.classList.add("has-selection");
-          } else {
-            nameSpan.classList.remove("has-selection");
-          }
+          updateRowSelectionState(row);
         });
       }
 
@@ -2608,6 +2631,15 @@ return _originalFetch.apply(this, args);
           nameSpan.textContent = pieceKey;
           nameSpan.insertAdjacentHTML("beforeend", ' <span class="prompt-gen-chevron">▾</span>');
 
+          const clearBtn = document.createElement("button");
+          clearBtn.className = "prompt-gen-clear-btn";
+          clearBtn.title = "Clear selections";
+          clearBtn.textContent = "🗑";
+          clearBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            showPromptGenClearSelectionConfirm(piece.key, pieceKey);
+          });
+
           const collapsedContentSpan = document.createElement("span");
           collapsedContentSpan.className = "prompt-gen-collapsed-content";
 
@@ -2635,12 +2667,7 @@ return _originalFetch.apply(this, args);
                 return;
               }
               btn.classList.toggle("selected");
-              const nameSpan = row.querySelector(".prompt-generator-name");
-              if (row.querySelector(".prompt-generator-toggle.selected")) {
-                nameSpan.classList.add("has-selection");
-              } else {
-                nameSpan.classList.remove("has-selection");
-              }
+              updateRowSelectionState(row);
             });
 
             const deleteEl = btn.querySelector(".toggle-delete");
@@ -2788,6 +2815,7 @@ return _originalFetch.apply(this, args);
 
           row.appendChild(dragHandle);
           row.appendChild(nameSpan);
+          row.appendChild(clearBtn);
           row.appendChild(collapsedContentSpan);
           row.appendChild(valuesContainer);
 
@@ -2802,7 +2830,7 @@ return _originalFetch.apply(this, args);
           };
 
           row.addEventListener("click", (e) => {
-            if (e.target.closest(".prompt-gen-drag-handle") || e.target.closest(".prompt-generator-toggle")) return;
+            if (e.target.closest(".prompt-gen-drag-handle") || e.target.closest(".prompt-generator-toggle") || e.target.closest(".prompt-gen-clear-btn")) return;
             if (justDragged) return;
             row.classList.toggle("collapsed");
             const collapsedKeys = JSON.parse(sessionStorage.getItem("promptGenCollapsed") || "{}");
@@ -2817,13 +2845,7 @@ return _originalFetch.apply(this, args);
         });
 
         el.promptGeneratorList.querySelectorAll(".prompt-generator-row").forEach((row) => {
-          const selectedBtns = row.querySelectorAll(".prompt-generator-toggle.selected");
-          const nameSpan = row.querySelector(".prompt-generator-name");
-          if (selectedBtns.length > 0) {
-            nameSpan.classList.add("has-selection");
-          } else {
-            nameSpan.classList.remove("has-selection");
-          }
+          updateRowSelectionState(row);
         });
       }
 
@@ -2866,10 +2888,6 @@ return _originalFetch.apply(this, args);
           row.querySelectorAll(".prompt-generator-toggle.selected").forEach((btn) => {
             btn.classList.remove("selected");
           });
-          const nameSpan = row.querySelector(".prompt-generator-name");
-          if (nameSpan) {
-            nameSpan.classList.remove("has-selection");
-          }
           // Update collapsed content if collapsed
           if (row.classList.contains("collapsed")) {
             const collapsedContentSpan = row.querySelector(".prompt-gen-collapsed-content");
@@ -2877,6 +2895,7 @@ return _originalFetch.apply(this, args);
               collapsedContentSpan.textContent = "";
             }
           }
+          updateRowSelectionState(row);
         });
         // Clear saved selections in sessionStorage
         sessionStorage.setItem("promptGenSelections", JSON.stringify({}));
@@ -3299,6 +3318,45 @@ return _originalFetch.apply(this, args);
           closePromptGenDeleteConfirmModal();
         }
       });
+
+      let promptGenPendingClearKey = null;
+
+      window.showPromptGenClearSelectionConfirm = function (key, pieceName) {
+        promptGenPendingClearKey = key;
+        document.getElementById("promptGenClearConfirmPieceName").textContent = pieceName;
+        document.getElementById("promptGenClearSelectionConfirmModal").style.display = "flex";
+      };
+
+      window.closePromptGenClearSelectionConfirm = function () {
+        document.getElementById("promptGenClearSelectionConfirmModal").style.display = "none";
+        promptGenPendingClearKey = null;
+      };
+
+      document.getElementById("promptGenClearSelectionConfirmModal").addEventListener("click", (e) => {
+        if (e.target === document.getElementById("promptGenClearSelectionConfirmModal")) {
+          closePromptGenClearSelectionConfirm();
+        }
+      });
+
+      window.confirmClearPromptGenSelections = function () {
+        if (!promptGenPendingClearKey) return;
+        const row = el.promptGeneratorList.querySelector(`.prompt-generator-row[data-key="${promptGenPendingClearKey}"]`);
+        if (row) {
+          row.querySelectorAll(".prompt-generator-toggle.selected").forEach((btn) => {
+            btn.classList.remove("selected");
+          });
+          if (row.classList.contains("collapsed")) {
+            const collapsedContentSpan = row.querySelector(".prompt-gen-collapsed-content");
+            if (collapsedContentSpan) {
+              collapsedContentSpan.textContent = "";
+            }
+          }
+          updateRowSelectionState(row);
+        }
+        promptGenPendingClearKey = null;
+        closePromptGenClearSelectionConfirm();
+        savePromptGenSelections();
+      };
 
       window.confirmPromptGenDeletePiece = async function () {
         if (!promptGenPendingDeleteKey) return;
@@ -6232,6 +6290,7 @@ return _originalFetch.apply(this, args);
       #addPromptPieceModal,
       #promptPiecesDeleteConfirmModal,
       #promptGenDeleteConfirmModal,
+      #promptGenClearSelectionConfirmModal,
       #promptGeneratorModal,
       #promptGenSaveSetModal,
       #promptGenNothingToSaveModal,
@@ -6258,6 +6317,10 @@ return _originalFetch.apply(this, args);
       }
 
       #promptGenDeleteConfirmModal {
+        z-index: 1300;
+      }
+
+      #promptGenClearSelectionConfirmModal {
         z-index: 1300;
       }
 
@@ -6396,6 +6459,45 @@ return _originalFetch.apply(this, args);
 
       #promptGenSavedSetDeleteConfirmDeleteBtn:hover {
         background: #f85149;
+      }
+
+      #promptGenClearSelectionConfirmMessage p {
+        margin: 12px 0;
+        color: #c9d1d9;
+        font-size: 14px;
+      }
+
+      #promptGenClearSelectionConfirmActions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+        margin-top: 16px;
+      }
+
+      #promptGenClearConfirmCancelBtn {
+        padding: 8px 16px;
+        background: #21262d;
+        border: 1px solid #30363d;
+        border-radius: 6px;
+        color: #c9d1d9;
+        cursor: pointer;
+      }
+
+      #promptGenClearConfirmCancelBtn:hover {
+        background: #30363d;
+      }
+
+      #promptGenClearConfirmClearBtn {
+        padding: 8px 16px;
+        background: #388bfd;
+        border: 1px solid #388bfd;
+        border-radius: 6px;
+        color: #fff;
+        cursor: pointer;
+      }
+
+      #promptGenClearConfirmClearBtn:hover {
+        background: #1f6feb;
       }
 
       #historyModalContent,
@@ -7072,7 +7174,8 @@ return _originalFetch.apply(this, args);
 
       #addPromptPieceModalContent,
       #promptPiecesDeleteConfirmContent,
-      #promptGenDeleteConfirmContent {
+      #promptGenDeleteConfirmContent,
+      #promptGenClearSelectionConfirmContent {
         background: #161b22;
         border: 1px solid #30363d;
         border-radius: 12px;
@@ -7458,6 +7561,24 @@ return _originalFetch.apply(this, args);
 
       .prompt-generator-name.has-selection {
         color: #58a6ff;
+      }
+
+      .prompt-gen-clear-btn {
+        background: none;
+        border: none;
+        cursor: pointer;
+        color: #8b949e;
+        font-size: 12px;
+        padding: 2px 4px;
+        opacity: 0.6;
+        line-height: 1;
+        user-select: none;
+        flex-shrink: 0;
+      }
+
+      .prompt-gen-clear-btn:hover {
+        opacity: 1;
+        color: #f85149;
       }
 
       .prompt-generator-row.collapsed .prompt-generator-values {
