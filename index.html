@@ -8,27 +8,99 @@ const _originalFetch = window.fetch;
 const tileRequestIdMap = new Map(); // requestId → tileId
 const requestIdTileIdMap = new Map(); // tileId → requestId
 
-// This wrapper is installed as early as possible (in <head>, before Perchance's
-// plugin system loads) so that the image() plugin captures THIS function when it
-// grabs a reference to window.fetch at load time. That is what lets us observe the
-// getUserQueuePosition responses and update each in-flight tile.
+// ---- Shared queue-position handling (used by both fetch + XHR interceptors) ----
+
+// Update a single tile's status label and the queue-info block below it.
+function ttiApplyQueueInfo(tile, data) {
+  const placeholder = tile.querySelector ? tile.querySelector(".placeholder") : null;
+  const queueInfo = tile.querySelector ? tile.querySelector(".queue-info") : null;
+  if (!placeholder) return;
+
+  const position = data.position;
+  const total = data.total;
+
+  if (typeof position === "number" && position > 0) {
+    placeholder.textContent = "Queued";
+  } else if (data.status === "not_in_queue") {
+    placeholder.textContent = "Generating...";
+  }
+
+  if (queueInfo) {
+    if (typeof position === "number" && position > 0 && typeof total === "number") {
+      queueInfo.style.display = "block";
+      queueInfo.textContent =
+        `Queue: ${position}/${total}\nTechnical Difficulties: ${data.havingTechnicalDifficulties}`;
+    } else {
+      queueInfo.style.display = "none";
+    }
+  }
+}
+
+// Resolve which tile(s) a queue response belongs to and apply the update.
+function ttiHandleQueueData(data, url) {
+  try {
+    console.log("[TTI] queue response:", data);
+  } catch (e) {}
+
+  let requestId = null;
+  try {
+    const u = new URL(url);
+    requestId = u.searchParams.get("requestId");
+  } catch (e) {}
+  const tileId = requestId ? tileRequestIdMap.get(requestId) : null;
+
+  if (tileId) {
+    const tile = document.querySelector(`[data-id="${tileId}"]`);
+    if (tile) {
+      requestAnimationFrame(() => ttiApplyQueueInfo(tile, data));
+      return;
+    }
+  }
+
+  const position = data.position;
+  if (typeof position === "number" && position > 0) {
+    // Fallback: no per-tile correlation available (plugin doesn't echo _tileId),
+    // so update every tile currently waiting for generation. We query the DOM
+    // directly rather than relying solely on the waitingTiles Set.
+    requestAnimationFrame(() => {
+      let tiles;
+      if (typeof waitingTiles !== "undefined" && waitingTiles.size) {
+        tiles = Array.from(waitingTiles);
+      } else {
+        tiles = Array.from(document.querySelectorAll(".tile")).filter((t) => {
+          const p = t.querySelector(".placeholder");
+          return p && (p.textContent.startsWith("Generating") || p.textContent.startsWith("Queued"));
+        });
+      }
+      tiles.forEach((tile) => {
+        const p = tile.querySelector(".placeholder");
+        if (p && (p.textContent.startsWith("Generating") || p.textContent.startsWith("Queued"))) {
+          ttiApplyQueueInfo(tile, data);
+        }
+      });
+    });
+  }
+}
+
+// Capture requestId → _tileId correlation from generate requests.
+function ttiCaptureGenerateMapping(url) {
+  try {
+    const urlObj = new URL(url);
+    const requestId = urlObj.searchParams.get("requestId");
+    const tileId = urlObj.searchParams.get("_tileId");
+    if (requestId && tileId) {
+      tileRequestIdMap.set(requestId, tileId);
+      requestIdTileIdMap.set(tileId, requestId);
+    }
+  } catch (e) {}
+}
+
+// ---- window.fetch interceptor ----
 window.fetch = async function (...args) {
   const url = typeof args[0] === "string" ? args[0] : (args[0] && args[0].url);
 
-  // Capture requestId correlation for generate requests so the associated
-  // getUserQueuePosition responses can be mapped back to a tile.
   if (url && url.includes("/api/generate") && !url.includes("getUserQueuePosition")) {
-    try {
-      const urlObj = new URL(url);
-      const requestId = urlObj.searchParams.get("requestId");
-      const tileId = urlObj.searchParams.get("_tileId");
-      if (requestId && tileId) {
-        tileRequestIdMap.set(requestId, tileId);
-        requestIdTileIdMap.set(tileId, requestId);
-      }
-    } catch (e) {
-      // Ignore invalid URL
-    }
+    ttiCaptureGenerateMapping(url);
 
     const controller = new AbortController();
     activeGenerateControllers.add(controller);
@@ -61,64 +133,7 @@ window.fetch = async function (...args) {
     const clonedResponse = response.clone();
     try {
       const data = await clonedResponse.json();
-      const position = data.position;
-      const total = data.total;
-      const technicalDifficulties = data.havingTechnicalDifficulties;
-
-      const applyQueueInfo = (tile) => {
-        const placeholder = tile.querySelector ? tile.querySelector(".placeholder") : null;
-        const queueInfo = tile.querySelector ? tile.querySelector(".queue-info") : null;
-        if (!placeholder) return;
-
-        if (typeof position === "number" && position > 0) {
-          placeholder.textContent = "Queued";
-        } else if (data.status === "not_in_queue") {
-          placeholder.textContent = "Generating...";
-        }
-
-        if (queueInfo) {
-          if (typeof position === "number" && position > 0 && typeof total === "number") {
-            queueInfo.style.display = "block";
-            queueInfo.textContent =
-              `Queue: ${position}/${total}\nTechnical Difficulties: ${technicalDifficulties}`;
-          } else {
-            queueInfo.style.display = "none";
-          }
-        }
-      };
-
-      const requestId = (() => {
-        try { return new URL(url).searchParams.get("requestId"); } catch (e) { return null; }
-      })();
-      const tileId = requestId ? tileRequestIdMap.get(requestId) : null;
-
-      if (tileId) {
-        const tile = document.querySelector(`[data-id="${tileId}"]`);
-        if (tile) {
-          requestAnimationFrame(() => applyQueueInfo(tile));
-        }
-      } else if (typeof position === "number" && position > 0) {
-        // Fallback: no per-tile correlation available (plugin doesn't echo _tileId),
-        // so update every tile currently waiting for generation. We query the DOM
-        // directly rather than relying solely on the waitingTiles Set.
-        requestAnimationFrame(() => {
-          let tiles;
-          if (typeof waitingTiles !== "undefined" && waitingTiles.size) {
-            tiles = Array.from(waitingTiles);
-          } else {
-            tiles = Array.from(document.querySelectorAll(".tile")).filter((t) => {
-              const p = t.querySelector(".placeholder");
-              return p && (p.textContent.startsWith("Generating") || p.textContent.startsWith("Queued"));
-            });
-          }
-          tiles.forEach((tile) => {
-            const p = tile.querySelector(".placeholder");
-            if (p && (p.textContent.startsWith("Generating") || p.textContent.startsWith("Queued"))) {
-              applyQueueInfo(tile);
-            }
-          });
-        });
-      }
+      ttiHandleQueueData(data, url);
     } catch (e) {
       // Ignore
     }
@@ -126,6 +141,48 @@ window.fetch = async function (...args) {
 
   return response;
 };
+
+// ---- XMLHttpRequest interceptor (robust via prototype hooking) ----
+// Unlike fetch, XHR instances always use the prototype methods, so hooking them
+// works even if the plugin captured the XHR constructor reference at load time.
+(function () {
+  const OrigOpen = XMLHttpRequest.prototype.open;
+  const OrigSend = XMLHttpRequest.prototype.send;
+  const pending = new WeakMap(); // xhr -> url
+
+  XMLHttpRequest.prototype.open = function (method, url) {
+    try { pending.set(this, typeof url === "string" ? url : (url && url.toString())); } catch (e) {}
+    return OrigOpen.apply(this, arguments);
+  };
+
+  XMLHttpRequest.prototype.send = function () {
+    const xhr = this;
+    const url = pending.get(xhr);
+
+    if (url && url.includes("/api/generate") && !url.includes("getUserQueuePosition")) {
+      ttiCaptureGenerateMapping(url);
+    }
+
+    if (url && url.includes("getUserQueuePosition")) {
+      const onLoad = function () {
+        try {
+          let data = null;
+          if (typeof xhr.response === "object" && xhr.response !== null && !(xhr.response instanceof ArrayBuffer)) {
+            data = xhr.response; // responseType "json"
+          } else {
+            const text = xhr.responseText;
+            if (!text) return;
+            data = JSON.parse(text);
+          }
+          ttiHandleQueueData(data, url);
+        } catch (e) {}
+      };
+      xhr.addEventListener("load", onLoad);
+    }
+
+    return OrigSend.apply(this, arguments);
+  };
+})();
 </script>
     <script src="https://unpkg.com/dexie@3.2.4/dist/dexie.min.js"></script>
     <script src="https://unpkg.com/jszip@3.10.1/dist/jszip.min.js"></script>
