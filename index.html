@@ -7,6 +7,125 @@
 const _originalFetch = window.fetch;
 const tileRequestIdMap = new Map(); // requestId → tileId
 const requestIdTileIdMap = new Map(); // tileId → requestId
+
+// This wrapper is installed as early as possible (in <head>, before Perchance's
+// plugin system loads) so that the image() plugin captures THIS function when it
+// grabs a reference to window.fetch at load time. That is what lets us observe the
+// getUserQueuePosition responses and update each in-flight tile.
+window.fetch = async function (...args) {
+  const url = typeof args[0] === "string" ? args[0] : (args[0] && args[0].url);
+
+  // Capture requestId correlation for generate requests so the associated
+  // getUserQueuePosition responses can be mapped back to a tile.
+  if (url && url.includes("/api/generate") && !url.includes("getUserQueuePosition")) {
+    try {
+      const urlObj = new URL(url);
+      const requestId = urlObj.searchParams.get("requestId");
+      const tileId = urlObj.searchParams.get("_tileId");
+      if (requestId && tileId) {
+        tileRequestIdMap.set(requestId, tileId);
+        requestIdTileIdMap.set(tileId, requestId);
+      }
+    } catch (e) {
+      // Ignore invalid URL
+    }
+
+    const controller = new AbortController();
+    activeGenerateControllers.add(controller);
+    if (cancelRequested) controller.abort();
+
+    const init = args[1] && typeof args[1] === "object" ? { ...args[1] } : {};
+    const pluginSignal = init.signal;
+    let onPluginAbort = null;
+    if (pluginSignal) {
+      if (pluginSignal.aborted) {
+        controller.abort(pluginSignal.reason);
+      } else {
+        onPluginAbort = () => controller.abort();
+        pluginSignal.addEventListener("abort", onPluginAbort, { once: true });
+      }
+    }
+    init.signal = controller.signal;
+
+    try {
+      return await _originalFetch.apply(this, [args[0], init]);
+    } finally {
+      activeGenerateControllers.delete(controller);
+      if (onPluginAbort && pluginSignal) pluginSignal.removeEventListener("abort", onPluginAbort);
+    }
+  }
+
+  const response = await _originalFetch.apply(this, args);
+
+  if (url && url.includes("getUserQueuePosition")) {
+    const clonedResponse = response.clone();
+    try {
+      const data = await clonedResponse.json();
+      const position = data.position;
+      const total = data.total;
+      const technicalDifficulties = data.havingTechnicalDifficulties;
+
+      const applyQueueInfo = (tile) => {
+        const placeholder = tile.querySelector ? tile.querySelector(".placeholder") : null;
+        const queueInfo = tile.querySelector ? tile.querySelector(".queue-info") : null;
+        if (!placeholder) return;
+
+        if (typeof position === "number" && position > 0) {
+          placeholder.textContent = "Queued";
+        } else if (data.status === "not_in_queue") {
+          placeholder.textContent = "Generating...";
+        }
+
+        if (queueInfo) {
+          if (typeof position === "number" && position > 0 && typeof total === "number") {
+            queueInfo.style.display = "block";
+            queueInfo.textContent =
+              `Queue: ${position}/${total}\nTechnical Difficulties: ${technicalDifficulties}`;
+          } else {
+            queueInfo.style.display = "none";
+          }
+        }
+      };
+
+      const requestId = (() => {
+        try { return new URL(url).searchParams.get("requestId"); } catch (e) { return null; }
+      })();
+      const tileId = requestId ? tileRequestIdMap.get(requestId) : null;
+
+      if (tileId) {
+        const tile = document.querySelector(`[data-id="${tileId}"]`);
+        if (tile) {
+          requestAnimationFrame(() => applyQueueInfo(tile));
+        }
+      } else if (typeof position === "number" && position > 0) {
+        // Fallback: no per-tile correlation available (plugin doesn't echo _tileId),
+        // so update every tile currently waiting for generation. We query the DOM
+        // directly rather than relying solely on the waitingTiles Set.
+        requestAnimationFrame(() => {
+          let tiles;
+          if (typeof waitingTiles !== "undefined" && waitingTiles.size) {
+            tiles = Array.from(waitingTiles);
+          } else {
+            tiles = Array.from(document.querySelectorAll(".tile")).filter((t) => {
+              const p = t.querySelector(".placeholder");
+              return p && (p.textContent.startsWith("Generating") || p.textContent.startsWith("Queued"));
+            });
+          }
+          tiles.forEach((tile) => {
+            const p = tile.querySelector(".placeholder");
+            if (p && (p.textContent.startsWith("Generating") || p.textContent.startsWith("Queued"))) {
+              applyQueueInfo(tile);
+            }
+          });
+        });
+      }
+    } catch (e) {
+      // Ignore
+    }
+  }
+
+  return response;
+};
 </script>
     <script src="https://unpkg.com/dexie@3.2.4/dist/dexie.min.js"></script>
     <script src="https://unpkg.com/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -891,118 +1010,6 @@ const requestIdTileIdMap = new Map(); // tileId → requestId
       let selectedPromptPiecesIds = new Set();
       let editingPromptPieceId = null;
 
-      window.fetch = async function (...args) {
-        const url = typeof args[0] === "string" ? args[0] : args[0]?.url;
-
-        if (url && url.includes("/api/generate") && !url.includes("getUserQueuePosition")) {
-          // Capture requestId correlation for generate requests so that the
-          // associated getUserQueuePosition responses can be mapped to a tile.
-          try {
-            const urlObj = new URL(url);
-            const requestId = urlObj.searchParams.get("requestId");
-            const tileId = urlObj.searchParams.get("_tileId");
-            if (requestId && tileId) {
-              tileRequestIdMap.set(requestId, tileId);
-              requestIdTileIdMap.set(tileId, requestId);
-            }
-          } catch (e) {
-            // Ignore invalid URL
-          }
-
-          const controller = new AbortController();
-          activeGenerateControllers.add(controller);
-
-          if (cancelRequested) controller.abort();
-
-          const init = args[1] && typeof args[1] === "object" ? { ...args[1] } : {};
-          const pluginSignal = init.signal;
-          let onPluginAbort = null;
-          if (pluginSignal) {
-            if (pluginSignal.aborted) {
-              controller.abort(pluginSignal.reason);
-            } else {
-              onPluginAbort = () => controller.abort();
-              pluginSignal.addEventListener("abort", onPluginAbort, { once: true });
-            }
-          }
-          init.signal = controller.signal;
-
-          try {
-            return await _originalFetch.apply(this, [args[0], init]);
-          } finally {
-            activeGenerateControllers.delete(controller);
-            if (onPluginAbort && pluginSignal) pluginSignal.removeEventListener("abort", onPluginAbort);
-          }
-        }
-
-        const response = await _originalFetch.apply(this, args);
-
-        if (url && url.includes("getUserQueuePosition")) {
-          const clonedResponse = response.clone();
-          try {
-            const data = await clonedResponse.json();
-            const urlObj = new URL(url);
-            const requestId = urlObj.searchParams.get("requestId");
-            const tileId = requestId ? tileRequestIdMap.get(requestId) : null;
-
-            const position = data.position;
-            const total = data.total;
-            const technicalDifficulties = data.havingTechnicalDifficulties;
-
-            // Apply the queue info to a single tile: update its status label and
-            // the queue-info block rendered just below "Generating..."/"Queued".
-            const applyQueueInfo = (tile) => {
-              const placeholder = tile.querySelector(".placeholder");
-              const queueInfo = tile.querySelector(".queue-info");
-              if (!placeholder) return;
-
-              if (typeof position === "number" && position > 0) {
-                placeholder.textContent = "Queued";
-              } else if (data.status === "not_in_queue") {
-                placeholder.textContent = "Generating...";
-              }
-
-              if (queueInfo) {
-                if (typeof position === "number" && position > 0 && typeof total === "number") {
-                  queueInfo.style.display = "block";
-                  queueInfo.textContent =
-                    `Queue: ${position}/${total}\nTechnical Difficulties: ${technicalDifficulties}`;
-                } else {
-                  queueInfo.style.display = "none";
-                }
-              }
-            };
-
-            if (tileId) {
-              const tile = document.querySelector(`[data-id="${tileId}"]`);
-              if (tile) {
-                requestAnimationFrame(() => applyQueueInfo(tile));
-              }
-            } else {
-              // Fallback: no per-tile correlation available, so broadcast the
-              // queue info to every tile still waiting for generation.
-              if (typeof position === "number" && position > 0) {
-                requestAnimationFrame(() => {
-                  waitingTiles.forEach((tile) => {
-                    const placeholder = tile.querySelector(".placeholder");
-                    if (
-                      placeholder &&
-                      (placeholder.textContent.startsWith("Generating") ||
-                        placeholder.textContent.startsWith("Queued"))
-                    ) {
-                      applyQueueInfo(tile);
-                    }
-                  });
-                });
-              }
-            }
-          } catch (e) {
-            // Ignore
-          }
-        }
-
-        return response;
-      };
 
       // Keep track of tab visibility to prevent throttling
       let keepAliveInterval = null;
