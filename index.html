@@ -7,27 +7,6 @@
 const _originalFetch = window.fetch;
 const tileRequestIdMap = new Map(); // requestId → tileId
 const requestIdTileIdMap = new Map(); // tileId → requestId
-
-window.fetch = async function (...args) {
-  const url = typeof args[0] === "string" ? args[0] : args[0]?.url;
-
-  // Capture requestId correlation for generate requests
-  if (url && url.includes("/api/generate") && !url.includes("getUserQueuePosition")) {
-    try {
-      const urlObj = new URL(url);
-      const requestId = urlObj.searchParams.get("requestId");
-      const tileId = urlObj.searchParams.get("_tileId");
-      if (requestId && tileId) {
-        tileRequestIdMap.set(requestId, tileId);
-        requestIdTileIdMap.set(tileId, requestId);
-      }
-    } catch (e) {
-      // Ignore invalid URL
-    }
-  }
-
-return _originalFetch.apply(this, args);
-};
 </script>
     <script src="https://unpkg.com/dexie@3.2.4/dist/dexie.min.js"></script>
     <script src="https://unpkg.com/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -916,6 +895,20 @@ return _originalFetch.apply(this, args);
         const url = typeof args[0] === "string" ? args[0] : args[0]?.url;
 
         if (url && url.includes("/api/generate") && !url.includes("getUserQueuePosition")) {
+          // Capture requestId correlation for generate requests so that the
+          // associated getUserQueuePosition responses can be mapped to a tile.
+          try {
+            const urlObj = new URL(url);
+            const requestId = urlObj.searchParams.get("requestId");
+            const tileId = urlObj.searchParams.get("_tileId");
+            if (requestId && tileId) {
+              tileRequestIdMap.set(requestId, tileId);
+              requestIdTileIdMap.set(tileId, requestId);
+            }
+          } catch (e) {
+            // Ignore invalid URL
+          }
+
           const controller = new AbortController();
           activeGenerateControllers.add(controller);
 
@@ -952,27 +945,52 @@ return _originalFetch.apply(this, args);
             const requestId = urlObj.searchParams.get("requestId");
             const tileId = requestId ? tileRequestIdMap.get(requestId) : null;
 
+            const position = data.position;
+            const total = data.total;
+            const technicalDifficulties = data.havingTechnicalDifficulties;
+
+            // Apply the queue info to a single tile: update its status label and
+            // the queue-info block rendered just below "Generating..."/"Queued".
+            const applyQueueInfo = (tile) => {
+              const placeholder = tile.querySelector(".placeholder");
+              const queueInfo = tile.querySelector(".queue-info");
+              if (!placeholder) return;
+
+              if (typeof position === "number" && position > 0) {
+                placeholder.textContent = "Queued";
+              } else if (data.status === "not_in_queue") {
+                placeholder.textContent = "Generating...";
+              }
+
+              if (queueInfo) {
+                if (typeof position === "number" && position > 0 && typeof total === "number") {
+                  queueInfo.style.display = "block";
+                  queueInfo.textContent =
+                    `Queue: ${position}/${total}\nTechnical Difficulties: ${technicalDifficulties}`;
+                } else {
+                  queueInfo.style.display = "none";
+                }
+              }
+            };
+
             if (tileId) {
               const tile = document.querySelector(`[data-id="${tileId}"]`);
               if (tile) {
-                const placeholder = tile.querySelector(".placeholder");
-                requestAnimationFrame(() => {
-                  if (placeholder) {
-                    if (data.position > 0) {
-                      placeholder.textContent = `Queued (${data.position}/${data.total})`;
-                    } else if (data.status === "not_in_queue") {
-                      placeholder.textContent = "Generating...";
-                    }
-                  }
-                });
+                requestAnimationFrame(() => applyQueueInfo(tile));
               }
             } else {
-              if (data.position !== undefined && data.total !== undefined && data.position > 0) {
+              // Fallback: no per-tile correlation available, so broadcast the
+              // queue info to every tile still waiting for generation.
+              if (typeof position === "number" && position > 0) {
                 requestAnimationFrame(() => {
                   waitingTiles.forEach((tile) => {
                     const placeholder = tile.querySelector(".placeholder");
-                    if (placeholder && (placeholder.textContent.startsWith("Generating") || placeholder.textContent.startsWith("Queued"))) {
-                      placeholder.textContent = `Queued (${data.position}/${data.total})`;
+                    if (
+                      placeholder &&
+                      (placeholder.textContent.startsWith("Generating") ||
+                        placeholder.textContent.startsWith("Queued"))
+                    ) {
+                      applyQueueInfo(tile);
                     }
                   });
                 });
@@ -1674,6 +1692,8 @@ return _originalFetch.apply(this, args);
             cancelledTiles.add(tile);
             waitingTiles.delete(tile);
             p.textContent = "Cancelled";
+            const queueInfo = tile.querySelector(".queue-info");
+            if (queueInfo) queueInfo.style.display = "none";
           }
         }
 
@@ -4883,6 +4903,10 @@ return _originalFetch.apply(this, args);
               const placeholder = tile.querySelector(".placeholder");
               if (placeholder) {
                 placeholder.textContent = text;
+                // Queue info only shows while actively in the queue; clear it
+                // whenever the status label changes to a non-queue state.
+                const queueInfo = tile.querySelector(".queue-info");
+                if (queueInfo) queueInfo.style.display = "none";
                 // Update UI to check if cancel button should still be visible
                 updateGenerationUI();
               }
@@ -5749,7 +5773,11 @@ return _originalFetch.apply(this, args);
         for (let i = 0; i < num; i++) {
           const tile = document.createElement("div");
           tile.className = `tile ${shape}`;
-          tile.innerHTML = `<div class="placeholder">Waiting...</div>`;
+          // Unique id used both as the DOM id and as the _tileId sent with the
+          // generate request, so queue-position responses can be correlated.
+          tile.id = `tile-${Date.now()}-${i}-${Math.floor(Math.random() * 1e6)}`;
+          tile.setAttribute("data-id", tile.id);
+          tile.innerHTML = `<div class="placeholder">Waiting...</div><div class="queue-info" style="display:none;"></div>`;
           el.mosaic.appendChild(tile);
           tiles.push(tile);
         }
@@ -8231,6 +8259,14 @@ return _originalFetch.apply(this, args);
       .placeholder {
         font-size: 11px;
         opacity: 0.4;
+      }
+
+      .queue-info {
+        font-size: 11px;
+        opacity: 0.4;
+        white-space: pre-line;
+        margin-top: 4px;
+        text-align: center;
       }
 
       #imageModal {
