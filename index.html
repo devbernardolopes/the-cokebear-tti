@@ -4354,9 +4354,9 @@ window.fetch = async function (...args) {
         try {
           const metadata = window.imageMetadata?.[currentModalImageSrc];
           const prompt = metadata?.prompt || el.prompt.value;
-          const guidance = el.guidance.value;
-          const style = el.style.value;
-          const resolution = el.resolution.value;
+          const guidance = metadata?.guidance ?? el.guidance.value;
+          const style = metadata?.style ?? el.style.value;
+          const resolution = metadata?.resolution ?? el.resolution.value;
           const seed = metadata?.seed || null;
           const negativePrompt = metadata?.negativePrompt || el.negativePrompt.value;
 
@@ -4991,10 +4991,10 @@ window.fetch = async function (...args) {
           const startTime = Date.now();
           const promptData = {
             prompt: imagePrompt,
-            guidanceScale: parseInt(el.guidance.value),
-            negativePrompt: el.negativePrompt.value,
+            guidanceScale: parseInt(metadata.guidance ?? el.guidance.value),
+            negativePrompt: metadata.negativePrompt ?? el.negativePrompt.value,
             seed: metadata.seed,
-            resolution: el.resolution.value,
+            resolution: metadata.resolution ?? el.resolution.value,
             _tileId: tile.id,
           };
 
@@ -5809,7 +5809,8 @@ window.fetch = async function (...args) {
         const thisGenerationId = currentGenerationId;
 
         const res = el.resolution.value;
-        const gs = `(guidanceScale:::${el.guidance.value})`;
+        const guidanceSnapshot = el.guidance.value;
+        const gs = `(guidanceScale:::${guidanceSnapshot})`;
         const negPrompt = el.negativePrompt.value.trim();
         const negPromptFormatted = negPrompt ? `(negativePrompt:::${negPrompt})` : "";
         const seedInput = el.seed.value.trim();
@@ -5931,7 +5932,7 @@ window.fetch = async function (...args) {
             const metadata = {
               prompt: imagePrompt,
               seed: imageSeedValue,
-              guidance: el.guidance.value,
+              guidance: guidanceSnapshot,
               style: style,
               resolution: res,
               negativePrompt: negPrompt,
@@ -5972,7 +5973,7 @@ window.fetch = async function (...args) {
             // Save prompt to history with settings after generation completes
             const seedsToSave = userProvidedSeed !== null ? userProvidedSeed : generatedSeeds;
             await savePrompt(basePrompt, {
-              guidance: el.guidance.value,
+              guidance: guidanceSnapshot,
               style: style,
               resolution: res,
               seeds: seedsToSave,
