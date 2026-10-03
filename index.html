@@ -364,6 +364,8 @@ window.fetch = async function (...args) {
           <input type="checkbox" id="selectAllHistory" />
           <span>Select All</span>
           <button onclick="showHistoryDeleteConfirmation()" id="deleteHistorySelectedBtn" disabled>💥</button>
+          <input type="checkbox" id="saveHistoryToggle" />
+          <span>Save history</span>
         </div>
         <div id="historyList"></div>
         <button id="loadMoreBtn" style="display: none">Load More</button>
@@ -728,6 +730,7 @@ window.fetch = async function (...args) {
         historyCount: document.getElementById("historyCount"),
         selectAllHistory: document.getElementById("selectAllHistory"),
         deleteHistorySelectedBtn: document.getElementById("deleteHistorySelectedBtn"),
+        saveHistoryToggle: document.getElementById("saveHistoryToggle"),
         loadMoreBtn: document.getElementById("loadMoreBtn"),
         manageHistoryModal: document.getElementById("manageHistoryModal"),
         manageHistoryModalContent: document.getElementById("manageHistoryModalContent"),
@@ -1985,6 +1988,7 @@ window.fetch = async function (...args) {
           await db.settings.put({ key: "numImages", value: el.num.value });
           await db.settings.put({ key: "concurrency", value: el.conc.value });
           await db.settings.put({ key: "tileSize", value: el.tileSize.value });
+          await db.settings.put({ key: "saveHistoryEnabled", value: !!el.saveHistoryToggle?.checked });
         } catch (e) {
           console.warn("Failed to save settings:", e);
         }
@@ -2020,6 +2024,10 @@ window.fetch = async function (...args) {
             el.tileSize.value = tileSize.value;
             el.mosaic.style.setProperty("--tile-size", tileSize.value + "px");
           }
+          const saveHistoryEnabled = await db.settings.get("saveHistoryEnabled");
+          if (el.saveHistoryToggle) {
+            el.saveHistoryToggle.checked = saveHistoryEnabled ? !!saveHistoryEnabled.value : false;
+          }
         } catch (e) {
           console.warn("Failed to load settings:", e);
         }
@@ -2038,6 +2046,7 @@ window.fetch = async function (...args) {
         el.mosaic.style.setProperty("--tile-size", size + "px");
         saveSettings();
       });
+      el.saveHistoryToggle.addEventListener("change", saveSettings);
 
       // History search with debounce
       el.historySearch.addEventListener("input", (e) => {
@@ -2060,6 +2069,7 @@ window.fetch = async function (...args) {
       // Save prompt to database
       async function savePrompt(prompt, options = {}) {
         if (!db || !prompt.trim()) return;
+        if (!el.saveHistoryToggle?.checked) return;
         const { guidance, style, resolution, seeds } = options;
         try {
           // Check if an identical entry exists (same prompt AND all parameters)
