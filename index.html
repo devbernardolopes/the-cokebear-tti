@@ -401,6 +401,7 @@ window.fetch = async function (...args) {
           <button onclick="toggleGallerySort()" id="gallerySortBtn">⬇</button>
           <button onclick="toggleGalleryFavoritesOnly()" id="galleryFavoritesOnlyBtn" title="Show favorites only">🤍</button>
           <button onclick="toggleGallerySelectMode()" id="gallerySelectModeBtn">☐</button>
+          <button onclick="toggleGallerySelectAll()" id="gallerySelectAllBtn" style="display: none; font-size: 12px;" title="Select all images in the current view">Select all</button>
           <button onclick="showDeleteConfirmation()" id="galleryDeleteSelectedBtn" disabled>💥</button>
            <span id="galleryCount"></span>
             <button onclick="exportGallery()" id="galleryExportBtn" title="Export Gallery">⤴</button>
@@ -759,6 +760,7 @@ window.fetch = async function (...args) {
         galleryList: document.getElementById("galleryList"),
         galleryCount: document.getElementById("galleryCount"),
         gallerySelectModeBtn: document.getElementById("gallerySelectModeBtn"),
+        gallerySelectAllBtn: document.getElementById("gallerySelectAllBtn"),
         galleryDeleteSelectedBtn: document.getElementById("galleryDeleteSelectedBtn"),
         gallerySortBtn: document.getElementById("gallerySortBtn"),
         gallerySearch: document.getElementById("gallerySearch"),
@@ -908,6 +910,7 @@ window.fetch = async function (...args) {
       let galleryTotalCount = 0;
       let gallerySelectMode = false;
       let selectedGalleryIds = new Set();
+      let galleryAllSelected = false; // true when the whole current view was bulk-selected
       let galleryCurrentImage = null; // For info modal when opened from gallery
       let gallerySortDesc = true; // true = newest first (⬇), false = oldest first (⬆)
       let gallerySearchQuery = "";
@@ -1019,6 +1022,8 @@ window.fetch = async function (...args) {
 
       function refreshGallery(placeholderText) {
         galleryLoadToken++;
+        galleryAllSelected = false;
+        updateGallerySelectAllBtn();
         resetGalleryList(galleryLoadToken, placeholderText);
         loadGallery(false, galleryLoadToken);
       }
@@ -4204,11 +4209,13 @@ window.fetch = async function (...args) {
         galleryLoadToken++;
         gallerySelectMode = false;
         selectedGalleryIds.clear();
+        galleryAllSelected = false;
         gallerySearchQuery = "";
         gallerySearchCache = { query: "", sortDesc: gallerySortDesc, favoritesOnly: galleryFavoritesOnly, items: null };
         el.gallerySearch.value = "";
         el.galleryList.innerHTML = "";
         el.gallerySelectModeBtn.textContent = "☐";
+        updateGallerySelectAllBtn();
         el.gallerySortBtn.textContent = gallerySortDesc ? "⬇" : "⬆";
         el.galleryModal.style.display = "flex";
         document.body.classList.add("modal-open");
@@ -4251,7 +4258,87 @@ window.fetch = async function (...args) {
 
         if (!gallerySelectMode) {
           selectedGalleryIds.clear();
+          galleryAllSelected = false;
           updateGalleryCount();
+        }
+        updateGallerySelectAllBtn();
+      };
+
+      function updateGallerySelectAllBtn() {
+        const btn = el.gallerySelectAllBtn;
+        if (!btn) return;
+        btn.style.display = gallerySelectMode ? "" : "none";
+        btn.textContent = galleryAllSelected ? "Unselect all" : "Select all";
+        btn.title = galleryAllSelected ? "Unselect all images in the current view" : "Select all images in the current view";
+      }
+
+      // Collect the ids of every gallery image in the current view
+      // (favorites filter + search), without loading image blobs into memory.
+      // Uses the same filter predicates as loadGallery.
+      async function getGalleryScopeIds() {
+        const ids = [];
+        const searchQuery = gallerySearchQuery.toLowerCase();
+        const batchSize = 200;
+        let offset = 0;
+        for (;;) {
+          const batch = await db.gallery.orderBy("timestamp").offset(offset).limit(batchSize).toArray();
+          if (batch.length === 0) break;
+          for (const item of batch) {
+            if (galleryFavoritesOnly && !(item.favorite === 1 || item.favorite === true)) continue;
+            if (searchQuery) {
+              const promptMatch = item.prompt && item.prompt.toLowerCase().includes(searchQuery);
+              const seedMatch = item.seed ? String(item.seed).includes(searchQuery) : false;
+              if (!promptMatch && !seedMatch) continue;
+            }
+            ids.push(item.id);
+          }
+          offset += batch.length;
+          if (batch.length < batchSize) break;
+        }
+        return ids;
+      }
+
+      function refreshGallerySelectionUI() {
+        const tiles = el.galleryList.querySelectorAll(".gallery-item");
+        tiles.forEach((tile) => {
+          const id = parseInt(tile.dataset.id, 10);
+          const checkmark = tile.querySelector(".gallery-item-checkmark");
+          if (selectedGalleryIds.has(id)) {
+            tile.classList.add("selecting");
+            if (checkmark) checkmark.style.display = "";
+          } else {
+            tile.classList.remove("selecting");
+            if (checkmark) checkmark.style.display = "none";
+          }
+        });
+      }
+
+      window.toggleGallerySelectAll = async function () {
+        if (!db || !gallerySelectMode) return;
+        const btn = el.gallerySelectAllBtn;
+        if (galleryAllSelected) {
+          selectedGalleryIds.clear();
+          galleryAllSelected = false;
+          refreshGallerySelectionUI();
+          updateGalleryCount();
+          updateGallerySelectAllBtn();
+          return;
+        }
+        if (btn) {
+          btn.disabled = true;
+          btn.textContent = "Loading...";
+        }
+        try {
+          const ids = await getGalleryScopeIds();
+          ids.forEach((id) => selectedGalleryIds.add(id));
+          galleryAllSelected = true;
+          refreshGallerySelectionUI();
+          updateGalleryCount();
+        } catch (e) {
+          console.warn("Failed to select all gallery images:", e);
+        } finally {
+          if (btn) btn.disabled = false;
+          updateGallerySelectAllBtn();
         }
       };
 
@@ -4279,6 +4366,10 @@ window.fetch = async function (...args) {
           selectedGalleryIds.delete(id);
           div.classList.remove("selecting");
           div.querySelector(".gallery-item-checkmark").style.display = "none";
+          if (galleryAllSelected) {
+            galleryAllSelected = false;
+            updateGallerySelectAllBtn();
+          }
         } else {
           selectedGalleryIds.add(id);
           div.classList.add("selecting");
@@ -4330,8 +4421,10 @@ window.fetch = async function (...args) {
             if (tile) tile.remove();
           });
           selectedGalleryIds.clear();
+          galleryAllSelected = false;
           gallerySelectMode = false;
           el.gallerySelectModeBtn.textContent = "☐";
+          updateGallerySelectAllBtn();
           galleryTotalCount = await db.gallery.count();
           updateGalleryCount();
           if (galleryHasMore) {
