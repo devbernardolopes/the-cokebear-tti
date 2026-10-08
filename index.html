@@ -1751,6 +1751,45 @@ window.fetch = async function (...args) {
         if (el.generateBtn) el.generateBtn.disabled = isGenerating;
       }
 
+      // Live tab-title progress indicator, e.g. "(2/5) TTI Generator".
+      // Done state uses a distinct marker since title text cannot be colored:
+      // "(5/5) ● TTI Generator".
+      const BASE_TAB_TITLE = document.title || "TTI Generator";
+      let tabProgressTotal = 0;
+      let tabProgressDone = 0;
+      let tabProgressGenerationId = 0;
+
+      function updateTabTitle() {
+        if (tabProgressTotal > 0) {
+          document.title = `(${tabProgressDone}/${tabProgressTotal}) ${BASE_TAB_TITLE}`;
+        } else {
+          document.title = BASE_TAB_TITLE;
+        }
+      }
+
+      function resetTabTitle() {
+        tabProgressTotal = 0;
+        tabProgressDone = 0;
+        tabProgressGenerationId = 0;
+        document.title = BASE_TAB_TITLE;
+      }
+
+      function markTabTitleDone() {
+        if (tabProgressTotal > 0) {
+          document.title = `(${tabProgressTotal}/${tabProgressTotal}) \u25CF ${BASE_TAB_TITLE}`;
+        } else {
+          document.title = BASE_TAB_TITLE;
+        }
+      }
+
+      function advanceTabProgress(generationId) {
+        if (generationId !== currentGenerationId) return;
+        if (tabProgressGenerationId !== generationId) return;
+        if (cancelRequested) return;
+        tabProgressDone = Math.min(tabProgressDone + 1, tabProgressTotal);
+        updateTabTitle();
+      }
+
       // Cancel generation
       window.cancelGeneration = function () {
         cancelRequested = true;
@@ -1782,6 +1821,7 @@ window.fetch = async function (...args) {
         isGenerating = false;
         stopKeepAlive();
         updateGenerationUI();
+        resetTabTitle();
       };
 
       // Keyboard shortcuts
@@ -5934,6 +5974,10 @@ window.fetch = async function (...args) {
         isGenerating = true;
         cancelRequested = false;
         startKeepAlive();
+        tabProgressTotal = num;
+        tabProgressDone = 0;
+        tabProgressGenerationId = thisGenerationId;
+        updateTabTitle();
 
         const shape = res.includes("512x768") ? "portrait" : res.includes("768x512") ? "landscape" : "square";
 
@@ -6045,11 +6089,13 @@ window.fetch = async function (...args) {
             if (result && result.seed !== undefined) {
               generatedSeeds.push(result.seed);
             }
+            advanceTabProgress(thisGenerationId);
           } catch (err) {
             if (currentGenerationId !== thisGenerationId || err.message === "Cancelled" || cancelledTiles.has(tile)) {
               tile.innerHTML = `<div class="placeholder">Cancelled</div>`;
             } else {
               tile.innerHTML = `<div class="placeholder" style="color: #ff7b72;">Error</div>`;
+              advanceTabProgress(thisGenerationId);
             }
             updateGenerationUI();
           }
@@ -6072,6 +6118,11 @@ window.fetch = async function (...args) {
             isGenerating = false;
             stopKeepAlive();
             updateGenerationUI();
+            if (cancelRequested) {
+              resetTabTitle();
+            } else {
+              markTabTitleDone();
+            }
 
             // Save prompt to history with settings after generation completes
             const seedsToSave = userProvidedSeed !== null ? userProvidedSeed : generatedSeeds;
