@@ -1753,11 +1753,14 @@ window.fetch = async function (...args) {
 
       // Live tab-title progress indicator, e.g. "(2/5) TTI Generator".
       // Done state uses a distinct marker since title text cannot be colored:
-      // "(5/5) ● TTI Generator".
+      // "● TTI Generator" (numbers removed). The dot is only shown when the
+      // tab is not being viewed (hidden tab or unfocused window); otherwise
+      // the title resets straight back to the base title.
       const BASE_TAB_TITLE = document.title || "TTI Generator";
       let tabProgressTotal = 0;
       let tabProgressDone = 0;
       let tabProgressGenerationId = 0;
+      let tabTitleDoneShown = false;
 
       function updateTabTitle() {
         if (tabProgressTotal > 0) {
@@ -1771,16 +1774,38 @@ window.fetch = async function (...args) {
         tabProgressTotal = 0;
         tabProgressDone = 0;
         tabProgressGenerationId = 0;
+        tabTitleDoneShown = false;
         document.title = BASE_TAB_TITLE;
       }
 
+      function isTabAway() {
+        try {
+          if (document.hidden) return true;
+        } catch (e) {}
+        try {
+          if (typeof document.hasFocus === "function" && !document.hasFocus()) return true;
+        } catch (e) {}
+        return false;
+      }
+
       function markTabTitleDone() {
-        if (tabProgressTotal > 0) {
-          document.title = `(${tabProgressTotal}/${tabProgressTotal}) \u25CF ${BASE_TAB_TITLE}`;
+        if (tabProgressTotal > 0 && isTabAway()) {
+          document.title = `\u25CF ${BASE_TAB_TITLE}`;
+          tabTitleDoneShown = true;
         } else {
-          document.title = BASE_TAB_TITLE;
+          resetTabTitle();
         }
       }
+
+      function clearTabTitleDoneOnReturn() {
+        if (!tabTitleDoneShown) return;
+        if (isGenerating) return;
+        if (isTabAway()) return;
+        resetTabTitle();
+      }
+
+      document.addEventListener("visibilitychange", clearTabTitleDoneOnReturn);
+      window.addEventListener("focus", clearTabTitleDoneOnReturn);
 
       function advanceTabProgress(generationId) {
         if (generationId !== currentGenerationId) return;
