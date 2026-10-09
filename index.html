@@ -4819,7 +4819,7 @@ window.fetch = async function (...args) {
         if (!db || !imageUrl) return;
         const btn = tileElement?.querySelector(".tile-save-btn");
         if (btn) {
-          btn.textContent = "⏳";
+          btn.innerHTML = MODAL_SVG_SAVE;
           btn.disabled = true;
         }
         try {
@@ -4844,12 +4844,12 @@ window.fetch = async function (...args) {
           });
 
           if (btn) {
-            btn.textContent = "✓";
-            btn.style.background = "rgba(35, 134, 54, 0.9)";
+            btn.innerHTML = MODAL_SVG_CHECK;
+            btn.style.background = "";
           }
           setTimeout(() => {
             if (btn) {
-              btn.textContent = "💾";
+              btn.innerHTML = MODAL_SVG_SAVE;
               btn.style.background = "";
               btn.disabled = false;
             }
@@ -4857,7 +4857,7 @@ window.fetch = async function (...args) {
         } catch (e) {
           console.warn("Failed to save image to gallery:", e);
           if (btn) {
-            btn.textContent = "💾";
+            btn.innerHTML = MODAL_SVG_SAVE;
             btn.disabled = false;
           }
         }
@@ -5311,10 +5311,11 @@ window.fetch = async function (...args) {
               img.src = r.dataUrl;
               img.style.cursor = "pointer";
 
-              // Create info button overlay
+              // Create info button overlay (hidden on mosaic tiles)
             const infoBtn = document.createElement("button");
             infoBtn.className = "tile-info-btn";
             infoBtn.innerHTML = "ℹ";
+            infoBtn.style.display = "none";
             infoBtn.onclick = (e) => {
               e.stopPropagation();
               flipTileToInfo(tile, r.dataUrl);
@@ -5323,7 +5324,9 @@ window.fetch = async function (...args) {
             // Create download button overlay
             const downloadBtn = document.createElement("button");
             downloadBtn.className = "tile-download-btn";
-            downloadBtn.innerHTML = "⬇";
+            downloadBtn.innerHTML = MODAL_SVG_DOWNLOAD;
+            downloadBtn.title = "Download";
+            downloadBtn.setAttribute("aria-label", "Download");
             downloadBtn.onclick = async (e) => {
               e.stopPropagation();
               await downloadImage(r.dataUrl);
@@ -5332,8 +5335,9 @@ window.fetch = async function (...args) {
             // Create save to gallery button overlay
             const saveToGalleryBtn = document.createElement("button");
             saveToGalleryBtn.className = "tile-save-btn";
-            saveToGalleryBtn.innerHTML = "💾";
+            saveToGalleryBtn.innerHTML = MODAL_SVG_SAVE;
             saveToGalleryBtn.title = "Save to Gallery";
+            saveToGalleryBtn.setAttribute("aria-label", "Save to gallery");
             saveToGalleryBtn.onclick = async (e) => {
               e.stopPropagation();
               await saveTileImageToGallery(r.dataUrl, tile);
@@ -5342,8 +5346,9 @@ window.fetch = async function (...args) {
             // Create download & save to gallery button overlay
             const downloadSaveBtn = document.createElement("button");
             downloadSaveBtn.className = "tile-download-save-btn";
-            downloadSaveBtn.innerHTML = "⬇💾";
+            downloadSaveBtn.innerHTML = MODAL_SVG_DOWNLOAD_SAVE;
             downloadSaveBtn.title = "Download & Save to Gallery";
+            downloadSaveBtn.setAttribute("aria-label", "Download and save to gallery");
             downloadSaveBtn.onclick = async (e) => {
               e.stopPropagation();
               await downloadImage(r.dataUrl);
@@ -5354,7 +5359,7 @@ window.fetch = async function (...args) {
             const badgesContainer = document.createElement("div");
             badgesContainer.className = "tile-badges";
             const meta = window.imageMetadata?.[r.dataUrl] || {};
-            if (meta.style) {
+            if (meta.style && String(meta.style).toLowerCase() !== "none") {
               const styleLabel = meta.style.replace(/_/g, " ");
               badgesContainer.innerHTML += `<span class="tile-badge">${escapeHtml(styleLabel)}</span>`;
             }
@@ -5981,6 +5986,7 @@ window.fetch = async function (...args) {
         const infoBtn = document.createElement("button");
         infoBtn.className = "tile-info-btn";
         infoBtn.innerHTML = "ℹ";
+        infoBtn.style.display = "none";
         infoBtn.onclick = (e) => {
           e.stopPropagation();
           flipTileToInfo(tile, imageUrl);
@@ -5988,7 +5994,9 @@ window.fetch = async function (...args) {
 
         const downloadBtn = document.createElement("button");
         downloadBtn.className = "tile-download-btn";
-        downloadBtn.innerHTML = "⬇";
+        downloadBtn.innerHTML = MODAL_SVG_DOWNLOAD;
+        downloadBtn.title = "Download";
+        downloadBtn.setAttribute("aria-label", "Download");
         downloadBtn.onclick = async (e) => {
           e.stopPropagation();
           await downloadImage(imageUrl);
@@ -5996,8 +6004,9 @@ window.fetch = async function (...args) {
 
         const saveToGalleryBtn = document.createElement("button");
         saveToGalleryBtn.className = "tile-save-btn";
-        saveToGalleryBtn.innerHTML = "💾";
+        saveToGalleryBtn.innerHTML = MODAL_SVG_SAVE;
         saveToGalleryBtn.title = "Save to Gallery";
+        saveToGalleryBtn.setAttribute("aria-label", "Save to gallery");
         saveToGalleryBtn.onclick = async (e) => {
           e.stopPropagation();
           await saveTileImageToGallery(imageUrl, tile);
@@ -6005,8 +6014,9 @@ window.fetch = async function (...args) {
 
         const downloadSaveBtn = document.createElement("button");
         downloadSaveBtn.className = "tile-download-save-btn";
-        downloadSaveBtn.innerHTML = "⬇💾";
+        downloadSaveBtn.innerHTML = MODAL_SVG_DOWNLOAD_SAVE;
         downloadSaveBtn.title = "Download & Save to Gallery";
+        downloadSaveBtn.setAttribute("aria-label", "Download and save to gallery");
         downloadSaveBtn.onclick = async (e) => {
           e.stopPropagation();
           await downloadImage(imageUrl);
@@ -6016,7 +6026,7 @@ window.fetch = async function (...args) {
         const meta = window.imageMetadata?.[imageUrl] || {};
         const badgesContainer = document.createElement("div");
         badgesContainer.className = "tile-badges";
-        if (meta.style) {
+        if (meta.style && String(meta.style).toLowerCase() !== "none") {
           const styleLabel = meta.style.replace(/_/g, " ");
           badgesContainer.innerHTML += `<span class="tile-badge">${escapeHtml(styleLabel)}</span>`;
         }
@@ -8486,6 +8496,89 @@ window.fetch = async function (...args) {
       .tile-download-save-btn:hover {
         background: rgba(232, 168, 38, 1);
         transform: translateY(-50%) scale(1.05);
+      }
+
+      /* ---- Mosaic tile overrides (main view only; gallery untouched) ---- */
+      #mosaic .tile-download-btn,
+      #mosaic .tile-save-btn,
+      #mosaic .tile-download-save-btn {
+        background: rgba(33, 38, 45, 0.9);
+        border: 1px solid #30363d;
+        color: #fff;
+        font-size: 0;
+        line-height: 1;
+      }
+
+      #mosaic .tile-download-btn:hover,
+      #mosaic .tile-save-btn:hover,
+      #mosaic .tile-download-save-btn:hover {
+        background: rgba(72, 79, 88, 0.95);
+        border-color: #484f58;
+      }
+
+      #mosaic .tile-download-btn:hover,
+      #mosaic .tile-save-btn:hover {
+        transform: scale(1.05);
+      }
+
+      #mosaic .tile-download-save-btn:hover {
+        transform: scale(1.05);
+      }
+
+      /* Download&Save -> bottom-right */
+      #mosaic .tile-download-save-btn {
+        top: auto;
+        bottom: 8px;
+        right: 8px;
+        transform: none;
+      }
+
+      /* Save -> middle */
+      #mosaic .tile-save-btn {
+        bottom: 8px;
+        right: 48px;
+      }
+
+      /* Download -> left of Save */
+      #mosaic .tile-download-btn {
+        top: auto;
+        bottom: 8px;
+        right: 88px;
+      }
+
+      /* Info hidden on mosaic tiles */
+      #mosaic .tile-info-btn {
+        display: none !important;
+        opacity: 0 !important;
+      }
+
+      #mosaic .tile-download-btn svg,
+      #mosaic .tile-save-btn svg,
+      #mosaic .tile-download-save-btn svg {
+        width: 16px;
+        height: 16px;
+        display: block;
+        pointer-events: none;
+      }
+
+      #mosaic .tile-download-save-btn .modal-svg-pair {
+        display: flex;
+        align-items: center;
+        gap: 1px;
+        pointer-events: none;
+      }
+
+      #mosaic .tile-download-save-btn .modal-svg-pair svg {
+        width: 12px;
+        height: 12px;
+      }
+
+      /* Badges -> top center on mosaic tiles */
+      #mosaic .tile-badges {
+        top: 8px;
+        left: 50%;
+        bottom: auto;
+        transform: translateX(-50%);
       }
 
       .tile-save-btn:disabled {
