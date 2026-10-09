@@ -1219,6 +1219,59 @@ window.fetch = async function (...args) {
       });
 
       // Modal functions
+      const MODAL_SVG_CLOSE = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>';
+      const MODAL_SVG_DOWNLOAD = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>';
+      const MODAL_SVG_SAVE = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>';
+      const MODAL_SVG_DOWNLOAD_SAVE = '<span class="modal-svg-pair"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></span>';
+      const MODAL_SVG_INFO = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>';
+      const MODAL_SVG_CHECK = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+      const MODAL_EMOJI = {
+        download: "⬇",
+        downloadSave: "⬇💾",
+        save: "💾",
+        close: "❌",
+        info: "ℹ",
+      };
+
+      function setGeneratedModalIcons() {
+        el.modalDownloadBtn.innerHTML = MODAL_SVG_DOWNLOAD;
+        el.modalDownloadBtn.title = "Download";
+        el.modalDownloadBtn.setAttribute("aria-label", "Download");
+        el.modalDownloadSaveBtn.innerHTML = MODAL_SVG_DOWNLOAD_SAVE;
+        el.modalDownloadSaveBtn.title = "Download & Save to Gallery";
+        el.modalDownloadSaveBtn.setAttribute("aria-label", "Download and save to gallery");
+        if (!el.saveToGalleryBtn.classList.contains("saved")) {
+          el.saveToGalleryBtn.innerHTML = MODAL_SVG_SAVE;
+        }
+        el.saveToGalleryBtn.title = "Save to Gallery";
+        el.saveToGalleryBtn.setAttribute("aria-label", "Save to gallery");
+        el.modalCloseBtn.innerHTML = MODAL_SVG_CLOSE;
+        el.modalCloseBtn.title = "Close";
+        el.modalCloseBtn.setAttribute("aria-label", "Close");
+        el.modalInfoBtn.innerHTML = MODAL_SVG_INFO;
+        el.modalInfoBtn.title = "Info";
+        el.modalInfoBtn.setAttribute("aria-label", "Info");
+      }
+
+      function restoreGalleryModalIcons() {
+        el.modalDownloadBtn.textContent = MODAL_EMOJI.download;
+        el.modalDownloadSaveBtn.textContent = MODAL_EMOJI.downloadSave;
+        el.saveToGalleryBtn.textContent = MODAL_EMOJI.save;
+        el.modalCloseBtn.textContent = MODAL_EMOJI.close;
+        el.modalInfoBtn.textContent = MODAL_EMOJI.info;
+      }
+
+      function setGeneratedModalView(enabled) {
+        if (el.modalImageContainer) {
+          el.modalImageContainer.classList.toggle("modal-generated-view", !!enabled);
+        }
+        if (enabled) {
+          setGeneratedModalIcons();
+        } else {
+          restoreGalleryModalIcons();
+        }
+      }
+
       window.openModal = function (imgSrc) {
         window.isModalInfoOpen = false;
         const existingPanel = document.getElementById("modalInfoPanelContainer");
@@ -1228,6 +1281,7 @@ window.fetch = async function (...args) {
         currentModalImageSrc = imgSrc;
         currentModalIndex = generatedImages.indexOf(imgSrc);
         isFromGenerated = currentModalIndex >= 0;
+        setGeneratedModalView(isFromGenerated);
         el.modalImage.src = imgSrc;
         el.imageModal.style.display = "flex";
         document.body.classList.add("modal-open");
@@ -1264,7 +1318,7 @@ window.fetch = async function (...args) {
         el.modalCopyBtn.style.display = "none";
         el.modalFavoriteBtn.style.display = "none";
         el.saveToGalleryBtn.classList.remove("saved");
-        el.saveToGalleryBtn.textContent = "💾";
+        setGeneratedModalView(false);
         const modalBadges = document.getElementById("modalBadges");
         if (modalBadges) modalBadges.innerHTML = "";
       };
@@ -1498,7 +1552,7 @@ window.fetch = async function (...args) {
 
         if (!metadata) return;
 
-        if (metadata.style) {
+        if (metadata.style && String(metadata.style).toLowerCase() !== "none") {
           const styleLabel = metadata.style.replace(/_/g, " ");
           modalBadges.innerHTML += `<span class="tile-badge">${escapeHtml(styleLabel)}</span>`;
         }
@@ -4575,10 +4629,18 @@ window.fetch = async function (...args) {
           });
 
           el.saveToGalleryBtn.classList.add("saved");
-          el.saveToGalleryBtn.textContent = "✓";
+          if (el.modalImageContainer && el.modalImageContainer.classList.contains("modal-generated-view")) {
+            el.saveToGalleryBtn.innerHTML = MODAL_SVG_CHECK;
+          } else {
+            el.saveToGalleryBtn.textContent = "✓";
+          }
           setTimeout(() => {
             el.saveToGalleryBtn.classList.remove("saved");
-            el.saveToGalleryBtn.textContent = "💾";
+            if (el.modalImageContainer && el.modalImageContainer.classList.contains("modal-generated-view")) {
+              el.saveToGalleryBtn.innerHTML = MODAL_SVG_SAVE;
+            } else {
+              el.saveToGalleryBtn.textContent = "💾";
+            }
           }, 1500);
         } catch (e) {
           console.warn("Failed to save image to gallery:", e);
@@ -4599,6 +4661,7 @@ window.fetch = async function (...args) {
             currentModalImageSrc = item.imageData;
             currentGalleryIndex = galleryImages.findIndex((img) => img.id === id);
             isFromGenerated = false;
+            setGeneratedModalView(false);
             el.modalImage.src = item.imageData;
             el.modalCounter.textContent = galleryImages.length > 0 ? `${currentGalleryIndex + 1}/${galleryImages.length}` : "";
             el.saveToGalleryBtn.style.display = "none";
@@ -4624,6 +4687,7 @@ window.fetch = async function (...args) {
             currentModalImageSrc = item.imageData;
             currentGalleryIndex = galleryImages.findIndex((img) => img.id === id);
             isFromGenerated = false;
+            setGeneratedModalView(false);
             el.modalImage.src = item.imageData;
             el.modalCounter.textContent = galleryImages.length > 0 ? `${currentGalleryIndex + 1}/${galleryImages.length}` : "";
             el.saveToGalleryBtn.style.display = "none";
@@ -8811,6 +8875,109 @@ window.fetch = async function (...args) {
       .modal-info-btn:hover {
         background: rgba(130, 84, 221, 1);
         transform: scale(1.1);
+      }
+
+      /* ---- Generated-view modal overrides (main-view tiles only) ----
+         Scoped under .modal-generated-view so the Gallery modal path keeps
+         its original colors/positions/emoji. */
+      #modalImageContainer.modal-generated-view .modal-badges {
+        top: 10px;
+        left: 50%;
+        bottom: auto;
+        transform: translateX(-50%);
+      }
+
+      #modalImageContainer.modal-generated-view .modal-download-btn,
+      #modalImageContainer.modal-generated-view .modal-download-save-btn,
+      #modalImageContainer.modal-generated-view .modal-save-btn,
+      #modalImageContainer.modal-generated-view .modal-close-btn,
+      #modalImageContainer.modal-generated-view .modal-info-btn {
+        background: rgba(33, 38, 45, 0.9);
+        border: 1px solid #30363d;
+        color: #fff;
+        font-size: 0;
+        line-height: 1;
+      }
+
+      #modalImageContainer.modal-generated-view .modal-download-btn:hover,
+      #modalImageContainer.modal-generated-view .modal-download-save-btn:hover,
+      #modalImageContainer.modal-generated-view .modal-save-btn:hover,
+      #modalImageContainer.modal-generated-view .modal-close-btn:hover,
+      #modalImageContainer.modal-generated-view .modal-info-btn:hover {
+        background: rgba(72, 79, 88, 0.95);
+        border-color: #484f58;
+      }
+
+      #modalImageContainer.modal-generated-view .modal-download-btn:hover,
+      #modalImageContainer.modal-generated-view .modal-save-btn:hover,
+      #modalImageContainer.modal-generated-view .modal-close-btn:hover,
+      #modalImageContainer.modal-generated-view .modal-info-btn:hover {
+        transform: scale(1.1);
+      }
+
+      #modalImageContainer.modal-generated-view .modal-download-save-btn:hover {
+        transform: scale(1.1);
+      }
+
+      #modalImageContainer.modal-generated-view .modal-save-btn.saved {
+        background: rgba(33, 38, 45, 0.9);
+        border-color: #30363d;
+      }
+
+      /* Close -> top right (old Download spot) */
+      #modalImageContainer.modal-generated-view .modal-close-btn {
+        top: 10px;
+        right: 10px;
+        bottom: auto;
+      }
+
+      /* Download&Save -> old Close spot (bottom right) */
+      #modalImageContainer.modal-generated-view .modal-download-save-btn {
+        top: auto;
+        bottom: 10px;
+        right: 10px;
+        transform: none;
+      }
+
+      /* Download -> left of Save button */
+      #modalImageContainer.modal-generated-view .modal-download-btn {
+        top: auto;
+        bottom: 10px;
+        right: 110px;
+      }
+
+      /* Save keeps its slot; Info keeps top-left */
+      #modalImageContainer.modal-generated-view .modal-save-btn {
+        bottom: 10px;
+        right: 60px;
+      }
+
+      #modalImageContainer.modal-generated-view .modal-info-btn {
+        top: 10px;
+        left: 10px;
+      }
+
+      #modalImageContainer.modal-generated-view .modal-download-btn svg,
+      #modalImageContainer.modal-generated-view .modal-download-save-btn svg,
+      #modalImageContainer.modal-generated-view .modal-save-btn svg,
+      #modalImageContainer.modal-generated-view .modal-close-btn svg,
+      #modalImageContainer.modal-generated-view .modal-info-btn svg {
+        width: 20px;
+        height: 20px;
+        display: block;
+        pointer-events: none;
+      }
+
+      #modalImageContainer.modal-generated-view .modal-download-save-btn .modal-svg-pair {
+        display: flex;
+        align-items: center;
+        gap: 1px;
+        pointer-events: none;
+      }
+
+      #modalImageContainer.modal-generated-view .modal-download-save-btn .modal-svg-pair svg {
+        width: 15px;
+        height: 15px;
       }
 
       .modal-counter {
