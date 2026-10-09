@@ -1773,8 +1773,12 @@ window.fetch = async function (...args) {
         if (current && current !== BASE_TAB_TITLE) {
           const clean = stripTabTitleMarkers(current);
           // Only adopt titles that carry none of our own markers, so we never
-          // mistake our progress/dot titles for a host rename.
-          if (clean === current) {
+          // mistake our progress/dot titles for a host rename. Additionally,
+          // only ever upgrade to a longer title: the host transiently parks
+          // the tab on a short title (e.g. "Perchance") during the generate
+          // click flow, and adopting it would permanently shrink every
+          // progress/dot title we compose afterwards.
+          if (clean === current && clean.length >= BASE_TAB_TITLE.length) {
             BASE_TAB_TITLE = current;
           }
         }
