@@ -1815,6 +1815,13 @@ window.fetch = async function (...args) {
         updateTabTitle();
       }
 
+      // Completion-order packing: each finished image tile moves to the front
+      // of the mosaic in completion order, so images always fill left-to-right
+      // and top-to-bottom regardless of which request finished first.
+      // Error/Cancelled tiles stay in place; only successful images pack.
+      let completedImageCount = 0;
+      let completedImageGenerationId = 0;
+
       // Cancel generation
       window.cancelGeneration = function () {
         cancelRequested = true;
@@ -5273,6 +5280,21 @@ window.fetch = async function (...args) {
             tile.classList.add("tile-with-image");
             tile.dataset.imageUrl = r.dataUrl;
             tile.addEventListener("click", () => openModal(r.dataUrl));
+            // Pack finished images to the front in completion order, so the
+            // mosaic fills left-to-right/top-to-bottom no matter which request
+            // finished first. Request→tile binding (queue info, _tileId) is
+            // unaffected since the tile element keeps its id and listeners.
+            if (
+              currentGenerationId === generationId &&
+              completedImageGenerationId === generationId &&
+              el.mosaic.contains(tile)
+            ) {
+              const slot = el.mosaic.children[completedImageCount];
+              if (slot && slot !== tile) {
+                el.mosaic.insertBefore(tile, slot);
+              }
+              completedImageCount = Math.min(completedImageCount + 1, el.mosaic.children.length);
+            }
             updateGenerationUI();
           });
 
@@ -6003,6 +6025,8 @@ window.fetch = async function (...args) {
         tabProgressDone = 0;
         tabProgressGenerationId = thisGenerationId;
         updateTabTitle();
+        completedImageCount = 0;
+        completedImageGenerationId = thisGenerationId;
 
         const shape = res.includes("512x768") ? "portrait" : res.includes("768x512") ? "landscape" : "square";
 
