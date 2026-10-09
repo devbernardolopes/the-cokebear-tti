@@ -1756,7 +1756,30 @@ window.fetch = async function (...args) {
       // "● TTI Generator" (numbers removed). The dot is only shown when the
       // tab is not being viewed (hidden tab or unfocused window); otherwise
       // the title resets straight back to the base title.
-      const BASE_TAB_TITLE = document.title || "TTI Generator";
+      // The host page (Perchance) may rename the tab after our script runs,
+      // so the base title is re-synced from document.title whenever we are
+      // idle (no progress/dot active) instead of being frozen at load time.
+      let BASE_TAB_TITLE = document.title || "TTI Generator";
+
+      function stripTabTitleMarkers(title) {
+        return String(title || "")
+          .replace(/^\(\d+\/\d+\)\s+/, "")
+          .replace(/^●\s+/, "");
+      }
+
+      function syncBaseTabTitle() {
+        if (tabProgressTotal > 0 || tabTitleDoneShown) return;
+        const current = document.title || "";
+        if (current && current !== BASE_TAB_TITLE) {
+          const clean = stripTabTitleMarkers(current);
+          // Only adopt titles that carry none of our own markers, so we never
+          // mistake our progress/dot titles for a host rename.
+          if (clean === current) {
+            BASE_TAB_TITLE = current;
+          }
+        }
+      }
+
       let tabProgressTotal = 0;
       let tabProgressDone = 0;
       let tabProgressGenerationId = 0;
@@ -1771,6 +1794,7 @@ window.fetch = async function (...args) {
       }
 
       function resetTabTitle() {
+        syncBaseTabTitle();
         tabProgressTotal = 0;
         tabProgressDone = 0;
         tabProgressGenerationId = 0;
@@ -6021,6 +6045,7 @@ window.fetch = async function (...args) {
         isGenerating = true;
         cancelRequested = false;
         startKeepAlive();
+        syncBaseTabTitle();
         tabProgressTotal = num;
         tabProgressDone = 0;
         tabProgressGenerationId = thisGenerationId;
