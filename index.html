@@ -1163,6 +1163,24 @@ window.fetch = async function (...args) {
         updateGuidanceColor(value);
       });
 
+      el.guidance
+        .closest(".guidance-row")
+        .addEventListener(
+          "wheel",
+          (e) => {
+            e.preventDefault();
+            const dir = e.deltaY > 0 ? -1 : 1;
+            const current = parseInt(el.guidance.value, 10);
+            const next = Math.min(30, Math.max(1, current + dir));
+            if (next !== current) {
+              el.guidance.value = next;
+              el.guidance.dispatchEvent(new Event("input"));
+              el.guidance.dispatchEvent(new Event("change"));
+            }
+          },
+          { passive: false },
+        );
+
       updateGuidanceColor(parseInt(el.guidance.value, 10));
 
       // Seed input validation - only allow numbers
