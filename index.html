@@ -1243,6 +1243,10 @@ window.fetch = async function (...args) {
       const MODAL_SVG_DOWNLOAD_SAVE = '<span class="modal-svg-pair"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></span>';
       const MODAL_SVG_INFO = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>';
       const MODAL_SVG_CHECK = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+      const MODAL_SVG_COPY = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>';
+      const MODAL_SVG_HEART = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>';
+      const MODAL_SVG_HEART_FILLED = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>';
+      const MODAL_SVG_TRASH = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>';
       const MODAL_EMOJI = {
         download: "⬇",
         downloadSave: "⬇💾",
@@ -1269,6 +1273,14 @@ window.fetch = async function (...args) {
         el.modalInfoBtn.innerHTML = MODAL_SVG_INFO;
         el.modalInfoBtn.title = "Info";
         el.modalInfoBtn.setAttribute("aria-label", "Info");
+        el.modalCopyBtn.innerHTML = MODAL_SVG_COPY;
+        el.modalCopyBtn.title = "Use as prompt";
+        el.modalCopyBtn.setAttribute("aria-label", "Use as prompt");
+        if (!el.modalFavoriteBtn.classList.contains("favorite-active")) {
+          el.modalFavoriteBtn.innerHTML = MODAL_SVG_HEART;
+        }
+        el.modalFavoriteBtn.title = "Favorite";
+        el.modalFavoriteBtn.setAttribute("aria-label", "Favorite");
       }
 
       function restoreGalleryModalIcons() {
@@ -1277,6 +1289,8 @@ window.fetch = async function (...args) {
         el.saveToGalleryBtn.textContent = MODAL_EMOJI.save;
         el.modalCloseBtn.textContent = MODAL_EMOJI.close;
         el.modalInfoBtn.textContent = MODAL_EMOJI.info;
+        el.modalCopyBtn.textContent = "📋";
+        el.modalFavoriteBtn.textContent = "🤍";
       }
 
       function setGeneratedModalView(enabled) {
@@ -1300,6 +1314,7 @@ window.fetch = async function (...args) {
         currentModalIndex = generatedImages.indexOf(imgSrc);
         isFromGenerated = currentModalIndex >= 0;
         setGeneratedModalView(isFromGenerated);
+        if (el.modalImageContainer) el.modalImageContainer.classList.remove("modal-gallery-view");
         el.modalImage.src = imgSrc;
         el.imageModal.style.display = "flex";
         document.body.classList.add("modal-open");
@@ -1337,6 +1352,7 @@ window.fetch = async function (...args) {
         el.modalFavoriteBtn.style.display = "none";
         el.saveToGalleryBtn.classList.remove("saved");
         setGeneratedModalView(false);
+        if (el.modalImageContainer) el.modalImageContainer.classList.remove("modal-gallery-view");
         const modalBadges = document.getElementById("modalBadges");
         if (modalBadges) modalBadges.innerHTML = "";
       };
@@ -4239,7 +4255,7 @@ window.fetch = async function (...args) {
           const isSelected = selectedGalleryIds.has(item.id) ? "selecting" : "";
           const checkmarkDisplay = selectedGalleryIds.has(item.id) ? "" : "display: none;";
           const favoriteClass = item.favorite ? "favorite-active" : "";
-          const favoriteBtnText = item.favorite ? "❤️" : "🤍";
+          const favoriteBtnIcon = item.favorite ? MODAL_SVG_HEART_FILLED : MODAL_SVG_HEART;
 
           let badgesHtml = "";
           if (item.style) {
@@ -4254,11 +4270,11 @@ window.fetch = async function (...args) {
             <img src="${item.imageData}" alt="${escapeHtml(item.prompt || "")}" />
             <div class="gallery-item-checkmark" style="${checkmarkDisplay}">✓</div>
             ${item.favorite ? '<div class="gallery-item-favorite-indicator">❤️</div>' : ''}
-            <button class="gallery-item-favorite-btn ${favoriteClass}" onclick="event.stopPropagation(); toggleGalleryImageFavorite(${item.id})">${favoriteBtnText}</button>
-            <button class="gallery-item-copy-btn" onclick="event.stopPropagation(); copyGalleryImageToPrompt(${item.id})">📋</button>
-            <button class="gallery-item-info-btn" onclick="event.stopPropagation(); openGalleryImageInfo(${item.id})">ℹ</button>
-            <button class="gallery-item-download-btn" onclick="event.stopPropagation(); downloadGalleryImage(${item.id})">⬇</button>
-            <button class="gallery-item-delete-btn" onclick="event.stopPropagation(); deleteGalleryImage(${item.id})">🗑</button>
+            <button class="gallery-item-favorite-btn ${favoriteClass}" title="Favorite" aria-label="Favorite" onclick="event.stopPropagation(); toggleGalleryImageFavorite(${item.id})">${favoriteBtnIcon}</button>
+            <button class="gallery-item-copy-btn" title="Use as prompt" aria-label="Use as prompt" onclick="event.stopPropagation(); copyGalleryImageToPrompt(${item.id})">${MODAL_SVG_COPY}</button>
+            <button class="gallery-item-info-btn" title="Info" aria-label="Info" onclick="event.stopPropagation(); openGalleryImageInfo(${item.id})">${MODAL_SVG_INFO}</button>
+            <button class="gallery-item-download-btn" title="Download" aria-label="Download" onclick="event.stopPropagation(); downloadGalleryImage(${item.id})">${MODAL_SVG_DOWNLOAD}</button>
+            <button class="gallery-item-delete-btn" title="Delete" aria-label="Delete" onclick="event.stopPropagation(); deleteGalleryImage(${item.id})">${MODAL_SVG_TRASH}</button>
             ${badgesHtml ? `<div class="tile-badges">${badgesHtml}</div>` : ""}
           `;
 
@@ -4293,7 +4309,7 @@ window.fetch = async function (...args) {
 
           const checkmarkDisplay = selectedGalleryIds.has(item.id) ? "" : "display: none;";
           const favoriteClass = item.favorite ? "favorite-active" : "";
-          const favoriteBtnText = item.favorite ? "❤️" : "🤍";
+          const favoriteBtnIcon = item.favorite ? MODAL_SVG_HEART_FILLED : MODAL_SVG_HEART;
 
           let badgesHtml = "";
           if (item.style) {
@@ -4308,11 +4324,11 @@ window.fetch = async function (...args) {
             <img alt="${escapeHtml(item.prompt || "")}" />
             <div class="gallery-item-checkmark" style="${checkmarkDisplay}">✓</div>
             ${item.favorite ? '<div class="gallery-item-favorite-indicator">❤️</div>' : ''}
-            <button class="gallery-item-favorite-btn ${favoriteClass}" onclick="event.stopPropagation(); toggleGalleryImageFavorite(${item.id})">${favoriteBtnText}</button>
-            <button class="gallery-item-copy-btn" onclick="event.stopPropagation(); copyGalleryImageToPrompt(${item.id})">📋</button>
-            <button class="gallery-item-info-btn" onclick="event.stopPropagation(); openGalleryImageInfo(${item.id})">ℹ</button>
-            <button class="gallery-item-download-btn" onclick="event.stopPropagation(); downloadGalleryImage(${item.id})">⬇</button>
-            <button class="gallery-item-delete-btn" onclick="event.stopPropagation(); deleteGalleryImage(${item.id})">🗑</button>
+            <button class="gallery-item-favorite-btn ${favoriteClass}" title="Favorite" aria-label="Favorite" onclick="event.stopPropagation(); toggleGalleryImageFavorite(${item.id})">${favoriteBtnIcon}</button>
+            <button class="gallery-item-copy-btn" title="Use as prompt" aria-label="Use as prompt" onclick="event.stopPropagation(); copyGalleryImageToPrompt(${item.id})">${MODAL_SVG_COPY}</button>
+            <button class="gallery-item-info-btn" title="Info" aria-label="Info" onclick="event.stopPropagation(); openGalleryImageInfo(${item.id})">${MODAL_SVG_INFO}</button>
+            <button class="gallery-item-download-btn" title="Download" aria-label="Download" onclick="event.stopPropagation(); downloadGalleryImage(${item.id})">${MODAL_SVG_DOWNLOAD}</button>
+            <button class="gallery-item-delete-btn" title="Delete" aria-label="Delete" onclick="event.stopPropagation(); deleteGalleryImage(${item.id})">${MODAL_SVG_TRASH}</button>
             ${badgesHtml ? `<div class="tile-badges">${badgesHtml}</div>` : ""}
           `;
 
@@ -4679,7 +4695,8 @@ window.fetch = async function (...args) {
             currentModalImageSrc = item.imageData;
             currentGalleryIndex = galleryImages.findIndex((img) => img.id === id);
             isFromGenerated = false;
-            setGeneratedModalView(false);
+            setGeneratedModalView(true);
+            if (el.modalImageContainer) el.modalImageContainer.classList.add("modal-gallery-view");
             el.modalImage.src = item.imageData;
             el.modalCounter.textContent = galleryImages.length > 0 ? `${currentGalleryIndex + 1}/${galleryImages.length}` : "";
             el.saveToGalleryBtn.style.display = "none";
@@ -4705,7 +4722,8 @@ window.fetch = async function (...args) {
             currentModalImageSrc = item.imageData;
             currentGalleryIndex = galleryImages.findIndex((img) => img.id === id);
             isFromGenerated = false;
-            setGeneratedModalView(false);
+            setGeneratedModalView(true);
+            if (el.modalImageContainer) el.modalImageContainer.classList.add("modal-gallery-view");
             el.modalImage.src = item.imageData;
             el.modalCounter.textContent = galleryImages.length > 0 ? `${currentGalleryIndex + 1}/${galleryImages.length}` : "";
             el.saveToGalleryBtn.style.display = "none";
@@ -4781,7 +4799,7 @@ window.fetch = async function (...args) {
             const favBtn = tile.querySelector(".gallery-item-favorite-btn");
             const favIndicator = tile.querySelector(".gallery-item-favorite-indicator");
             if (favBtn) {
-              favBtn.textContent = newFavorite ? "❤️" : "🤍";
+              favBtn.innerHTML = newFavorite ? MODAL_SVG_HEART_FILLED : MODAL_SVG_HEART;
               favBtn.classList.toggle("favorite-active", !!newFavorite);
             }
             if (newFavorite) {
@@ -4819,7 +4837,7 @@ window.fetch = async function (...args) {
       function updateFavoriteBtnInModal(isFavorite) {
         const btn = document.getElementById("modalFavoriteBtn");
         if (btn) {
-          btn.textContent = isFavorite ? "❤️" : "🤍";
+          btn.innerHTML = isFavorite ? MODAL_SVG_HEART_FILLED : MODAL_SVG_HEART;
           if (isFavorite) {
             btn.classList.add("favorite-active");
           } else {
@@ -7297,112 +7315,75 @@ window.fetch = async function (...args) {
 
       .gallery-item-info-btn,
       .gallery-item-download-btn,
-      .gallery-item-delete-btn {
+      .gallery-item-delete-btn,
+      .gallery-item-copy-btn,
+      .gallery-item-favorite-btn {
         position: absolute;
+        width: 32px;
+        height: 32px;
+        padding: 0;
         background: rgba(33, 38, 45, 0.9);
         border: 1px solid #30363d;
         border-radius: 6px;
-        color: #c9d1d9;
-        font-size: 14px;
+        color: #fff;
+        font-size: 0;
+        line-height: 1;
         cursor: pointer;
-        padding: 6px 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
         opacity: 0;
-        transition:
-          opacity 0.2s ease,
-          background 0.2s ease;
+        transition: opacity 0.2s ease;
         z-index: 10;
+      }
+
+      .gallery-item-info-btn svg,
+      .gallery-item-download-btn svg,
+      .gallery-item-delete-btn svg,
+      .gallery-item-copy-btn svg,
+      .gallery-item-favorite-btn svg {
+        width: 16px;
+        height: 16px;
+        display: block;
+        pointer-events: none;
       }
 
       .gallery-item-info-btn {
         top: 8px;
         left: 8px;
-        background: rgba(31, 111, 235, 0.9);
-        border: 1px solid #388bfd;
-        border-radius: 6px;
-        color: #fff;
-        font-size: 16px;
-        cursor: pointer;
-        padding: 0;
-        width: 32px;
-        height: 32px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
       }
 
       .gallery-item:hover .gallery-item-info-btn,
       .gallery-item:hover .gallery-item-download-btn,
-      .gallery-item:hover .gallery-item-delete-btn {
+      .gallery-item:hover .gallery-item-delete-btn,
+      .gallery-item:hover .gallery-item-copy-btn,
+      .gallery-item:hover .gallery-item-favorite-btn {
         opacity: 1;
       }
 
-      .gallery-item-info-btn:hover {
-        background: rgba(56, 139, 253, 1);
+      .gallery-item-info-btn:hover,
+      .gallery-item-download-btn:hover,
+      .gallery-item-delete-btn:hover,
+      .gallery-item-copy-btn:hover,
+      .gallery-item-favorite-btn:not(.favorite-active):hover {
+        background: rgba(72, 79, 88, 0.95);
+        border-color: #484f58;
         transform: scale(1.05);
       }
 
       .gallery-item-download-btn {
         top: 8px;
         right: 8px;
-        background: rgba(35, 134, 54, 0.9);
-        border: 1px solid #2ea043;
-        border-radius: 6px;
-        color: #fff;
-        font-size: 16px;
-        cursor: pointer;
-        padding: 0;
-        width: 32px;
-        height: 32px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-      }
-
-      .gallery-item-download-btn:hover {
-        background: rgba(46, 160, 67, 1);
-        transform: scale(1.05);
       }
 
       .gallery-item-delete-btn {
         bottom: 8px;
         right: 8px;
-        background: rgba(180, 0, 0, 0.9);
-        border-color: #cc0000;
-      }
-
-      .gallery-item-delete-btn:hover {
-        background: rgba(220, 0, 0, 1);
-        transform: scale(1.05);
       }
 
       .gallery-item-copy-btn {
-        position: absolute;
         bottom: 8px;
         left: 8px;
-        width: 32px;
-        height: 32px;
-        padding: 0;
-        background: rgba(0, 150, 100, 0.9);
-        border: 1px solid #00996c;
-        border-radius: 6px;
-        color: #fff;
-        font-size: 16px;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 10;
-        opacity: 0;
-        transition: opacity 0.2s ease, background 0.2s ease, transform 0.2s ease;
-      }
-
-      .gallery-item:hover .gallery-item-copy-btn {
-        opacity: 1;
-      }
-
-      .gallery-item-copy-btn:hover {
-        background: rgba(0, 180, 120, 1);
-        transform: scale(1.05);
       }
 
       .gallery-item.select-mode .gallery-item-copy-btn,
@@ -7442,23 +7423,8 @@ window.fetch = async function (...args) {
       }
 
       .gallery-item-favorite-btn {
-        position: absolute;
         top: 48px;
         left: 8px;
-        width: 28px;
-        height: 28px;
-        background: rgba(33, 38, 45, 0.9);
-        border: 1px solid #30363d;
-        border-radius: 6px;
-        color: #fff;
-        font-size: 14px;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 10;
-        opacity: 0;
-        transition: opacity 0.2s ease;
       }
 
       .gallery-item-favorite-btn.favorite-active {
@@ -7466,22 +7432,10 @@ window.fetch = async function (...args) {
         border-color: #dc3545;
       }
 
-      .gallery-item:hover .gallery-item-favorite-btn {
-        opacity: 1;
-      }
-
-      .gallery-item-favorite-indicator {
-        position: absolute;
-        top: 8px;
-        left: 8px;
-        width: 24px;
-        height: 24px;
-        font-size: 14px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 5;
-        pointer-events: none;
+      .gallery-item-favorite-btn.favorite-active:hover {
+        background: rgba(220, 38, 45, 0.95);
+        border-color: #dc3545;
+        transform: scale(1.05);
       }
 
       .gallery-item.select-mode .gallery-item-checkmark {
@@ -7500,6 +7454,15 @@ window.fetch = async function (...args) {
       .gallery-item.selecting .gallery-item-download-btn,
       .gallery-item.selecting .gallery-item-delete-btn {
         display: none;
+      }
+
+      /* Badges -> top center on gallery items (matches main-view mosaic tiles) */
+      #galleryList .tile-badges,
+      #galleryFavoritesList .tile-badges {
+        top: 8px;
+        left: 50%;
+        bottom: auto;
+        transform: translateX(-50%);
       }
 
       #galleryFavoritesList {
@@ -8992,9 +8955,9 @@ window.fetch = async function (...args) {
         transform: scale(1.1);
       }
 
-      /* ---- Generated-view modal overrides (main-view tiles only) ----
-         Scoped under .modal-generated-view so the Gallery modal path keeps
-         its original colors/positions/emoji. */
+      /* ---- Generated-view modal overrides (main-view tiles + gallery viewer) ----
+         Scoped under .modal-generated-view; the gallery viewer opts into the
+         same normalized style, keeping its own copy/favorite slots. */
       #modalImageContainer.modal-generated-view .modal-badges {
         top: 10px;
         left: 50%;
@@ -9006,7 +8969,9 @@ window.fetch = async function (...args) {
       #modalImageContainer.modal-generated-view .modal-download-save-btn,
       #modalImageContainer.modal-generated-view .modal-save-btn,
       #modalImageContainer.modal-generated-view .modal-close-btn,
-      #modalImageContainer.modal-generated-view .modal-info-btn {
+      #modalImageContainer.modal-generated-view .modal-info-btn,
+      #modalImageContainer.modal-generated-view .modal-copy-btn,
+      #modalImageContainer.modal-generated-view .modal-favorite-btn {
         background: rgba(33, 38, 45, 0.9);
         border: 1px solid #30363d;
         color: #fff;
@@ -9018,7 +8983,9 @@ window.fetch = async function (...args) {
       #modalImageContainer.modal-generated-view .modal-download-save-btn:hover,
       #modalImageContainer.modal-generated-view .modal-save-btn:hover,
       #modalImageContainer.modal-generated-view .modal-close-btn:hover,
-      #modalImageContainer.modal-generated-view .modal-info-btn:hover {
+      #modalImageContainer.modal-generated-view .modal-info-btn:hover,
+      #modalImageContainer.modal-generated-view .modal-copy-btn:hover,
+      #modalImageContainer.modal-generated-view .modal-favorite-btn:not(.favorite-active):hover {
         background: rgba(72, 79, 88, 0.95);
         border-color: #484f58;
       }
@@ -9026,7 +8993,9 @@ window.fetch = async function (...args) {
       #modalImageContainer.modal-generated-view .modal-download-btn:hover,
       #modalImageContainer.modal-generated-view .modal-save-btn:hover,
       #modalImageContainer.modal-generated-view .modal-close-btn:hover,
-      #modalImageContainer.modal-generated-view .modal-info-btn:hover {
+      #modalImageContainer.modal-generated-view .modal-info-btn:hover,
+      #modalImageContainer.modal-generated-view .modal-copy-btn:hover,
+      #modalImageContainer.modal-generated-view .modal-favorite-btn:hover {
         transform: scale(1.1);
       }
 
@@ -9037,6 +9006,11 @@ window.fetch = async function (...args) {
       #modalImageContainer.modal-generated-view .modal-save-btn.saved {
         background: rgba(33, 38, 45, 0.9);
         border-color: #30363d;
+      }
+
+      #modalImageContainer.modal-generated-view .modal-favorite-btn.favorite-active {
+        background: rgba(220, 38, 45, 0.9);
+        border-color: #dc3545;
       }
 
       /* Close -> top right (old Download spot) */
@@ -9072,11 +9046,31 @@ window.fetch = async function (...args) {
         left: 10px;
       }
 
+      /* Gallery-viewer slots: same dark style, compact bottom row
+         (download / copy / favorite) since save & download-save are hidden */
+      #modalImageContainer.modal-generated-view.modal-gallery-view .modal-download-btn {
+        top: auto;
+        bottom: 10px;
+        right: 10px;
+      }
+
+      #modalImageContainer.modal-generated-view.modal-gallery-view .modal-copy-btn {
+        bottom: 10px;
+        right: 60px;
+      }
+
+      #modalImageContainer.modal-generated-view.modal-gallery-view .modal-favorite-btn {
+        bottom: 10px;
+        right: 110px;
+      }
+
       #modalImageContainer.modal-generated-view .modal-download-btn svg,
       #modalImageContainer.modal-generated-view .modal-download-save-btn svg,
       #modalImageContainer.modal-generated-view .modal-save-btn svg,
       #modalImageContainer.modal-generated-view .modal-close-btn svg,
-      #modalImageContainer.modal-generated-view .modal-info-btn svg {
+      #modalImageContainer.modal-generated-view .modal-info-btn svg,
+      #modalImageContainer.modal-generated-view .modal-copy-btn svg,
+      #modalImageContainer.modal-generated-view .modal-favorite-btn svg {
         width: 20px;
         height: 20px;
         display: block;
@@ -9126,6 +9120,8 @@ window.fetch = async function (...args) {
         .modal-save-btn,
         .modal-close-btn,
         .modal-info-btn,
+        .modal-copy-btn,
+        .modal-favorite-btn,
         .modal-download-save-btn {
           opacity: 0.7;
         }
@@ -9133,6 +9129,8 @@ window.fetch = async function (...args) {
         #modalImageContainer:active .modal-save-btn,
         #modalImageContainer:active .modal-close-btn,
         #modalImageContainer:active .modal-info-btn,
+        #modalImageContainer:active .modal-copy-btn,
+        #modalImageContainer:active .modal-favorite-btn,
         #modalImageContainer:active .modal-download-save-btn {
           opacity: 1;
         }
