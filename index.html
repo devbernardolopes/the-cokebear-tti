@@ -4724,7 +4724,7 @@ window.fetch = async function (...args) {
         try {
           const item = await db.gallery.get(id);
           if (item) {
-            await triggerDownload(item.imageData, `gallery-${id}.png`, item);
+            await triggerDownload(item.imageData, buildDownloadFilename(item), item);
           }
         } catch (e) {
           console.warn("Failed to download gallery image:", e);
@@ -5760,14 +5760,18 @@ window.fetch = async function (...args) {
         };
       }
 
-      function downloadImage(dataUrl) {
+      function buildDownloadFilename(metadata) {
         const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, -5);
+        const seed = metadata?.seed ?? "";
+        return seed ? `tti-${timestamp}-${seed}.png` : `tti-${timestamp}.png`;
+      }
+
+      function downloadImage(dataUrl) {
         let metadata = window.imageMetadata?.[dataUrl];
         if (!metadata && galleryCurrentImage && galleryCurrentImage.imageData === dataUrl) {
           metadata = galleryCurrentImage;
         }
-        const seed = metadata?.seed ?? "";
-        const filename = seed ? `tti-${timestamp}-${seed}.png` : `tti-${timestamp}.png`;
+        const filename = buildDownloadFilename(metadata);
         triggerDownload(dataUrl, filename, metadata);
       }
 
